@@ -6,16 +6,18 @@ import androidx.core.graphics.ColorUtils
 
 data class AlbumPalette(
     val lightVibrant: Color? = null,
+    val vibrant: Color? = null,
     val dominant: Color? = null,
     val muted: Color? = null,
     val darkVibrant: Color? = null,
     val darkMuted: Color? = null,
 ) {
     fun accentColor(): Color {
-        val color = lightVibrant ?: dominant ?: muted ?: Color.White
+        val color = vibrant ?: lightVibrant ?: darkVibrant ?: dominant ?: muted ?: Color.White
         val hsl = FloatArray(3)
         ColorUtils.colorToHSL(color.toArgb(), hsl)
-        hsl[2] = hsl[2].coerceAtLeast(0.5f)
+        hsl[1] = hsl[1].coerceAtLeast(0.42f)
+        hsl[2] = hsl[2].coerceIn(0.42f, 0.72f)
         return Color(ColorUtils.HSLToColor(hsl))
     }
 

@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -24,13 +25,6 @@ import androidx.wear.ongoing.OngoingActivity
 import androidx.wear.ongoing.Status
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import com.tidal.sdk.eventproducer.EventProducer
-import com.tidal.sdk.eventproducer.model.EventsConfig
-import com.tidal.sdk.player.common.model.AudioQuality
-import com.tidal.sdk.player.common.model.MediaProduct
-import com.tidal.sdk.player.common.model.ProductType
-import com.tidal.sdk.player.playbackengine.model.Event
-import com.tidal.sdk.player.playbackengine.model.PlaybackState
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.AudioPreset
@@ -51,10 +45,13 @@ private const val PLAYER_LOG_TAG = "Untidy/Player"
 class TidalMediaService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    private var tidalSdkPlayer: com.tidal.sdk.player.Player? = null
+    private var playbackBackend: PlaybackBackend? = null
     private var sessionPlayer: TidalSessionPlayer? = null
     private var session: MediaLibrarySession? = null
     private var currentTrack: TidalTrack? = null
+    private var currentQueue: List<TidalTrack> = emptyList()
+    private var currentQueueIndex: Int = 0
+    private var currentTrackStartedAtMs: Long = 0L
     private lateinit var apiClient: TidalApiClient
     private lateinit var authRepository: com.tidal.wear.core.auth.TidalAuthRepository
 
@@ -63,37 +60,35 @@ class TidalMediaService : MediaLibraryService() {
         ensureNotificationChannel()
         authRepository = TidalAuthRepositoryProvider.get(this)
         apiClient = TidalApiClient(authRepository)
-        val eventProducer = EventProducer.getInstance(
-            credentialsProvider = authRepository.credentialsProvider,
-            config = EventsConfig(maxDiskUsageBytes = 1_000_000, blockedConsentCategories = emptySet(), appVersion = "0.1.0"),
+        val backend = DirectManifestPlaybackBackend(
             context = this,
-            coroutineScope = serviceScope,
-        )
-        val sdkPlayer = com.tidal.sdk.player.Player(
-            application = application,
-            credentialsProvider = authRepository.credentialsProvider,
-            eventSender = eventProducer.eventSender,
-            useLibflacAudioRenderer = false,
-            enableDecoderFallback = true,
-            version = "0.1.0",
-        ).also { player ->
-            player.playbackEngine.enableAdaptive = false
-            player.playbackEngine.streamingWifiAudioQuality = AudioQuality.LOW
-            player.playbackEngine.streamingCellularAudioQuality = AudioQuality.LOW
-        }
-        tidalSdkPlayer = sdkPlayer
-        sessionPlayer = TidalSessionPlayer(
-            sdkPlayer = sdkPlayer,
             scope = serviceScope,
+            authRepository = authRepository,
+        )
+        playbackBackend = backend
+        sessionPlayer = TidalSessionPlayer(
+            playbackBackend = backend,
+            onSkipNext = ::skipToNextInQueue,
+            onSkipPrevious = ::skipToPreviousInQueue,
         ).also { player ->
             serviceScope.launch {
-                sdkPlayer.playbackEngine.events.collect { event ->
-                    Log.d(PLAYER_LOG_TAG, "SDK event: ${event::class.simpleName}")
-                    if (event is Event.PlaybackStateChange) {
-                        Log.d(PLAYER_LOG_TAG, "SDK state: ${event.playbackState}")
-                        player.setSdkPlaybackState(event.playbackState)
-                    } else if (event::class.simpleName?.contains("Error", ignoreCase = true) == true) {
-                        Log.e(PLAYER_LOG_TAG, "SDK playback error event: ${event::class.simpleName}")
+                backend.events.collect { event ->
+                    Log.d(PLAYER_LOG_TAG, "backend event: ${event::class.simpleName.orEmpty()}")
+                    when (event) {
+                        is PlaybackBackendEvent.StateChanged -> {
+                            Log.d(PLAYER_LOG_TAG, "backend state: ${event.state}")
+                            player.setBackendPlaybackState(event.state)
+                        }
+                        is PlaybackBackendEvent.MediaTransition -> logPlaybackContext("transition", event.context)
+                        is PlaybackBackendEvent.MediaEnded -> {
+                            logPlaybackContext("ended", event.context)
+                            handleMediaProductEnded()
+                        }
+                        is PlaybackBackendEvent.QualityChanged -> logPlaybackContext("quality", event.context)
+                        is PlaybackBackendEvent.Error -> Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.code}", event.throwable)
+                        is PlaybackBackendEvent.Other -> if (event.name.contains("Error", ignoreCase = true)) {
+                            Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.name}")
+                        }
                     }
                 }
             }
@@ -119,16 +114,22 @@ class TidalMediaService : MediaLibraryService() {
             PlaybackActions.ACTION_PLAY_TRACK -> {
                 val trackId = intent.getStringExtra(PlaybackActions.EXTRA_TRACK_ID).orEmpty()
                 val knownTrack = intent.toTrackOrNull()
+                currentQueue = emptyList()
+                currentQueueIndex = 0
                 publishOngoingActivity(
                     knownTrack ?: TidalTrack(id = trackId, title = "Untidy", artist = "TIDAL", album = ""),
                     isPlaying = true,
                 )
                 playTrack(trackId = trackId, knownTrack = knownTrack)
             }
+            PlaybackActions.ACTION_PLAY_QUEUE -> playQueue(
+                queueId = intent.getStringExtra(PlaybackActions.EXTRA_QUEUE_ID).orEmpty(),
+                startIndex = intent.getIntExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, 0),
+            )
             PlaybackActions.ACTION_PAUSE -> { sessionPlayer?.pause(); currentTrack?.let { publishOngoingActivity(it, isPlaying = false) } }
             PlaybackActions.ACTION_RESUME -> { sessionPlayer?.play(); currentTrack?.let { publishOngoingActivity(it, isPlaying = true) } }
-            PlaybackActions.ACTION_SKIP_NEXT -> sessionPlayer?.seekToNextMediaItem()
-            PlaybackActions.ACTION_SKIP_PREVIOUS -> sessionPlayer?.seekToPreviousMediaItem()
+            PlaybackActions.ACTION_SKIP_NEXT -> skipToNextInQueue()
+            PlaybackActions.ACTION_SKIP_PREVIOUS -> skipToPreviousInQueue()
         }
         return result
     }
@@ -159,24 +160,85 @@ class TidalMediaService : MediaLibraryService() {
                 "resolved track id=${track.id} title=${track.title} artist=${track.artist} durationMs=${track.durationMs}",
             )
             currentTrack = track
+            currentTrackStartedAtMs = SystemClock.elapsedRealtime()
             sessionPlayer?.loadTrack(track)
             publishOngoingActivity(track, isPlaying = true)
             runCatching {
-                Log.d(PLAYER_LOG_TAG, "SDK load start id=$id")
-                tidalSdkPlayer?.playbackEngine?.load(MediaProduct(ProductType.TRACK, id))
-                Log.d(PLAYER_LOG_TAG, "SDK load completed id=$id")
+                Log.d(PLAYER_LOG_TAG, "backend load start id=$id")
+                playbackBackend?.loadTrack(id)
+                Log.d(PLAYER_LOG_TAG, "backend load completed id=$id")
             }.onFailure {
-                Log.e(PLAYER_LOG_TAG, "SDK load failed", it)
+                Log.e(PLAYER_LOG_TAG, "backend load failed", it)
             }
             runCatching {
-                Log.d(PLAYER_LOG_TAG, "SDK play start")
-                tidalSdkPlayer?.playbackEngine?.play()
-                Log.d(PLAYER_LOG_TAG, "SDK play completed")
+                Log.d(PLAYER_LOG_TAG, "backend play start")
+                playbackBackend?.play()
+                Log.d(PLAYER_LOG_TAG, "backend play completed")
             }.onFailure {
-                Log.e(PLAYER_LOG_TAG, "SDK play failed", it)
+                Log.e(PLAYER_LOG_TAG, "backend play failed", it)
             }
-            sessionPlayer?.setSdkPlaybackState(PlaybackState.PLAYING)
+            sessionPlayer?.setBackendPlaybackState(PlaybackBackendState.Playing)
         }
+    }
+
+    private fun playQueue(queueId: String, startIndex: Int) {
+        val queue = PlaybackQueueStore.get(queueId)
+        if (queue.isEmpty()) {
+            Log.w(PLAYER_LOG_TAG, "playQueue ignored empty queue id=$queueId")
+            return
+        }
+        currentQueue = queue
+        currentQueueIndex = startIndex.coerceIn(0, queue.lastIndex)
+        val track = queue[currentQueueIndex]
+        Log.d(PLAYER_LOG_TAG, "playQueue id=$queueId size=${queue.size} start=$currentQueueIndex track=${track.id}")
+        playTrack(track.id, track)
+    }
+
+    private fun skipToNextInQueue() {
+        val next = currentQueueIndex + 1
+        if (currentQueue.isNotEmpty() && next <= currentQueue.lastIndex) {
+            currentQueueIndex = next
+            val track = currentQueue[currentQueueIndex]
+            Log.d(PLAYER_LOG_TAG, "queue next index=$currentQueueIndex id=${track.id}")
+            playTrack(track.id, track)
+        } else {
+            Log.d(PLAYER_LOG_TAG, "queue next unavailable size=${currentQueue.size} index=$currentQueueIndex")
+        }
+    }
+
+    private fun skipToPreviousInQueue() {
+        val previous = currentQueueIndex - 1
+        if (currentQueue.isNotEmpty() && previous >= 0) {
+            currentQueueIndex = previous
+            val track = currentQueue[currentQueueIndex]
+            Log.d(PLAYER_LOG_TAG, "queue previous index=$currentQueueIndex id=${track.id}")
+            playTrack(track.id, track)
+        } else {
+            currentTrack?.let { playTrack(it.id, it) }
+        }
+    }
+
+    private fun handleMediaProductEnded() {
+        val track = currentTrack
+        val elapsedMs = (SystemClock.elapsedRealtime() - currentTrackStartedAtMs).coerceAtLeast(0L)
+        val durationMs = track?.durationMs ?: 0L
+        val endedEarly = durationMs > 60_000L && elapsedMs < durationMs - 45_000L
+        if (endedEarly) {
+            Log.w(
+                PLAYER_LOG_TAG,
+                "backend ended before catalog duration id=${track?.id.orEmpty()} elapsedMs=$elapsedMs durationMs=$durationMs; not advancing queue automatically",
+            )
+            sessionPlayer?.setBackendPlaybackState(PlaybackBackendState.Idle)
+            return
+        }
+        skipToNextInQueue()
+    }
+
+    private fun logPlaybackContext(label: String, context: PlaybackDiagnosticContext) {
+        Log.d(
+            PLAYER_LOG_TAG,
+            "backend context $label productId=${context.productId} presentation=${context.assetPresentation} previewReason=${context.previewReason.orEmpty()} durationSec=${context.durationSeconds} quality=${context.audioQuality.orEmpty()} codec=${context.audioCodec.orEmpty()}",
+        )
     }
 
     private suspend fun configureQuality() {
@@ -184,12 +246,7 @@ class TidalMediaService : MediaLibraryService() {
             playbackSettingsDataStore.data.first()[stringPreferencesKey("audio_preset")]
                 ?.let { AudioPreset.valueOf(it) }
         }.getOrNull() ?: AudioPreset.BatterySaver
-        val quality = when (preset) {
-            AudioPreset.BatterySaver -> AudioQuality.LOW
-            AudioPreset.Balanced, AudioPreset.High -> AudioQuality.HIGH
-        }
-        tidalSdkPlayer?.playbackEngine?.streamingWifiAudioQuality = quality
-        tidalSdkPlayer?.playbackEngine?.streamingCellularAudioQuality = quality
+        playbackBackend?.setAudioPreset(preset)
     }
 
     private fun ensureNotificationChannel() {
@@ -253,8 +310,8 @@ class TidalMediaService : MediaLibraryService() {
         session = null
         sessionPlayer?.release()
         sessionPlayer = null
-        tidalSdkPlayer?.release()
-        tidalSdkPlayer = null
+        playbackBackend?.release()
+        playbackBackend = null
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -282,8 +339,9 @@ private fun Intent.toTrackOrNull(): TidalTrack? {
 }
 
 private class TidalSessionPlayer(
-    private val sdkPlayer: com.tidal.sdk.player.Player,
-    private val scope: CoroutineScope,
+    private val playbackBackend: PlaybackBackend,
+    private val onSkipNext: () -> Unit,
+    private val onSkipPrevious: () -> Unit,
 ) : SimpleBasePlayer(Looper.getMainLooper()) {
     private var mediaItem: MediaItem? = null
     private var playWhenReady = false
@@ -313,15 +371,15 @@ private class TidalSessionPlayer(
         invalidateState()
     }
 
-    fun setSdkPlaybackState(state: PlaybackState) {
-        Log.d(PLAYER_LOG_TAG, "SessionPlayer setSdkPlaybackState $state")
+    fun setBackendPlaybackState(state: PlaybackBackendState) {
+        Log.d(PLAYER_LOG_TAG, "SessionPlayer setBackendPlaybackState $state")
         playbackState = when (state) {
-            PlaybackState.IDLE -> Player.STATE_IDLE
-            PlaybackState.PLAYING -> Player.STATE_READY
-            PlaybackState.NOT_PLAYING -> Player.STATE_READY
-            PlaybackState.STALLED -> Player.STATE_BUFFERING
+            PlaybackBackendState.Idle -> Player.STATE_IDLE
+            PlaybackBackendState.Playing -> Player.STATE_READY
+            PlaybackBackendState.NotPlaying -> Player.STATE_READY
+            PlaybackBackendState.Stalled -> Player.STATE_BUFFERING
         }
-        playWhenReady = state == PlaybackState.PLAYING
+        playWhenReady = state == PlaybackBackendState.Playing
         if (!playWhenReady) basePositionMs = currentPositionInternal()
         baseElapsedMs = android.os.SystemClock.elapsedRealtime()
         invalidateState()
@@ -364,10 +422,10 @@ private class TidalSessionPlayer(
         this.playWhenReady = playWhenReady
         if (playWhenReady) {
             baseElapsedMs = android.os.SystemClock.elapsedRealtime()
-            sdkPlayer.playbackEngine.play()
+            playbackBackend.play()
         } else {
             basePositionMs = currentPositionInternal()
-            sdkPlayer.playbackEngine.pause()
+            playbackBackend.pause()
         }
         invalidateState()
         return Futures.immediateFuture(Any())
@@ -375,12 +433,12 @@ private class TidalSessionPlayer(
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<Any> {
         when (seekCommand) {
-            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> sdkPlayer.playbackEngine.skipToNext()
-            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> sdkPlayer.playbackEngine.seek(0f)
+            Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> onSkipNext()
+            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> onSkipPrevious()
             else -> if (positionMs != C.TIME_UNSET) {
                 basePositionMs = positionMs.coerceAtLeast(0L)
                 baseElapsedMs = android.os.SystemClock.elapsedRealtime()
-                sdkPlayer.playbackEngine.seek(basePositionMs / 1000f)
+                playbackBackend.seek(basePositionMs / 1000f)
             }
         }
         invalidateState()
@@ -390,8 +448,8 @@ private class TidalSessionPlayer(
     override fun handleRelease(): ListenableFuture<Any> = Futures.immediateFuture(Any())
 
     private fun currentPositionInternal(): Long {
-        val sdkPositionMs = (sdkPlayer.playbackEngine.assetPosition * 1000f).toLong()
-        if (sdkPositionMs > 0L) return sdkPositionMs
+        val backendPositionMs = playbackBackend.positionMs
+        if (backendPositionMs > 0L) return backendPositionMs
         val estimated = if (playWhenReady && playbackState == Player.STATE_READY) {
             basePositionMs + (android.os.SystemClock.elapsedRealtime() - baseElapsedMs)
         } else {

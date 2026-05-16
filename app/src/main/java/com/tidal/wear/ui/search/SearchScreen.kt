@@ -1,13 +1,16 @@
 package com.tidal.wear.ui.search
 
+import android.widget.Toast
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,34 +23,50 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
+import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.Text
+import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
+import com.tidal.wear.core.model.TidalAlbum
+import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
-import com.tidal.wear.ui.components.TidalChip
+import com.tidal.wear.ui.art.rememberArtworkPalette
 import com.tidal.wear.ui.theme.TidalColors
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -55,38 +74,58 @@ import kotlinx.coroutines.withContext
 fun SearchScreen(
     apiClient: TidalApiClient,
     onPlayTrack: (TidalTrack) -> Unit,
+    onOpenAlbum: (TidalAlbum) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
+    val context = LocalContext.current
     val sidePadding = (LocalConfiguration.current.screenWidthDp * 0.12f).dp
     var query by remember { mutableStateOf("") }
     var submittedQuery by remember { mutableStateOf("") }
-    var tracks by remember { mutableStateOf<List<TidalTrack>>(emptyList()) }
+    var result by remember { mutableStateOf<TidalSearchResult?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var requestKeyboardTick by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(requestKeyboardTick) {
+        if (requestKeyboardTick > 0) {
+            delay(120)
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
 
     fun searchNow() {
         val q = query.trim()
         if (q.isBlank() || loading) return
         submittedQuery = q
-        tracks = emptyList()
+        result = null
         error = null
         loading = true
         focusManager.clearFocus()
         keyboardController?.hide()
         scope.launch {
             try {
-                tracks = withContext(Dispatchers.IO) { apiClient.search(q).tracks.take(12) }
+                result = withContext(Dispatchers.IO) { apiClient.search(q) }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Throwable) {
-                tracks = emptyList()
+                result = null
                 error = "Search unavailable"
             } finally {
                 loading = false
             }
         }
+    }
+
+    fun resetSearch() {
+        query = ""
+        submittedQuery = ""
+        result = null
+        error = null
+        requestKeyboardTick += 1
     }
 
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
@@ -110,6 +149,7 @@ fun SearchScreen(
                         query = query,
                         onQueryChange = { query = it },
                         onSearch = ::searchNow,
+                        focusRequester = focusRequester,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = sidePadding),
                     )
                 }
@@ -131,6 +171,8 @@ fun SearchScreen(
                         color = TidalColors.White,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = sidePadding, vertical = 4.dp),
                     )
@@ -138,36 +180,161 @@ fun SearchScreen(
                 when {
                     loading -> item { SearchingIndicator() }
                     error != null -> item { StatusText(error.orEmpty()) }
-                    tracks.isEmpty() -> item { StatusText("No tracks found") }
-                    else -> tracks.forEach { track ->
-                        item {
-                            TidalChip(
+                    result.isNullOrEmpty() -> item { StatusText("No results found") }
+                    else -> {
+                        val safeResult = result ?: TidalSearchResult()
+                        section("Songs", safeResult.tracks.take(6)) { track ->
+                            SearchResultChip(
                                 label = track.title,
                                 secondaryLabel = listOf(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" · "),
+                                artworkUrl = track.artworkUrl,
+                                fallback = "♪",
                                 onClick = { onPlayTrack(track) },
-                                icon = null,
+                            )
+                        }
+                        section("Albums", safeResult.albums.take(4)) { album ->
+                            SearchResultChip(
+                                label = album.title,
+                                secondaryLabel = album.artist.ifBlank { "Album" },
+                                artworkUrl = album.artworkUrl,
+                                fallback = "▣",
+                                onClick = { onOpenAlbum(album) },
+                            )
+                        }
+                        section("Artists", safeResult.artists.take(4)) { artist ->
+                            SearchResultChip(
+                                label = artist.name,
+                                secondaryLabel = "Artist",
+                                artworkUrl = artist.artworkUrl,
+                                fallback = "★",
+                                onClick = { Toast.makeText(context, "Artists coming soon", Toast.LENGTH_SHORT).show() },
+                            )
+                        }
+                        section("Playlists", safeResult.playlists.take(4)) { playlist ->
+                            SearchResultChip(
+                                label = playlist.title,
+                                secondaryLabel = playlist.creator.ifBlank { "Playlist" },
+                                artworkUrl = playlist.artworkUrl,
+                                fallback = "≡",
+                                onClick = { Toast.makeText(context, "Playlists coming soon", Toast.LENGTH_SHORT).show() },
                             )
                         }
                     }
                 }
                 if (!loading) {
                     item {
-                        Button(
-                            onClick = {
-                                submittedQuery = ""
-                                tracks = emptyList()
-                                error = null
-                            },
-                            colors = ButtonDefaults.secondaryButtonColors(backgroundColor = TidalColors.Surface, contentColor = TidalColors.White),
-                            modifier = Modifier.padding(top = 2.dp),
-                        ) {
-                            Icon(Icons.Filled.Search, contentDescription = "New search")
-                        }
+                        Chip(
+                            onClick = ::resetSearch,
+                            colors = ChipDefaults.secondaryChipColors(
+                                backgroundColor = TidalColors.Surface,
+                                contentColor = TidalColors.White,
+                                iconColor = TidalColors.Cyan,
+                            ),
+                            icon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            label = { Text("New search", fontWeight = FontWeight.Bold) },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 2.dp),
+                        )
                     }
                 }
             }
         }
     }
+}
+
+private fun TidalSearchResult?.isNullOrEmpty(): Boolean = this == null ||
+    (tracks.isEmpty() && albums.isEmpty() && artists.isEmpty() && playlists.isEmpty())
+
+private fun <T> androidx.wear.compose.material.ScalingLazyListScope.section(
+    title: String,
+    items: List<T>,
+    itemContent: @Composable (T) -> Unit,
+) {
+    if (items.isEmpty()) return
+    item { SectionHeader(title) }
+    items.forEach { element -> item { itemContent(element) } }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        color = TidalColors.Cyan,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Black,
+        letterSpacing = 1.sp,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 2.dp),
+    )
+}
+
+@Composable
+private fun SearchResultChip(
+    label: String,
+    secondaryLabel: String,
+    artworkUrl: String?,
+    fallback: String,
+    onClick: () -> Unit,
+) {
+    val art = rememberArtworkPalette(artworkUrl, Size(96, 96))
+    val accent = art.palette.accentColor()
+    val background = lerp(TidalColors.Surface, accent, 0.28f)
+    Chip(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        onClick = onClick,
+        colors = ChipDefaults.secondaryChipColors(
+            backgroundColor = background,
+            contentColor = TidalColors.White,
+            secondaryContentColor = lerp(TidalColors.OnSurfaceDim, Color.White, 0.28f),
+            iconColor = TidalColors.White,
+        ),
+        icon = {
+            ArtworkThumb(
+                label = label,
+                fallback = fallback,
+                bitmap = art.bitmap,
+                accent = accent,
+            )
+        },
+        label = { OneLineText(label) },
+        secondaryLabel = { OneLineText(secondaryLabel) },
+        contentPadding = PaddingValues(horizontal = 12.dp),
+    )
+}
+
+@Composable
+private fun ArtworkThumb(
+    label: String,
+    fallback: String,
+    bitmap: androidx.compose.ui.graphics.ImageBitmap?,
+    accent: Color,
+) {
+    Box(
+        modifier = Modifier
+            .size(ChipDefaults.LargeIconSize)
+            .clip(RoundedCornerShape(6.dp))
+            .background(lerp(TidalColors.SurfaceHigh, accent, 0.62f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = label,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(
+                text = label.trim().firstOrNull()?.uppercaseChar()?.toString() ?: fallback,
+                color = TidalColors.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 14.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OneLineText(text: String) {
+    Text(text = text, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
@@ -199,11 +366,13 @@ private fun SearchInput(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     BasicTextField(
         value = query,
         onValueChange = onQueryChange,
+        modifier = modifier.focusRequester(focusRequester),
         singleLine = true,
         textStyle = TextStyle(color = TidalColors.White, fontSize = 14.sp, textAlign = TextAlign.Center),
         cursorBrush = SolidColor(TidalColors.Cyan),
@@ -211,7 +380,8 @@ private fun SearchInput(
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         decorationBox = { innerTextField ->
             Box(
-                modifier = modifier
+                modifier = Modifier
+                    .fillMaxWidth()
                     .background(TidalColors.Surface, RoundedCornerShape(18.dp))
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center,

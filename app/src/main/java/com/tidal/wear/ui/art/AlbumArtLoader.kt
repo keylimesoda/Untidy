@@ -28,12 +28,20 @@ data class AlbumArt(
 
 @Composable
 fun rememberAlbumArt(track: TidalTrack?): AlbumArt? {
-    val context = LocalContext.current
-    var bitmap by remember(track?.artworkUrl) { mutableStateOf<Bitmap?>(null) }
-    var art by remember(track?.artworkUrl) { mutableStateOf<AlbumArt?>(AlbumArt(null, AlbumPalette.Default)) }
+    return rememberArtworkPalette(track?.artworkUrl, Size.ORIGINAL)
+}
 
-    LaunchedEffect(track?.artworkUrl) {
-        val url = track?.artworkUrl
+@Composable
+fun rememberArtworkPalette(
+    artworkUrl: String?,
+    requestSize: Size = Size(160, 160),
+): AlbumArt {
+    val context = LocalContext.current
+    var bitmap by remember(artworkUrl, requestSize) { mutableStateOf<Bitmap?>(null) }
+    var art by remember(artworkUrl, requestSize) { mutableStateOf(AlbumArt(null, AlbumPalette.Default)) }
+
+    LaunchedEffect(artworkUrl, requestSize) {
+        val url = artworkUrl
         if (url.isNullOrBlank()) {
             bitmap = null
             art = AlbumArt(null, AlbumPalette.Default)
@@ -43,7 +51,7 @@ fun rememberAlbumArt(track: TidalTrack?): AlbumArt? {
             val request = ImageRequest.Builder(context)
                 .data(url)
                 .allowHardware(false)
-                .size(Size.ORIGINAL)
+                .size(requestSize)
                 .build()
             (ImageLoader(context).execute(request).drawable as? BitmapDrawable)?.bitmap
         }
@@ -56,7 +64,7 @@ fun rememberAlbumArt(track: TidalTrack?): AlbumArt? {
         } ?: AlbumArt(null, AlbumPalette.Default)
     }
 
-    DisposableEffect(track?.artworkUrl) {
+    DisposableEffect(artworkUrl, requestSize) {
         onDispose {
             bitmap?.takeIf { !it.isRecycled }?.recycle()
             bitmap = null
@@ -69,6 +77,7 @@ private fun Bitmap.toAlbumPalette(): AlbumPalette {
     val palette = Palette.from(this).generate()
     return AlbumPalette(
         lightVibrant = palette.lightVibrantSwatch?.rgb?.let(::Color),
+        vibrant = palette.vibrantSwatch?.rgb?.let(::Color),
         dominant = palette.dominantSwatch?.rgb?.let(::Color),
         muted = palette.mutedSwatch?.rgb?.let(::Color),
         darkVibrant = palette.darkVibrantSwatch?.rgb?.let(::Color),

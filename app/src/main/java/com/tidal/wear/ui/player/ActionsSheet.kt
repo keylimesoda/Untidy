@@ -21,6 +21,11 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,12 +51,16 @@ sealed interface DownloadState {
 @Composable
 fun ActionsSheet(
     downloadState: DownloadState,
+    outputOptions: List<AudioOutputOption>,
     onDownload: () -> Unit,
+    onOutputSettings: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onViewAlbum: () -> Unit,
     onViewArtist: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var outputExpanded by remember { mutableStateOf(false) }
+    val preferredOutput = outputOptions.firstOrNull { it.preferred } ?: outputOptions.firstOrNull()
     Column(
         modifier = modifier.fillMaxSize().background(TidalColors.Black),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -77,12 +86,39 @@ fun ActionsSheet(
                     onClick = onDownload,
                 )
             }
+            item {
+                ActionRow(
+                    icon = Icons.Filled.Settings,
+                    label = "Output: ${preferredOutput?.label ?: "System"}",
+                    rightIndicator = null,
+                    iconTint = TidalColors.White,
+                    onClick = { outputExpanded = !outputExpanded },
+                )
+            }
+            if (outputExpanded) {
+                outputOptions.forEach { output ->
+                    item {
+                        ActionRow(
+                            icon = Icons.Filled.Settings,
+                            label = output.label,
+                            rightIndicator = if (output.preferred) Icons.Filled.Check else null,
+                            iconTint = if (output.preferred) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
+                            onClick = onOutputSettings,
+                        )
+                    }
+                }
+            }
             item { ActionRow(Icons.Filled.PlaylistAdd, "Add to playlist", null, TidalColors.White, onAddToPlaylist) }
             item { ActionRow(Icons.Filled.Album, "View album", null, TidalColors.White, onViewAlbum) }
             item { ActionRow(Icons.Filled.Person, "View artist", null, TidalColors.White, onViewArtist) }
         }
     }
 }
+
+data class AudioOutputOption(
+    val label: String,
+    val preferred: Boolean,
+)
 
 private fun downloadLabel(state: DownloadState): String = when (state) {
     DownloadState.NotDownloaded -> "Download"

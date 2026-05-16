@@ -13,6 +13,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.playback.PlaybackActions
 import com.tidal.wear.core.playback.TidalMediaService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -102,11 +103,11 @@ class NowPlayingStateHolder(
     }
 
     fun seekToPrevious() {
-        controller?.seekToPreviousMediaItem()
+        sendServiceAction(PlaybackActions.ACTION_SKIP_PREVIOUS)
     }
 
     fun seekToNext() {
-        controller?.seekToNextMediaItem()
+        sendServiceAction(PlaybackActions.ACTION_SKIP_NEXT)
     }
 
     fun seekTo(ms: Long) {
@@ -162,5 +163,12 @@ class NowPlayingStateHolder(
                 delay(500)
             }
         }
+    }
+
+    private fun sendServiceAction(action: String) {
+        ContextCompat.startForegroundService(
+            context,
+            android.content.Intent(context, TidalMediaService::class.java).setAction(action),
+        )
     }
 }

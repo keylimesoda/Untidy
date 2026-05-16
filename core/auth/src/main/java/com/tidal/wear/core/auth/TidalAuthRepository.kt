@@ -138,6 +138,7 @@ class TidalDeviceAuth(
             .add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
             .add("device_code", session.deviceCode)
             .add("client_id", clientId)
+            .apply { if (scopes.isNotBlank()) add("scope", scopes) }
             .build()
         val request = Request.Builder()
             .url("$AUTH_BASE_URL/token")
@@ -187,6 +188,7 @@ class TidalDeviceAuth(
             .add("grant_type", "refresh_token")
             .add("refresh_token", refreshToken)
             .add("client_id", clientId)
+            .apply { if (scopes.isNotBlank()) add("scope", scopes) }
             .build()
         val request = Request.Builder()
             .url("$AUTH_BASE_URL/token")

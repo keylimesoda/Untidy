@@ -3,8 +3,7 @@ package com.tidal.wear
 import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -56,10 +55,13 @@ import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.AuthState
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
+import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.PlaybackActions
+import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
 import com.tidal.wear.playback.NowPlayingViewModel
+import com.tidal.wear.ui.album.AlbumScreen
 import com.tidal.wear.ui.components.SecondaryChip
 import com.tidal.wear.ui.foryou.ForYouScreen
 import com.tidal.wear.ui.library.LibraryScreen
@@ -93,8 +95,11 @@ private object Routes {
     const val Home = "home"
     const val ForYou = "for-you"
     const val Search = "search"
+    const val Album = "album/{albumId}"
     const val Library = "library"
     const val Settings = "settings"
+
+    fun album(albumId: String): String = "album/${Uri.encode(albumId)}"
 }
 
 @Composable
@@ -124,6 +129,14 @@ private fun TidalWearApp() {
                 context.startTrackPlayback(track)
                 openPlayer()
             }
+            fun playQueue(tracks: List<TidalTrack>, startIndex: Int) {
+                context.startQueuePlayback(tracks, startIndex)
+                openPlayer()
+            }
+            fun openAlbum(album: TidalAlbum) {
+                AlbumSelectionStore.put(album)
+                navController.navigate(Routes.album(album.id))
+            }
             fun playQuery(query: String) {
                 scope.launch {
                     val track = withContext(Dispatchers.IO) { runCatching { apiClient.search(query).tracks.firstOrNull() }.getOrNull() }
@@ -143,13 +156,23 @@ private fun TidalWearApp() {
                     HomeScreen(
                         navController = navController,
                         track = nowPlaying.track,
-                        connectivityLabel = context.connectivityLabel(),
-                        onResume = { nowPlaying.track?.let(::playTrack) ?: playQuery("Daft Punk") },
+                        onResume = { nowPlaying.track?.let(::playTrack) ?: navController.navigate(Routes.Search) },
                         onOffline = { Toast.makeText(context, "Offline coming soon", Toast.LENGTH_SHORT).show() },
                     )
                 }
                 composable(Routes.ForYou) { ForYouScreen(onPlayQuery = ::playQuery) }
-                composable(Routes.Search) { SearchScreen(apiClient = apiClient, onPlayTrack = ::playTrack) }
+                composable(Routes.Search) {
+                    SearchScreen(apiClient = apiClient, onPlayTrack = ::playTrack, onOpenAlbum = ::openAlbum)
+                }
+                composable(Routes.Album) { entry ->
+                    val albumId = entry.arguments?.getString("albumId")?.let(Uri::decode).orEmpty()
+                    AlbumScreen(
+                        apiClient = apiClient,
+                        albumId = albumId,
+                        initialAlbum = AlbumSelectionStore.get(albumId),
+                        onPlayQueue = ::playQueue,
+                    )
+                }
                 composable(Routes.Library) { LibraryScreen() }
                 composable(Routes.Settings) { SettingsScreen(authRepository = authRepository, onSignedOut = { navController.navigateAndClear(Routes.Home) }) }
             }
@@ -161,7 +184,6 @@ private fun TidalWearApp() {
 private fun HomeScreen(
     navController: NavHostController,
     track: TidalTrack?,
-    connectivityLabel: String,
     onResume: () -> Unit,
     onOffline: () -> Unit,
 ) {
@@ -173,8 +195,6 @@ private fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Untidy", color = TidalColors.Cyan, fontWeight = FontWeight.Black, fontSize = 12.sp, letterSpacing = 2.sp)
-            Spacer(Modifier.width(6.dp))
-            Text(connectivityLabel, color = TidalColors.OnSurfaceMuted, fontSize = 12.sp)
         }
 
         Column(
@@ -189,10 +209,15 @@ private fun HomeScreen(
                     .clickable(onClick = onResume),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "Resume", modifier = Modifier.size(28.dp), tint = TidalColors.Black)
+                Icon(
+                    if (hasLastPlayed) Icons.Filled.PlayArrow else Icons.Filled.Search,
+                    contentDescription = if (hasLastPlayed) "Resume" else "Search",
+                    modifier = Modifier.size(28.dp),
+                    tint = TidalColors.Black,
+                )
             }
             Text(
-                if (hasLastPlayed) "Resume" else "Start",
+                if (hasLastPlayed) "Resume" else "Search",
                 color = TidalColors.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
@@ -238,6 +263,26 @@ private fun Context.startTrackPlayback(track: TidalTrack) {
     ContextCompat.startForegroundService(this, intent)
 }
 
+private fun Context.startQueuePlayback(tracks: List<TidalTrack>, startIndex: Int) {
+    val queueId = PlaybackQueueStore.put(tracks)
+    if (queueId.isBlank()) return
+    val intent = Intent(this, TidalMediaService::class.java)
+        .setAction(PlaybackActions.ACTION_PLAY_QUEUE)
+        .putExtra(PlaybackActions.EXTRA_QUEUE_ID, queueId)
+        .putExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, startIndex)
+    ContextCompat.startForegroundService(this, intent)
+}
+
+private object AlbumSelectionStore {
+    private val albums = java.util.concurrent.ConcurrentHashMap<String, TidalAlbum>()
+
+    fun put(album: TidalAlbum) {
+        if (album.id.isNotBlank()) albums[album.id] = album
+    }
+
+    fun get(albumId: String): TidalAlbum? = albums[albumId]
+}
+
 private fun fixtureTrack() = TidalTrack(
     id = "fixture-run-01",
     title = "TIDAL Preview",
@@ -245,16 +290,6 @@ private fun fixtureTrack() = TidalTrack(
     album = "Fixture",
     durationMs = 30_000L,
 )
-
-private fun Context.connectivityLabel(): String {
-    val manager = getSystemService(ConnectivityManager::class.java) ?: return "Offline"
-    val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return "Offline"
-    return when {
-        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi‑Fi"
-        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "LTE"
-        else -> "Online"
-    }
-}
 
 private fun NavHostController.navigateAndClear(route: String) {
     navigate(route) {

@@ -9,6 +9,7 @@ import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalSection
 import com.tidal.wear.core.model.TidalTrack
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -76,6 +77,7 @@ interface TidalApiService {
     suspend fun albumItems(
         @Path("id") id: String,
         @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "items",
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
@@ -104,6 +106,23 @@ interface TidalLegacyApiService {
         @Query("limit") limit: Int = 25,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
+
+    @GET("albums/{id}")
+    suspend fun album(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET("albums/{id}/tracks")
+    suspend fun albumTracks(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Query("limit") limit: Int = 50,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
 }
 
 interface TidalDesktopApiService {
@@ -114,6 +133,21 @@ interface TidalDesktopApiService {
         @Query("countryCode") countryCode: String,
         @Query("types") types: String = "TRACKS,ALBUMS,ARTISTS,PLAYLISTS",
         @Query("limit") limit: Int = 25,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET
+    suspend fun album(
+        @Url url: String,
+        @Query("countryCode") countryCode: String,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET
+    suspend fun albumTracks(
+        @Url url: String,
+        @Query("countryCode") countryCode: String,
+        @Query("limit") limit: Int = 50,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
 }
@@ -184,8 +218,48 @@ class TidalApiClient(
     suspend fun favorites(): TidalSearchResult = parseSearch(service.favorites(countryCode))
     suspend fun playlist(id: String): TidalPlaylist? = service.playlist(id, countryCode).dataObjects().firstOrNull()?.toPlaylist()
     suspend fun playlistTracks(id: String): List<TidalTrack> = service.playlistItems(id, countryCode).allResourceObjects().mapNotNull { it.toTrack() }
-    suspend fun album(id: String): TidalAlbum? = service.album(id, countryCode).dataObjects().firstOrNull()?.toAlbum()
-    suspend fun albumTracks(id: String): List<TidalTrack> = service.albumItems(id, countryCode).allResourceObjects().mapNotNull { it.toTrack() }
+    suspend fun album(id: String): TidalAlbum? = try {
+        service.album(id, countryCode).dataObjects().firstOrNull()?.toAlbum()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        Log.d(API_LOG_TAG, "album v2 failed reason=${t.safeReason()}")
+        legacyAlbum(id)
+    }?.let { v2Album ->
+        if (v2Album.artist.isNotBlank() && !v2Album.artworkUrl.isNullOrBlank()) {
+            v2Album
+        } else {
+            val legacyAlbum = legacyAlbum(id)
+            v2Album.copy(
+                artist = v2Album.artist.ifBlank { legacyAlbum?.artist.orEmpty() },
+                artworkUrl = v2Album.artworkUrl ?: legacyAlbum?.artworkUrl,
+            )
+        }
+    }
+    suspend fun albumTracks(id: String): List<TidalTrack> {
+        val v2Tracks = try {
+            service.albumItems(id, countryCode).allResourceObjects().mapNotNull { it.toTrack() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.d(API_LOG_TAG, "album tracks v2 failed reason=${t.safeReason()}")
+            emptyList()
+        }
+        if (v2Tracks.isEmpty()) return legacyAlbumTracks(id)
+        if (v2Tracks.all { it.artist.isNotBlank() && !it.artworkUrl.isNullOrBlank() }) return v2Tracks
+        val legacyTracks = runCatching { legacyAlbumTracks(id) }.getOrDefault(emptyList())
+        if (legacyTracks.isEmpty()) return v2Tracks
+        val legacyById = legacyTracks.associateBy { it.id }
+        return v2Tracks.map { track ->
+            val legacy = legacyById[track.id]
+            track.copy(
+                artist = track.artist.ifBlank { legacy?.artist.orEmpty() },
+                album = track.album.ifBlank { legacy?.album.orEmpty() },
+                artworkUrl = track.artworkUrl ?: legacy?.artworkUrl,
+                durationMs = track.durationMs.takeIf { it > 0L } ?: legacy?.durationMs ?: 0L,
+            )
+        }
+    }
     suspend fun track(id: String): TidalTrack? = service.track(id, countryCode).dataObjects().firstOrNull()?.toTrack()
     suspend fun artist(id: String): TidalArtist? = service.artist(id, countryCode).dataObjects().firstOrNull()?.toArtist()
 
@@ -225,6 +299,43 @@ class TidalApiClient(
             artists = root.legacyItems("artists").mapNotNull { it.toLegacyArtist() }.distinctBy { it.id },
             playlists = root.legacyItems("playlists").mapNotNull { it.toLegacyPlaylist() }.distinctBy { it.id },
         )
+    }
+
+    private suspend fun legacyAlbum(id: String): TidalAlbum? {
+        val clientId = authRepository.getClientIdForApi()
+        return runCatching { (legacyService.album(id, countryCode, token = clientId) as? JsonObject)?.toLegacyAlbum() }
+            .recoverCatching {
+                Log.d(API_LOG_TAG, "album v1 failed reason=${it.safeReason()}, trying desktop")
+                (desktopService.album("https://listen.tidal.com/v1/albums/$id", countryCode) as? JsonObject)?.toLegacyAlbum()
+            }
+            .onFailure { Log.d(API_LOG_TAG, "album desktop failed reason=${it.safeReason()}") }
+            .getOrNull()
+    }
+
+    private suspend fun legacyAlbumTracks(id: String): List<TidalTrack> {
+        Log.d(API_LOG_TAG, "album tracks v1 fallback")
+        val clientId = authRepository.getClientIdForApi()
+        return runCatching { parseLegacyTracks(legacyService.albumTracks(id, countryCode, token = clientId)) }
+            .recoverCatching {
+                Log.d(API_LOG_TAG, "album tracks v1 failed reason=${it.safeReason()}, trying desktop")
+                parseLegacyTracks(desktopService.albumTracks("https://listen.tidal.com/v1/albums/$id/tracks", countryCode))
+            }
+            .onFailure { Log.d(API_LOG_TAG, "album tracks desktop failed reason=${it.safeReason()}") }
+            .getOrThrow()
+            .also { Log.d(API_LOG_TAG, "album tracks ok count=${it.size}") }
+    }
+
+    private fun parseLegacyTracks(element: JsonElement): List<TidalTrack> {
+        val root = element as? JsonObject
+        val albumArtist = root?.legacyAlbumArtist().orEmpty()
+        val items = when {
+            root == null -> (element as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            root["items"] is JsonArray -> (root["items"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            else -> root.legacyItems("tracks")
+        }
+        return items.mapNotNull { it.legacyTrackObject().toLegacyTrack() }
+            .map { track -> if (track.artist.isBlank() && albumArtist.isNotBlank()) track.copy(artist = albumArtist) else track }
+            .distinctBy { it.id }
     }
 }
 
@@ -291,43 +402,57 @@ private fun JsonObject.toPlaylist(): TidalPlaylist? {
 }
 
 private fun JsonObject.toLegacyTrack(): TidalTrack? {
-    val id = primitive("id")?.contentOrNull ?: return null
-    val title = string("title", "name") ?: return null
+    val resource = legacyWrappedObject("track", "item")
+    val album = (resource["album"] as? JsonObject)?.legacyWrappedObject("album", "item")
+    val id = resource.primitive("id")?.contentOrNull ?: return null
+    val title = resource.string("title", "name") ?: return null
     return TidalTrack(
         id = id,
         title = title,
-        artist = (this["artist"] as? JsonObject)?.string("name") ?: legacyArtistNames() ?: string("artistName", "artist") ?: "",
-        album = (this["album"] as? JsonObject)?.string("title") ?: string("albumTitle", "album") ?: "",
-        artworkUrl = (this["album"] as? JsonObject)?.imageUrl(320) ?: imageUrl(320),
-        durationMs = long("duration", "durationMs")?.let { if (it < 10_000) it * 1000L else it } ?: 0L,
+        artist = (resource["artist"] as? JsonObject)?.string("name")
+            ?: resource.legacyArtistNames()
+            ?: resource.string("artistName", "artist")
+            ?: album?.legacyAlbumArtist()
+            ?: "",
+        album = album?.string("title", "name") ?: resource.string("albumTitle", "album") ?: "",
+        artworkUrl = album?.imageUrl(320) ?: resource.imageUrl(320),
+        durationMs = resource.long("duration", "durationMs")?.let { if (it < 10_000) it * 1000L else it } ?: 0L,
     )
 }
 
 private fun JsonObject.toLegacyAlbum(): TidalAlbum? {
-    val id = primitive("id")?.contentOrNull ?: return null
-    val title = string("title", "name") ?: return null
+    val resource = legacyWrappedObject("album", "item")
+    val id = resource.primitive("id")?.contentOrNull ?: return null
+    val title = resource.string("title", "name") ?: return null
+    val artist = resource.legacyAlbumArtist()
+    val artworkUrl = resource.imageUrl(320)
+    if (artist.isBlank() || artworkUrl.isNullOrBlank()) {
+        Log.d(API_LOG_TAG, "album metadata parse incomplete art=${!artworkUrl.isNullOrBlank()} artist=${artist.isNotBlank()} keys=${resource.keysSummary()}")
+    }
     return TidalAlbum(
         id = id,
         title = title,
-        artist = (this["artist"] as? JsonObject)?.string("name") ?: string("artistName", "artist") ?: "",
-        artworkUrl = imageUrl(320),
+        artist = artist,
+        artworkUrl = artworkUrl,
     )
 }
 
 private fun JsonObject.toLegacyArtist(): TidalArtist? {
-    val id = primitive("id")?.contentOrNull ?: return null
-    val name = string("name", "title") ?: return null
-    return TidalArtist(id = id, name = name, artworkUrl = imageUrl(320))
+    val resource = legacyWrappedObject("artist", "item")
+    val id = resource.primitive("id")?.contentOrNull ?: return null
+    val name = resource.string("name", "title") ?: return null
+    return TidalArtist(id = id, name = name, artworkUrl = resource.imageUrl(320))
 }
 
 private fun JsonObject.toLegacyPlaylist(): TidalPlaylist? {
-    val id = primitive("uuid")?.contentOrNull ?: primitive("id")?.contentOrNull ?: return null
-    val title = string("title", "name") ?: return null
+    val resource = legacyWrappedObject("playlist", "item")
+    val id = resource.primitive("uuid")?.contentOrNull ?: resource.primitive("id")?.contentOrNull ?: return null
+    val title = resource.string("title", "name") ?: return null
     return TidalPlaylist(
         id = id,
         title = title,
-        creator = (this["creator"] as? JsonObject)?.string("name") ?: string("creatorName", "ownerName", "creator") ?: "",
-        artworkUrl = imageUrl(320),
+        creator = (resource["creator"] as? JsonObject)?.string("name") ?: resource.string("creatorName", "ownerName", "creator") ?: "",
+        artworkUrl = resource.imageUrl(320),
     )
 }
 
@@ -346,6 +471,24 @@ private fun JsonObject.legacyArtistNames(): String? = (this["artists"] as? JsonA
     ?.takeIf { it.isNotEmpty() }
     ?.joinToString(", ")
 
+private fun JsonObject.legacyAlbumArtist(): String =
+    (this["artist"] as? JsonObject)?.string("name")
+        ?: legacyArtistNames()
+        ?: (this["artists"] as? JsonObject)?.string("name")
+        ?: (this["album"] as? JsonObject)?.legacyWrappedObject("album", "item")?.legacyAlbumArtist()
+        ?: string("artistName", "artistNameInBaseLocale", "albumArtist", "artist")
+        ?: ""
+
+private fun JsonObject.legacyTrackObject(): JsonObject =
+    legacyWrappedObject("track", "item")
+
+private fun JsonObject.legacyWrappedObject(vararg names: String): JsonObject {
+    names.forEach { name ->
+        (this[name] as? JsonObject)?.let { return it }
+    }
+    return this
+}
+
 private fun JsonObject.string(vararg names: String): String? {
     names.forEach { name ->
         val value = primitive(name)?.contentOrNull
@@ -362,9 +505,19 @@ private fun JsonObject.long(vararg names: String): Long? {
 }
 
 private fun JsonObject.imageUrl(size: Int = 320): String? {
-    string("coverArt", "cover", "imageId")
-        ?.takeIf { it.isNotBlank() && !it.startsWith("http", ignoreCase = true) }
-        ?.let { return tidalResourceImageUrl(it, size) }
+    directImageUrl(size)?.let { return it }
+    listOf("album", "item", "track", "artist", "playlist", "image", "picture").forEach { name ->
+        (this[name] as? JsonObject)?.directImageUrl(size)?.let { return it }
+    }
+    return null
+}
+
+private fun JsonObject.directImageUrl(size: Int = 320): String? {
+    string("imageUrl", "artworkUrl", "coverUrl")?.let { return it }
+    string("coverArt", "cover", "imageId", "picture", "squareImage")
+        ?.takeIf { it.isNotBlank() }
+        ?.let { return if (it.startsWith("http", ignoreCase = true)) it else tidalResourceImageUrl(it, size) }
+    string("url")?.takeIf { it.looksLikeImageUrl() }?.let { return it }
     val imageLinks = this["imageLinks"] as? JsonArray
     imageLinks?.mapNotNull { it as? JsonObject }
         ?.sortedByDescending { it.long("width", "height") ?: 0L }
@@ -372,7 +525,23 @@ private fun JsonObject.imageUrl(size: Int = 320): String? {
         ?.string("href", "url")
         ?.let { return it }
     imageLinks?.mapNotNull { (it as? JsonObject)?.string("href", "url") }?.firstOrNull()?.let { return it }
-    return string("imageUrl", "artworkUrl", "coverUrl")
+    val images = this["images"] as? JsonArray
+    images?.mapNotNull { it as? JsonObject }
+        ?.sortedByDescending { it.long("width", "height") ?: 0L }
+        ?.firstOrNull()
+        ?.string("href", "url", "imageUrl")
+        ?.let { return it }
+    images?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }?.firstOrNull()?.let { return it }
+    return null
+}
+
+private fun String.looksLikeImageUrl(): Boolean {
+    val lower = lowercase()
+    return lower.contains("resources.tidal.com/images/") ||
+        lower.endsWith(".jpg") ||
+        lower.endsWith(".jpeg") ||
+        lower.endsWith(".png") ||
+        lower.endsWith(".webp")
 }
 
 private fun tidalResourceImageUrl(id: String, size: Int): String {
@@ -380,6 +549,9 @@ private fun tidalResourceImageUrl(id: String, size: Int): String {
     val supported = listOf(80, 160, 320, 640, 1280).firstOrNull { it >= size } ?: 320
     return "https://resources.tidal.com/images/$normalized/${supported}x${supported}.jpg"
 }
+
+private fun JsonObject.keysSummary(): String =
+    keys.sorted().take(16).joinToString("|")
 
 private fun Throwable.safeReason(): String = when (this) {
     is HttpException -> "http-${code()}"

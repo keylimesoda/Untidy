@@ -1,6 +1,11 @@
 package com.tidal.wear.ui.player
 
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -195,8 +200,8 @@ private fun TidalPlayerNonAmbient(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset(y = 12.dp * scale)
-                .clip(RoundedCornerShape(6.dp))
                 .clickable(onClick = viewModel::togglePlayPause),
+            cornerRadius = 6.dp,
         )
 
         LikeIconAt(
@@ -224,7 +229,7 @@ private fun TidalPlayerNonAmbient(
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = 75.dp * scale)
+                .offset(y = 82.dp * scale)
                 .fillMaxWidth()
                 .height(60.dp * scale)
                 .background(
@@ -283,6 +288,7 @@ private fun TidalPlayerNonAmbient(
                 scale = scale,
                 onClick = viewModel::togglePlayPause,
                 isPlayPause = true,
+                playPauseColor = accent,
             )
             TransportButton(Icons.Filled.SkipNext, "Next", visualSize = 28, iconSize = 16, scale = scale, onClick = viewModel::seekToNext)
         }
@@ -308,7 +314,15 @@ private fun TidalPlayerNonAmbient(
             1 -> ScreenScaffold(timeText = {}) {
                 ActionsSheet(
                     downloadState = downloadState,
+                    outputOptions = rememberAudioOutputOptions(),
                     onDownload = onDownload,
+                    onOutputSettings = {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                        }.onFailure {
+                            Toast.makeText(context, "Open Wear OS Bluetooth settings to change output", Toast.LENGTH_SHORT).show()
+                        }
+                    },
                     onAddToPlaylist = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
                     onViewAlbum = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
                     onViewArtist = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
@@ -394,6 +408,7 @@ private fun TransportButton(
     scale: Float,
     onClick: () -> Unit,
     isPlayPause: Boolean = false,
+    playPauseColor: Color = TidalColors.Cyan,
 ) {
     Box(
         modifier = Modifier
@@ -406,7 +421,7 @@ private fun TransportButton(
             modifier = Modifier
                 .size(visualSize.dp * scale)
                 .clip(CircleShape)
-                .background(if (isPlayPause) TidalColors.Cyan else TidalColors.Surface),
+                .background(if (isPlayPause) playPauseColor else TidalColors.Surface),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -467,6 +482,53 @@ private fun TidalPlayerAmbient(
             )
         }
     }
+}
+
+@Composable
+private fun rememberAudioOutputOptions(): List<AudioOutputOption> {
+    val context = LocalContext.current
+    return remember(context) { context.audioOutputOptions() }
+}
+
+private fun Context.audioOutputOptions(): List<AudioOutputOption> {
+    val audioManager = getSystemService(AudioManager::class.java) ?: return listOf(AudioOutputOption("System", true))
+    val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        .filter { it.type.isWearOutputType() }
+        .distinctBy { "${it.type}:${it.productName}" }
+    val preferred = devices.firstOrNull { it.type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER } ?: devices.firstOrNull()
+    return devices.map { device ->
+        AudioOutputOption(
+            label = device.outputLabel(),
+            preferred = device == preferred,
+        )
+    }.ifEmpty { listOf(AudioOutputOption("System", true)) }
+}
+
+private fun Int.isWearOutputType(): Boolean = when (this) {
+    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+    AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+    AudioDeviceInfo.TYPE_USB_HEADSET,
+    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+    -> true
+    else -> false
+}
+
+private fun AudioDeviceInfo.outputLabel(): String {
+    val product = productName?.toString()?.takeIf { it.isNotBlank() }
+    val typeLabel = when (type) {
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        -> "Bluetooth"
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+        -> "Wired headphones"
+        AudioDeviceInfo.TYPE_USB_HEADSET -> "USB headset"
+        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Watch speaker"
+        else -> "Output"
+    }
+    return product?.takeUnless { it.equals(typeLabel, ignoreCase = true) } ?: typeLabel
 }
 
 @Composable
