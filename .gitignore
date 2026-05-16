@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+.idea/
+local.properties
+build/
+captures/
+*.iml
+
+.dev-secrets/
+.dev-fixtures/
+
+# Local emulator/debug captures
+artifacts/
+window_*.xml
