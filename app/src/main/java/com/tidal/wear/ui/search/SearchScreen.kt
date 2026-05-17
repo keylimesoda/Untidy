@@ -1,6 +1,7 @@
 package com.tidal.wear.ui.search
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -8,9 +9,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,6 +24,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,9 +36,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
@@ -50,8 +56,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material.Button
-import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
@@ -60,6 +64,7 @@ import androidx.wear.compose.material.Text
 import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalAlbum
+import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.art.rememberArtworkPalette
@@ -75,6 +80,8 @@ fun SearchScreen(
     apiClient: TidalApiClient,
     onPlayTrack: (TidalTrack) -> Unit,
     onOpenAlbum: (TidalAlbum) -> Unit,
+    onOpenPlaylist: (TidalPlaylist) -> Unit,
+    onCancel: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -87,7 +94,8 @@ fun SearchScreen(
     var result by remember { mutableStateOf<TidalSearchResult?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var requestKeyboardTick by remember { mutableIntStateOf(0) }
+    var requestKeyboardTick by remember { mutableIntStateOf(1) }
+    var inputFocusedOnce by remember { mutableStateOf(false) }
 
     LaunchedEffect(requestKeyboardTick) {
         if (requestKeyboardTick > 0) {
@@ -125,56 +133,48 @@ fun SearchScreen(
         submittedQuery = ""
         result = null
         error = null
+        inputFocusedOnce = false
         requestKeyboardTick += 1
     }
 
+    fun editSearch() {
+        query = submittedQuery
+        submittedQuery = ""
+        error = null
+        inputFocusedOnce = false
+        requestKeyboardTick += 1
+    }
+
+    BackHandler(enabled = submittedQuery.isBlank()) { onCancel() }
+
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
-        ScalingLazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            item {
-                Text(
-                    text = "Search",
-                    color = TidalColors.Cyan,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 12.sp,
-                    letterSpacing = 2.sp,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
+        if (submittedQuery.isBlank()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                SearchInput(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onSearch = ::searchNow,
+                    focusRequester = focusRequester,
+                    onFocusChanged = { isFocused ->
+                        if (isFocused) {
+                            inputFocusedOnce = true
+                        } else if (inputFocusedOnce && query.isBlank() && submittedQuery.isBlank()) {
+                            onCancel()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = sidePadding).alpha(0f),
                 )
             }
-            if (submittedQuery.isBlank()) {
+        } else {
+            ScalingLazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 item {
-                    SearchInput(
-                        query = query,
-                        onQueryChange = { query = it },
-                        onSearch = ::searchNow,
-                        focusRequester = focusRequester,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = sidePadding),
-                    )
-                }
-                item {
-                    Button(
-                        onClick = ::searchNow,
-                        enabled = query.isNotBlank() && !loading,
-                        colors = ButtonDefaults.buttonColors(backgroundColor = TidalColors.Cyan, contentColor = TidalColors.Black),
-                        modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
-                    ) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
-                    }
-                }
-                item { StatusText("Type a song, artist, or album") }
-            } else {
-                item {
-                    Text(
-                        text = submittedQuery,
-                        color = TidalColors.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = sidePadding, vertical = 4.dp),
+                    SearchResultsTopBar(
+                        query = submittedQuery,
+                        onEdit = ::editSearch,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
                     )
                 }
                 when {
@@ -216,7 +216,7 @@ fun SearchScreen(
                                 secondaryLabel = playlist.creator.ifBlank { "Playlist" },
                                 artworkUrl = playlist.artworkUrl,
                                 fallback = "≡",
-                                onClick = { Toast.makeText(context, "Playlists coming soon", Toast.LENGTH_SHORT).show() },
+                                onClick = { onOpenPlaylist(playlist) },
                             )
                         }
                     }
@@ -252,6 +252,56 @@ private fun <T> androidx.wear.compose.material.ScalingLazyListScope.section(
     if (items.isEmpty()) return
     item { SectionHeader(title) }
     items.forEach { element -> item { itemContent(element) } }
+}
+
+@Composable
+private fun SearchResultsTopBar(
+    query: String,
+    onEdit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Search results",
+                color = TidalColors.Cyan,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 0.8.sp,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = query,
+                color = TidalColors.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(TidalColors.Surface.copy(alpha = 0.45f))
+                .clickable(onClick = onEdit),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.Edit,
+                contentDescription = "Edit search",
+                tint = TidalColors.Cyan,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
 }
 
 @Composable
@@ -367,12 +417,15 @@ private fun SearchInput(
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     focusRequester: FocusRequester,
+    onFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BasicTextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = modifier.focusRequester(focusRequester),
+        modifier = modifier
+            .focusRequester(focusRequester)
+            .onFocusChanged { onFocusChanged(it.isFocused) },
         singleLine = true,
         textStyle = TextStyle(color = TidalColors.White, fontSize = 14.sp, textAlign = TextAlign.Center),
         cursorBrush = SolidColor(TidalColors.Cyan),

@@ -94,6 +94,13 @@ sealed class AuthState {
     data object UserSignedIn : AuthState()
 }
 
+data class TidalAccountInfo(
+    val userId: String,
+    val tokenClientId: String,
+    val scopes: Set<String>,
+    val expiresAtEpochSeconds: Long,
+)
+
 class TidalAuthException(message: String) : IOException(message)
 
 class TidalDeviceAuth(
@@ -263,6 +270,7 @@ class TidalDeviceAuth(
 interface TidalAuthRepository {
     val isAuthenticated: Flow<Boolean>
     val authState: Flow<AuthState>
+    val accountInfo: Flow<TidalAccountInfo?>
     val credentialsProvider: CredentialsProvider
     suspend fun ensureClientCredentialsToken(): String?
     suspend fun getAccessToken(): String?
@@ -291,6 +299,8 @@ class DefaultTidalAuthRepository private constructor(
         if (hasUsableSession() && !prefs.getString(KEY_REFRESH_TOKEN, null).isNullOrBlank()) AuthState.UserSignedIn else AuthState.Initializing,
     )
     override val authState: StateFlow<AuthState> = _authState.asStateFlow()
+    private val _accountInfo = MutableStateFlow(readAccountInfo())
+    override val accountInfo: StateFlow<TidalAccountInfo?> = _accountInfo.asStateFlow()
 
     @Suppress("unused")
     private val tidalAuth = TidalAuth.getInstance(
@@ -429,9 +439,11 @@ class DefaultTidalAuthRepository private constructor(
             .putString(KEY_TOKEN_CLIENT_ID, tokenClientId)
             .putStringSet(KEY_GRANTED_SCOPES, result.scopes.ifEmpty { if (tokenClientId == clientId) requestedScopes else userScopes })
             .apply()
+        _accountInfo.value = readAccountInfo()
     }
 
     private fun updateAuthState(user: Boolean = !prefs.getString(KEY_USER_ID, null).isNullOrBlank()) {
+        _accountInfo.value = readAccountInfo()
         val usable = hasUsableSession()
         _isAuthenticated.value = usable
         _authState.value = when {
@@ -443,6 +455,16 @@ class DefaultTidalAuthRepository private constructor(
 
     private fun hasUsableSession(): Boolean = prefs.getString(KEY_REFRESH_TOKEN, null) != null ||
         ((prefs.getLong(KEY_EXPIRES_AT, 0L) - EXPIRY_SKEW_SECONDS) > System.currentTimeMillis() / 1000L && !prefs.getString(KEY_ACCESS_TOKEN, null).isNullOrBlank())
+
+    private fun readAccountInfo(): TidalAccountInfo? {
+        val userId = prefs.getString(KEY_USER_ID, null)?.takeIf { it.isNotBlank() } ?: return null
+        return TidalAccountInfo(
+            userId = userId,
+            tokenClientId = prefs.getString(KEY_TOKEN_CLIENT_ID, FALLBACK_CLIENT_ID) ?: FALLBACK_CLIENT_ID,
+            scopes = prefs.getStringSet(KEY_GRANTED_SCOPES, emptySet()).orEmpty(),
+            expiresAtEpochSeconds = prefs.getLong(KEY_EXPIRES_AT, 0L),
+        )
+    }
 
     companion object {
         @Volatile private var instance: DefaultTidalAuthRepository? = null

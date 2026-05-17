@@ -10,8 +10,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -19,6 +21,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.tidal.wear.BuildConfig
+import com.tidal.wear.core.auth.AuthState
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
@@ -41,16 +45,73 @@ fun SettingsScreen(
     val context = LocalContext.current
     val repository = remember(context) { SettingsRepository(context.applicationContext) }
     val preset by repository.preset.collectAsState(initial = AudioPreset.BatterySaver)
-    val isAuthenticated by authRepository.isAuthenticated.collectAsState(initial = false)
+    val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
+    val accountInfo by authRepository.accountInfo.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
+    var confirmErase by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(modifier = Modifier.fillMaxSize()) {
+                item { SectionHeader("Account") }
+                if (accountInfo != null) {
+                    item {
+                        StatusChip(
+                            label = "TIDAL account",
+                            secondary = "User #${accountInfo?.userId.orEmpty()}",
+                            active = true,
+                        )
+                    }
+                    item {
+                        Chip(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                            onClick = { confirmErase = true },
+                            label = { Text("Erase account") },
+                            secondaryLabel = { Text("Sign out on this watch") },
+                            colors = tidalSecondaryChipColors(),
+                        )
+                    }
+                    if (confirmErase) {
+                        item {
+                            Chip(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                onClick = { confirmErase = false },
+                                label = { Text("Cancel") },
+                                colors = tidalSecondaryChipColors(),
+                            )
+                        }
+                        item {
+                            Chip(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                onClick = {
+                                    confirmErase = false
+                                    scope.launch {
+                                        authRepository.signOut()
+                                        onSignedOut()
+                                    }
+                                },
+                                label = { Text("Confirm erase") },
+                                secondaryLabel = { Text("Remove account from watch") },
+                                colors = ChipDefaults.primaryChipColors(backgroundColor = TidalColors.Cyan, contentColor = TidalColors.Black),
+                            )
+                        }
+                    }
+                } else {
+                    item {
+                        StatusChip(
+                            label = "No linked account",
+                            secondary = "Linking starts from app open",
+                            active = false,
+                        )
+                    }
+                }
+
+                item { SectionHeader("Playback") }
                 item {
                     Text(
-                        "Streaming quality",
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        color = TidalColors.White,
-                        fontWeight = FontWeight.Black,
+                        text = "Streaming quality",
+                        style = MaterialTheme.typography.caption1,
+                        color = TidalColors.OnSurfaceDim,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                        textAlign = TextAlign.Center,
                     )
                 }
                 item {
@@ -68,42 +129,27 @@ fun SettingsScreen(
                         scope.launch { repository.setPreset(AudioPreset.High) }
                     }
                 }
-                item {
-                    Chip(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                        onClick = { },
-                        icon = {
-                            Box(
-                                    Modifier
-                                     .size(10.dp)
-                                     .clip(CircleShape)
-                                     .background(if (isAuthenticated) TidalColors.Cyan else TidalColors.OnSurfaceMuted),
-                             )
-                         },
-                         label = { Text("Catalog access") },
-                         secondaryLabel = { Text(if (isAuthenticated) "ready" else "connecting") },
-                         colors = tidalSecondaryChipColors(),
-                     )
-                 }
-                item {
-                    Chip(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                        onClick = {
-                            scope.launch {
-                                authRepository.signOut()
-                                onSignedOut()
-                            }
-                        },
-                        label = { Text("Reset token") },
-                        secondaryLabel = { Text("Fetch catalog token again") },
-                        colors = tidalSecondaryChipColors(),
-                    )
+
+                item { SectionHeader("Downloads") }
+                item { DisabledSettingChip("Download quality", "Coming in downloads") }
+                item { DisabledSettingChip("Download over LTE", "Coming in downloads") }
+                item { DisabledSettingChip("Storage limit", "Coming in downloads") }
+
+                item { SectionHeader("About") }
+                item { DisabledSettingChip("Untidy", "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") }
+
+                if (BuildConfig.DEBUG) {
+                    item { SectionHeader("Debug") }
+                    item { DisabledSettingChip("Auth state", authState.label()) }
+                    item { DisabledSettingChip("Token client", accountInfo?.tokenClientId ?: "No linked account") }
+                    item { DisabledSettingChip("Scopes", accountInfo?.scopes?.sorted()?.joinToString(" ").orEmpty().ifBlank { "None" }) }
+                    item { DisabledSettingChip("Playback backend", "Direct manifest BTS") }
                 }
-                item { DisabledSettingChip("Download quality", "Coming in pass-4") }
-                item { DisabledSettingChip("Download over LTE", "Coming in pass-4") }
-                item { DisabledSettingChip("Storage limit", "Coming in pass-4") }
-                item { DisabledSettingChip("Headphones required", "Coming in pass-4") }
-                item { DisabledSettingChip("Sign in to TIDAL", "Coming soon") }
+
+                item { SectionHeader("Legal") }
+                item { DisabledSettingChip("Open-source licenses", "Coming before release") }
+                item { DisabledSettingChip("Privacy", "Tokens are local and erasable") }
+                item { DisabledSettingChip("TIDAL attribution", "Coming before release") }
                 item {
                     Text(
                         text = "Stream policy: AAC/MP4A non-lossless to preserve battery.",
@@ -115,6 +161,37 @@ fun SettingsScreen(
                 }
             }
     }
+}
+
+@Composable
+private fun SectionHeader(label: String) {
+    Text(
+        text = label.uppercase(),
+        color = TidalColors.Cyan,
+        fontWeight = FontWeight.Black,
+        style = MaterialTheme.typography.caption1,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp),
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
+private fun StatusChip(label: String, secondary: String, active: Boolean) {
+    Chip(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        onClick = { },
+        icon = {
+            Box(
+                Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(if (active) TidalColors.Cyan else TidalColors.OnSurfaceMuted),
+            )
+        },
+        label = { Text(label) },
+        secondaryLabel = { Text(secondary) },
+        colors = tidalSecondaryChipColors(),
+    )
 }
 
 @Composable
@@ -151,5 +228,11 @@ private fun PresetChip(label: String, value: AudioPreset, selected: AudioPreset,
             uncheckedContentColor = TidalColors.OnSurfaceDim,
         ),
     )
+}
+
+private fun AuthState.label(): String = when (this) {
+    AuthState.Anonymous -> "Anonymous"
+    AuthState.Initializing -> "Initializing"
+    AuthState.UserSignedIn -> "User signed in"
 }
 

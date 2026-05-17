@@ -15,36 +15,45 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
@@ -56,22 +65,25 @@ import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.AuthState
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.TidalAlbum
+import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.PlaybackActions
 import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
 import com.tidal.wear.playback.NowPlayingViewModel
 import com.tidal.wear.ui.album.AlbumScreen
-import com.tidal.wear.ui.components.SecondaryChip
-import com.tidal.wear.ui.foryou.ForYouScreen
+import com.tidal.wear.ui.discover.DiscoverScreen
 import com.tidal.wear.ui.library.LibraryScreen
 import com.tidal.wear.ui.onboarding.OnboardingScreen
+import com.tidal.wear.ui.playlist.PlaylistScreen
 import com.tidal.wear.ui.search.SearchScreen
 import com.tidal.wear.ui.settings.SettingsScreen
 import com.tidal.wear.ui.theme.TidalColors
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+
+private val HomePrimarySurface = Color(0xFF1A1A1A)
+private val HomeSecondarySurface = Color(0xFF1A1A1A)
+private val HomeDisabledContent = Color(0x80FFFFFF)
+private val HomeHorizontalPadding = 10.dp
 
 class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher =
@@ -93,13 +105,15 @@ class MainActivity : ComponentActivity() {
 private object Routes {
     const val Onboarding = "onboarding"
     const val Home = "home"
-    const val ForYou = "for-you"
+    const val Discover = "discover"
     const val Search = "search"
     const val Album = "album/{albumId}"
+    const val Playlist = "playlist/{playlistId}"
     const val Library = "library"
     const val Settings = "settings"
 
     fun album(albumId: String): String = "album/${Uri.encode(albumId)}"
+    fun playlist(playlistId: String): String = "playlist/${Uri.encode(playlistId)}"
 }
 
 @Composable
@@ -108,7 +122,6 @@ private fun TidalWearApp() {
         AppScaffold(timeText = {}) {
             val navController = rememberSwipeDismissableNavController()
             val context = LocalContext.current
-            val scope = rememberCoroutineScope()
             val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
             val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
             val nowPlayingViewModel = viewModel<NowPlayingViewModel>()
@@ -137,12 +150,9 @@ private fun TidalWearApp() {
                 AlbumSelectionStore.put(album)
                 navController.navigate(Routes.album(album.id))
             }
-            fun playQuery(query: String) {
-                scope.launch {
-                    val track = withContext(Dispatchers.IO) { runCatching { apiClient.search(query).tracks.firstOrNull() }.getOrNull() }
-                        ?: fixtureTrack()
-                    playTrack(track)
-                }
+            fun openPlaylist(playlist: TidalPlaylist) {
+                PlaylistSelectionStore.put(playlist)
+                navController.navigate(Routes.playlist(playlist.id))
             }
 
             SwipeDismissableNavHost(navController = navController, startDestination = Routes.Onboarding) {
@@ -155,14 +165,35 @@ private fun TidalWearApp() {
                 composable(Routes.Home) {
                     HomeScreen(
                         navController = navController,
+                        authState = authState,
                         track = nowPlaying.track,
+                        isPlaying = nowPlaying.isPlaying,
+                        onNowPlaying = ::openPlayer,
                         onResume = { nowPlaying.track?.let(::playTrack) ?: navController.navigate(Routes.Search) },
-                        onOffline = { Toast.makeText(context, "Offline coming soon", Toast.LENGTH_SHORT).show() },
+                        onOffline = { Toast.makeText(context, "Downloads coming soon", Toast.LENGTH_SHORT).show() },
                     )
                 }
-                composable(Routes.ForYou) { ForYouScreen(onPlayQuery = ::playQuery) }
+                composable(Routes.Discover) {
+                    DiscoverScreen(
+                        apiClient = apiClient,
+                        onOpenAlbum = ::openAlbum,
+                        onOpenPlaylist = ::openPlaylist,
+                        onPlayTrack = ::playTrack,
+                        onPlayQueue = ::playQueue,
+                    )
+                }
                 composable(Routes.Search) {
-                    SearchScreen(apiClient = apiClient, onPlayTrack = ::playTrack, onOpenAlbum = ::openAlbum)
+                    SearchScreen(
+                        apiClient = apiClient,
+                        onPlayTrack = ::playTrack,
+                        onOpenAlbum = ::openAlbum,
+                        onOpenPlaylist = ::openPlaylist,
+                        onCancel = {
+                            if (!navController.popBackStack()) {
+                                navController.navigateAndClear(Routes.Home)
+                            }
+                        },
+                    )
                 }
                 composable(Routes.Album) { entry ->
                     val albumId = entry.arguments?.getString("albumId")?.let(Uri::decode).orEmpty()
@@ -173,8 +204,24 @@ private fun TidalWearApp() {
                         onPlayQueue = ::playQueue,
                     )
                 }
-                composable(Routes.Library) { LibraryScreen() }
-                composable(Routes.Settings) { SettingsScreen(authRepository = authRepository, onSignedOut = { navController.navigateAndClear(Routes.Home) }) }
+                composable(Routes.Playlist) { entry ->
+                    val playlistId = entry.arguments?.getString("playlistId")?.let(Uri::decode).orEmpty()
+                    PlaylistScreen(
+                        apiClient = apiClient,
+                        playlistId = playlistId,
+                        initialPlaylist = PlaylistSelectionStore.get(playlistId),
+                        onPlayQueue = ::playQueue,
+                    )
+                }
+                composable(Routes.Library) {
+                    LibraryScreen(
+                        apiClient = apiClient,
+                        onOpenAlbum = ::openAlbum,
+                        onOpenPlaylist = ::openPlaylist,
+                        onPlayTrack = ::playTrack,
+                    )
+                }
+                composable(Routes.Settings) { SettingsScreen(authRepository = authRepository, onSignedOut = { navController.navigateAndClear(Routes.Onboarding) }) }
             }
         }
     }
@@ -183,74 +230,241 @@ private fun TidalWearApp() {
 @Composable
 private fun HomeScreen(
     navController: NavHostController,
+    authState: AuthState,
     track: TidalTrack?,
+    isPlaying: Boolean,
+    onNowPlaying: () -> Unit,
     onResume: () -> Unit,
     onOffline: () -> Unit,
 ) {
-    val hasLastPlayed = track != null
+    val signedIn = authState == AuthState.UserSignedIn
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
-        Row(
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("Untidy", color = TidalColors.Cyan, fontWeight = FontWeight.Black, fontSize = 12.sp, letterSpacing = 2.sp)
-        }
-
-        Column(
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 30.dp, start = 24.dp, end = 24.dp),
+        TransformingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 20.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(TidalColors.Cyan, CircleShape)
-                    .clickable(onClick = onResume),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    if (hasLastPlayed) Icons.Filled.PlayArrow else Icons.Filled.Search,
-                    contentDescription = if (hasLastPlayed) "Resume" else "Search",
-                    modifier = Modifier.size(28.dp),
-                    tint = TidalColors.Black,
+            item { HomeWordmark() }
+            item {
+                HomePrimaryAction(
+                    signedIn = signedIn,
+                    track = track,
+                    isPlaying = isPlaying,
+                    onSignedOutClick = { navController.navigate(Routes.Onboarding) },
+                    onSearchClick = { navController.navigate(Routes.Search) },
+                    onNowPlayingClick = onNowPlaying,
+                    onResumeClick = onResume,
                 )
             }
-            Text(
-                if (hasLastPlayed) "Resume" else "Search",
-                color = TidalColors.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-            )
-            if (hasLastPlayed) {
-                Text(
-                    "${track?.title.orEmpty()} · ${track?.artist.orEmpty()}",
-                    color = TidalColors.OnSurfaceMuted,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            if (signedIn) {
+                if (track != null) {
+                    item {
+                        HomeListChip(
+                            label = "Search",
+                            secondaryLabel = "Find music on TIDAL",
+                            icon = Icons.Filled.Search,
+                            onClick = { navController.navigate(Routes.Search) },
+                        )
+                    }
+                }
+                item {
+                        HomeListChip(
+                            label = "Discover",
+                            secondaryLabel = "Personalized mixes",
+                            icon = Icons.Filled.Star,
+                            onClick = { navController.navigate(Routes.Discover) },
+                        )
+                }
+                item {
+                    HomeListChip(
+                        label = "Library",
+                        secondaryLabel = "Your collection",
+                        icon = Icons.Filled.LibraryMusic,
+                        onClick = { navController.navigate(Routes.Library) },
+                    )
+                }
+                item {
+                    HomeListChip(
+                        label = "Downloads",
+                        secondaryLabel = "Coming soon",
+                        icon = Icons.Filled.Download,
+                        enabled = false,
+                        onClick = onOffline,
+                    )
+                }
+                item {
+                    HomeListChip(
+                        label = "Settings",
+                        secondaryLabel = "Account & playback",
+                        icon = Icons.Filled.Settings,
+                        onClick = { navController.navigate(Routes.Settings) },
+                    )
+                }
             }
-        }
-
-        Column(
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 94.dp, start = 4.dp, end = 4.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(-10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                SecondaryChip("For You", Icons.Filled.Star, onClick = { navController.navigate(Routes.ForYou) })
-                SecondaryChip("Search", Icons.Filled.Search, onClick = { navController.navigate(Routes.Search) })
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                SecondaryChip("Library", Icons.Filled.LibraryMusic, onClick = { navController.navigate(Routes.Library) })
-                SecondaryChip("Offline", Icons.Filled.Download, onClick = onOffline)
-            }
+            item { HomeFooter() }
         }
     }
 }
+
+@Composable
+private fun HomeWordmark() {
+    Text(
+        text = "UNTIDY",
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = HomeHorizontalPadding, vertical = 4.dp),
+        color = TidalColors.White,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        letterSpacing = 2.sp,
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
+private fun HomePrimaryAction(
+    signedIn: Boolean,
+    track: TidalTrack?,
+    isPlaying: Boolean,
+    onSignedOutClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    onNowPlayingClick: () -> Unit,
+    onResumeClick: () -> Unit,
+) {
+    val hasTrack = track != null
+    val icon: ImageVector
+    val label: String
+    val secondaryLabel: String
+    val onClick: () -> Unit
+
+    when {
+        !signedIn -> {
+            icon = Icons.Filled.Login
+            label = "Sign in to TIDAL"
+            secondaryLabel = "Connect your account"
+            onClick = onSignedOutClick
+        }
+        isPlaying && hasTrack -> {
+            icon = Icons.Filled.Equalizer
+            label = "Now playing"
+            secondaryLabel = track.metadataLine()
+            onClick = onNowPlayingClick
+        }
+        hasTrack -> {
+            icon = Icons.Filled.PlayArrow
+            label = "Resume"
+            secondaryLabel = track.metadataLine()
+            onClick = onResumeClick
+        }
+        else -> {
+            icon = Icons.Filled.Search
+            label = "Search"
+            secondaryLabel = "Find music on TIDAL"
+            onClick = onSearchClick
+        }
+    }
+
+    HomeRowSurface(
+        label = label,
+        secondaryLabel = secondaryLabel,
+        icon = icon,
+        iconTint = TidalColors.Cyan,
+        minHeight = 56.dp,
+        surfaceColor = HomePrimarySurface,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun HomeListChip(
+    label: String,
+    secondaryLabel: String,
+    icon: ImageVector,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    HomeRowSurface(
+        label = label,
+        secondaryLabel = secondaryLabel,
+        icon = icon,
+        enabled = enabled,
+        iconTint = if (enabled) TidalColors.Cyan else HomeDisabledContent,
+        minHeight = 48.dp,
+        surfaceColor = HomeSecondarySurface,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun HomeRowSurface(
+    label: String,
+    secondaryLabel: String,
+    icon: ImageVector,
+    enabled: Boolean = true,
+    iconTint: Color,
+    minHeight: Dp,
+    surfaceColor: Color,
+    onClick: () -> Unit,
+) {
+    val contentAlpha = if (enabled) 1f else 0.55f
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = HomeHorizontalPadding)
+            .heightIn(min = minHeight)
+            .background(surfaceColor, RoundedCornerShape(24.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .background(TidalColors.Black, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(17.dp), tint = iconTint)
+        }
+        Column(modifier = Modifier.weight(1f).alpha(contentAlpha)) {
+            Text(
+                text = label,
+                color = TidalColors.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = secondaryLabel,
+                color = TidalColors.OnSurfaceMuted,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeFooter() {
+    Text(
+        text = "Plays from TIDAL",
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = HomeHorizontalPadding, end = HomeHorizontalPadding, top = 8.dp, bottom = 12.dp),
+        color = TidalColors.White,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Medium,
+        textAlign = TextAlign.Center,
+    )
+}
+
+private fun TidalTrack?.metadataLine(): String = listOf(
+    this?.title.orEmpty(),
+    this?.artist.orEmpty(),
+).filter { it.isNotBlank() }.joinToString(" \u00B7 ").ifBlank { "TIDAL" }
 
 private fun Context.startTrackPlayback(track: TidalTrack) {
     val intent = Intent(this, TidalMediaService::class.java)
@@ -283,13 +497,15 @@ private object AlbumSelectionStore {
     fun get(albumId: String): TidalAlbum? = albums[albumId]
 }
 
-private fun fixtureTrack() = TidalTrack(
-    id = "fixture-run-01",
-    title = "TIDAL Preview",
-    artist = "Wear OS",
-    album = "Fixture",
-    durationMs = 30_000L,
-)
+private object PlaylistSelectionStore {
+    private val playlists = java.util.concurrent.ConcurrentHashMap<String, TidalPlaylist>()
+
+    fun put(playlist: TidalPlaylist) {
+        if (playlist.id.isNotBlank()) playlists[playlist.id] = playlist
+    }
+
+    fun get(playlistId: String): TidalPlaylist? = playlists[playlistId]
+}
 
 private fun NavHostController.navigateAndClear(route: String) {
     navigate(route) {
@@ -297,6 +513,7 @@ private fun NavHostController.navigateAndClear(route: String) {
         launchSingleTop = true
     }
 }
+
 
 
 

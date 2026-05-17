@@ -42,6 +42,12 @@ data class TidalSection(
     val tracks: List<TidalTrack>,
 )
 
+data class TidalDiscoverSection(
+    val title: String,
+    val result: TidalSearchResult,
+    val subtitle: String = "",
+)
+
 enum class AudioPreset {
     BatterySaver,
     Balanced,

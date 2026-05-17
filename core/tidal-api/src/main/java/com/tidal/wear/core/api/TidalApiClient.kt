@@ -5,11 +5,13 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalArtist
+import com.tidal.wear.core.model.TidalDiscoverSection
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalSection
 import com.tidal.wear.core.model.TidalTrack
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -35,6 +37,69 @@ interface TidalApiService {
         @Query("query") query: String,
         @Query("countryCode") countryCode: String,
         @Query("include") include: String = "tracks,albums,artists,playlists",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("userDiscoveryMixes/me")
+    suspend fun userDiscoveryMixes(
+        @Query("countryCode") countryCode: String,
+        @Query("locale") locale: String,
+        @Query("include") include: String = "items",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("userDiscoveryMixes/{id}/relationships/items")
+    suspend fun userDiscoveryMixItems(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("locale") locale: String,
+        @Query("page[cursor]") pageCursor: String? = null,
+        @Query("include") include: String = "items",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("userDailyMixes/me")
+    suspend fun userDailyMixes(
+        @Query("countryCode") countryCode: String,
+        @Query("locale") locale: String,
+        @Query("include") include: String = "items",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("userDailyMixes/{id}/relationships/items")
+    suspend fun userDailyMixItems(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("locale") locale: String,
+        @Query("page[cursor]") pageCursor: String? = null,
+        @Query("include") include: String = "items",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("userNewReleaseMixes/me")
+    suspend fun userNewReleaseMixes(
+        @Query("countryCode") countryCode: String,
+        @Query("locale") locale: String,
+        @Query("include") include: String = "items",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("userNewReleaseMixes/{id}/relationships/items")
+    suspend fun userNewReleaseMixItems(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("locale") locale: String,
+        @Query("page[cursor]") pageCursor: String? = null,
+        @Query("include") include: String = "items",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("userRecommendations/{id}")
+    suspend fun userRecommendations(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("locale") locale: String,
+        @Query("include") include: String = "discoveryMixes,myMixes,newArrivalMixes",
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
@@ -123,6 +188,42 @@ interface TidalLegacyApiService {
         @Query("limit") limit: Int = 50,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
+
+    @GET("users/{userId}/favorites/tracks")
+    suspend fun favoriteTracks(
+        @Path("userId") userId: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Query("limit") limit: Int = 50,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET("users/{userId}/favorites/albums")
+    suspend fun favoriteAlbums(
+        @Path("userId") userId: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Query("limit") limit: Int = 50,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET("users/{userId}/favorites/artists")
+    suspend fun favoriteArtists(
+        @Path("userId") userId: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Query("limit") limit: Int = 50,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET("users/{userId}/favorites/playlists")
+    suspend fun favoritePlaylists(
+        @Path("userId") userId: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Query("limit") limit: Int = 50,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
 }
 
 interface TidalDesktopApiService {
@@ -156,6 +257,7 @@ class TidalApiClient(
     private val authRepository: TidalAuthRepository,
     private val countryCode: String = Locale.getDefault().country.takeIf { it.length == 2 } ?: "US",
 ) {
+    private val locale: String = Locale.getDefault().toLanguageTag().takeIf { it.isNotBlank() } ?: "en-US"
     private val json = Json { ignoreUnknownKeys = true }
     private val service: TidalApiService
     private val legacyService: TidalLegacyApiService
@@ -215,9 +317,35 @@ class TidalApiClient(
             )
     }
     suspend fun currentUser(): JsonElement = service.currentUser(countryCode)
-    suspend fun favorites(): TidalSearchResult = parseSearch(service.favorites(countryCode))
+    suspend fun favorites(): TidalSearchResult = runCatching { parseSearch(service.favorites(countryCode)) }
+        .fold(
+            onSuccess = {
+                Log.d(API_LOG_TAG, "library v2 ok tracks=${it.tracks.size} albums=${it.albums.size} artists=${it.artists.size} playlists=${it.playlists.size}")
+                if (!it.isEmpty()) it else legacyFavorites("v2-empty")
+            },
+            onFailure = {
+                if (it is CancellationException) throw it
+                if (it is HttpException && it.code() !in setOf(401, 403, 404)) throw it
+                legacyFavorites("v2-${it.safeReason()}")
+            },
+        )
     suspend fun playlist(id: String): TidalPlaylist? = service.playlist(id, countryCode).dataObjects().firstOrNull()?.toPlaylist()
-    suspend fun playlistTracks(id: String): List<TidalTrack> = service.playlistItems(id, countryCode).allResourceObjects().mapNotNull { it.toTrack() }
+    suspend fun playlistTracks(id: String): List<TidalTrack> {
+        val root = try {
+            service.playlistItems(id, countryCode, include = "items,items.albums")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.d(API_LOG_TAG, "playlist items expanded include failed reason=${t.safeReason()}")
+            service.playlistItems(id, countryCode)
+        }
+        val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+        val tracks = root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }.distinctBy { it.id }
+        if (tracks.isNotEmpty() && tracks.none { !it.artworkUrl.isNullOrBlank() }) {
+            Log.d(API_LOG_TAG, "playlist tracks art missing tracks=${tracks.size} payloadImageKeys=${root.imageKeySummary()} imageValueCount=${root.imageValueCount()}")
+        }
+        return tracks
+    }
     suspend fun album(id: String): TidalAlbum? = try {
         service.album(id, countryCode).dataObjects().firstOrNull()?.toAlbum()
     } catch (e: CancellationException) {
@@ -268,6 +396,144 @@ class TidalApiClient(
         return listOf(TidalSection("Search", result.tracks.take(10)))
     }
 
+    suspend fun discoverSections(): List<TidalDiscoverSection> {
+        val dedicated = listOfNotNull(
+            userMixSection(
+                title = "Discovery Mix",
+                subtitle = "Personalized recommendations",
+                load = { service.userDiscoveryMixes(countryCode, locale) },
+                loadItems = { id -> service.userDiscoveryMixItems(id, countryCode, locale) },
+            ),
+            userMixSection(
+                title = "Daily Mixes",
+                subtitle = "Based on your listening",
+                load = { service.userDailyMixes(countryCode, locale) },
+                loadItems = { id -> service.userDailyMixItems(id, countryCode, locale) },
+            ),
+            userMixSection(
+                title = "New for You",
+                subtitle = "Personalized new releases",
+                load = { service.userNewReleaseMixes(countryCode, locale) },
+                loadItems = { id -> service.userNewReleaseMixItems(id, countryCode, locale) },
+            ),
+        )
+        if (dedicated.size == 3) return dedicated
+
+        val fallback = userRecommendationSections()
+        if (fallback.isEmpty()) return dedicated
+        val dedicatedTitles = dedicated.map { it.title }.toSet()
+        return dedicated + fallback.filterNot { it.title in dedicatedTitles }
+    }
+
+    private suspend fun userMixSection(
+        title: String,
+        subtitle: String,
+        load: suspend () -> JsonElement,
+        loadItems: suspend (String) -> JsonElement,
+    ): TidalDiscoverSection? {
+        val root = try {
+            load()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            if (t is HttpException && t.code() in setOf(401, 403, 404)) {
+                Log.d(API_LOG_TAG, "discover v2 unavailable title=$title reason=${t.safeReason()}")
+                return null
+            }
+            Log.d(API_LOG_TAG, "discover v2 failed title=$title reason=${t.safeReason()}")
+            throw t
+        }
+        val direct = parseSearch(root)
+        val result = if (!direct.isEmpty()) {
+            direct
+        } else {
+            root.dataObjects()
+                .mapNotNull { it.id }
+                .distinct()
+                .mapNotNull { id ->
+                    try {
+                        parseSearch(loadItems(id))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (t: Throwable) {
+                        if (t is HttpException && t.code() in setOf(401, 403)) throw t
+                        Log.d(API_LOG_TAG, "discover relationship failed title=$title reason=${t.safeReason()}")
+                        null
+                    }
+                }
+                .mergeSearchResults()
+        }
+        Log.d(API_LOG_TAG, "discover v2 ok title=$title tracks=${result.tracks.size} albums=${result.albums.size} playlists=${result.playlists.size}")
+        return result.takeUnless { it.isEmpty() }?.let { TidalDiscoverSection(title, it, subtitle) }
+    }
+
+    private suspend fun userRecommendationSections(): List<TidalDiscoverSection> {
+        // Official but deprecated compatibility fallback for current device-flow tokens, which
+        // do not include recommendations.read and can receive 404s from dedicated mix resources.
+        val root = try {
+            service.userRecommendations("me", countryCode, locale)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            if (t is HttpException && t.code() == 404) {
+                Log.d(API_LOG_TAG, "discover recommendations empty reason=http-404")
+                return emptyList()
+            }
+            Log.d(API_LOG_TAG, "discover recommendations failed reason=${t.safeReason()}")
+            throw t
+        }
+        val sections = parseUserRecommendationSections(root)
+        Log.d(API_LOG_TAG, "discover recommendations ok sections=${sections.size} playlists=${sections.sumOf { it.result.playlists.size }} art=${sections.sumOf { section -> section.result.playlists.count { !it.artworkUrl.isNullOrBlank() } }} payloadImageKeys=${root.imageKeySummary()} imageValueCount=${root.imageValueCount()}")
+        return sections
+    }
+
+    private fun parseUserRecommendationSections(element: JsonElement): List<TidalDiscoverSection> {
+        val relationships = element.dataObjects().firstOrNull()?.get("relationships") as? JsonObject ?: return emptyList()
+        val includedByKey = element.includedObjects().associateBy { it.resourceKey() }
+        return listOfNotNull(
+            recommendationSection(
+                title = "Discovery Mix",
+                subtitle = "Personalized mix playlist",
+                relationshipName = "discoveryMixes",
+                relationships = relationships,
+                includedByKey = includedByKey,
+            ),
+            recommendationSection(
+                title = "Daily Mixes",
+                subtitle = "Based on your listening",
+                relationshipName = "myMixes",
+                relationships = relationships,
+                includedByKey = includedByKey,
+            ),
+            recommendationSection(
+                title = "New for You",
+                subtitle = "Personalized new release mix",
+                relationshipName = "newArrivalMixes",
+                relationships = relationships,
+                includedByKey = includedByKey,
+            ),
+        )
+    }
+
+    private fun recommendationSection(
+        title: String,
+        subtitle: String,
+        relationshipName: String,
+        relationships: JsonObject,
+        includedByKey: Map<String, JsonObject>,
+    ): TidalDiscoverSection? {
+        val resources = relationships.relationshipResourceKeys(relationshipName)
+            .mapNotNull { includedByKey[it] }
+        val playlists = resources
+            .mapNotNull { it.toPlaylist() }
+            .distinctBy { it.id }
+        if (playlists.isNotEmpty() && playlists.none { !it.artworkUrl.isNullOrBlank() }) {
+            Log.d(API_LOG_TAG, "discover playlist art absent section=$title count=${playlists.size} attrKeys=${resources.map { it.attributes.keysSummary() }.distinct().take(3).joinToString(",")} imageKeys=${JsonArray(resources).imageKeySummary()}")
+        }
+        return playlists.takeIf { it.isNotEmpty() }
+            ?.let { TidalDiscoverSection(title, TidalSearchResult(playlists = it), subtitle) }
+    }
+
     private fun parseSearch(element: JsonElement): TidalSearchResult {
         val resources = element.allResourceObjects()
         return TidalSearchResult(
@@ -299,6 +565,34 @@ class TidalApiClient(
             artists = root.legacyItems("artists").mapNotNull { it.toLegacyArtist() }.distinctBy { it.id },
             playlists = root.legacyItems("playlists").mapNotNull { it.toLegacyPlaylist() }.distinctBy { it.id },
         )
+    }
+
+    private suspend fun legacyFavorites(reason: String): TidalSearchResult {
+        Log.d(API_LOG_TAG, "library v1 fallback reason=$reason")
+        val userId = authRepository.accountInfo.first()?.userId?.takeIf { it.isNotBlank() }
+            ?: throw IllegalStateException("TIDAL account unavailable")
+        val clientId = authRepository.getClientIdForApi()
+        return try {
+            TidalSearchResult(
+                tracks = parseLegacyTracks(legacyService.favoriteTracks(userId, countryCode, token = clientId)),
+                albums = parseLegacyFavoriteObjects(legacyService.favoriteAlbums(userId, countryCode, token = clientId))
+                    .mapNotNull { it.toLegacyAlbum() }
+                    .distinctBy { it.id },
+                artists = parseLegacyFavoriteObjects(legacyService.favoriteArtists(userId, countryCode, token = clientId))
+                    .mapNotNull { it.toLegacyArtist() }
+                    .distinctBy { it.id },
+                playlists = parseLegacyFavoriteObjects(legacyService.favoritePlaylists(userId, countryCode, token = clientId))
+                    .mapNotNull { it.toLegacyPlaylist() }
+                    .distinctBy { it.id },
+            ).also {
+                Log.d(API_LOG_TAG, "library v1 ok tracks=${it.tracks.size} albums=${it.albums.size} artists=${it.artists.size} playlists=${it.playlists.size}")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.d(API_LOG_TAG, "library v1 failed reason=${t.safeReason()}")
+            throw t
+        }
     }
 
     private suspend fun legacyAlbum(id: String): TidalAlbum? {
@@ -337,7 +631,26 @@ class TidalApiClient(
             .map { track -> if (track.artist.isBlank() && albumArtist.isNotBlank()) track.copy(artist = albumArtist) else track }
             .distinctBy { it.id }
     }
+
+    private fun parseLegacyFavoriteObjects(element: JsonElement): List<JsonObject> {
+        val root = element as? JsonObject
+        return when {
+            root == null -> (element as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            root["items"] is JsonArray -> (root["items"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            else -> emptyList()
+        }
+    }
 }
+
+private fun TidalSearchResult.isEmpty(): Boolean =
+    tracks.isEmpty() && albums.isEmpty() && artists.isEmpty() && playlists.isEmpty()
+
+private fun List<TidalSearchResult>.mergeSearchResults(): TidalSearchResult = TidalSearchResult(
+    tracks = flatMap { it.tracks }.distinctBy { it.id },
+    albums = flatMap { it.albums }.distinctBy { it.id },
+    artists = flatMap { it.artists }.distinctBy { it.id },
+    playlists = flatMap { it.playlists }.distinctBy { it.id },
+)
 
 private fun JsonElement.allResourceObjects(): List<JsonObject> = dataObjects() + includedObjects()
 
@@ -356,15 +669,24 @@ private fun JsonElement.includedObjects(): List<JsonObject> {
 }
 
 private fun JsonObject.toTrack(): TidalTrack? {
+    return toTrack(emptyMap())
+}
+
+private fun JsonObject.toTrack(includedByKey: Map<String, JsonObject>): TidalTrack? {
     if (!typeMatches("track", "tracks")) return null
     val attrs = attributes
+    val album = relationshipResourceKeys("album", "albums")
+        .firstNotNullOfOrNull { includedByKey[it] }
+    val albumAttrs = album?.attributes
     val title = attrs.string("title", "name") ?: return null
     return TidalTrack(
         id = id ?: return null,
         title = title,
-        artist = attrs.string("artistName", "artist", "artists") ?: "",
-        album = attrs.string("albumTitle", "album") ?: "",
-        artworkUrl = attrs.imageUrl(320),
+        artist = attrs.string("artistName", "artist", "artists")
+            ?: albumAttrs?.string("artistName", "artist")
+            ?: "",
+        album = attrs.string("albumTitle", "album") ?: albumAttrs?.string("title", "name") ?: "",
+        artworkUrl = attrs.imageUrl(320) ?: albumAttrs?.imageUrl(320) ?: album?.imageUrl(320),
         durationMs = attrs.long("duration", "durationMs")?.let { if (it < 10_000) it * 1000L else it } ?: 0L,
     )
 }
@@ -460,6 +782,21 @@ private val JsonObject.id: String? get() = primitive("id")?.contentOrNull
 private val JsonObject.attributes: JsonObject get() = this["attributes"] as? JsonObject ?: this
 private fun JsonObject.typeMatches(vararg expected: String): Boolean = primitive("type")?.contentOrNull?.lowercase() in expected.map { it.lowercase() }
 private fun JsonObject.primitive(name: String): JsonPrimitive? = this[name] as? JsonPrimitive
+private fun JsonObject.resourceKey(): String = "${primitive("type")?.contentOrNull.orEmpty()}:${id.orEmpty()}"
+
+private fun JsonObject.relationshipResourceKeys(vararg names: String): List<String> {
+    val relationships = this["relationships"] as? JsonObject ?: return emptyList()
+    return names.flatMap { relationships.relationshipResourceKeys(it) }
+}
+
+private fun JsonObject.relationshipResourceKeys(name: String): List<String> {
+    val relationship = this[name] as? JsonObject ?: return emptyList()
+    return when (val data = relationship["data"]) {
+        is JsonArray -> data.mapNotNull { (it as? JsonObject)?.resourceKey()?.takeIf { key -> key != ":" } }
+        is JsonObject -> listOfNotNull(data.resourceKey().takeIf { it != ":" })
+        else -> emptyList()
+    }
+}
 
 private fun JsonObject.legacyItems(name: String): List<JsonObject> {
     val bucket = this[name] as? JsonObject ?: return emptyList()
@@ -514,7 +851,7 @@ private fun JsonObject.imageUrl(size: Int = 320): String? {
 
 private fun JsonObject.directImageUrl(size: Int = 320): String? {
     string("imageUrl", "artworkUrl", "coverUrl")?.let { return it }
-    string("coverArt", "cover", "imageId", "picture", "squareImage")
+    string("coverArt", "cover", "image", "imageId", "picture", "squareImage", "smallImage", "largeImage")
         ?.takeIf { it.isNotBlank() }
         ?.let { return if (it.startsWith("http", ignoreCase = true)) it else tidalResourceImageUrl(it, size) }
     string("url")?.takeIf { it.looksLikeImageUrl() }?.let { return it }
@@ -552,6 +889,33 @@ private fun tidalResourceImageUrl(id: String, size: Int): String {
 
 private fun JsonObject.keysSummary(): String =
     keys.sorted().take(16).joinToString("|")
+
+private fun JsonElement.imageKeySummary(): String =
+    imageKeys().sorted().take(24).joinToString("|").ifBlank { "none" }
+
+private fun JsonElement.imageKeys(): Set<String> = when (this) {
+    is JsonObject -> keys.filter { it.looksLikeArtworkKey() }
+        .toSet() + values.flatMap { it.imageKeys() }
+    is JsonArray -> flatMap { it.imageKeys() }.toSet()
+    else -> emptySet()
+}
+
+private fun JsonElement.imageValueCount(): Int = when (this) {
+    is JsonObject -> values.sumOf { it.imageValueCount() }
+    is JsonArray -> sumOf { it.imageValueCount() }
+    is JsonPrimitive -> if (contentOrNull?.looksLikeImageUrl() == true) 1 else 0
+}
+
+private fun String.looksLikeArtworkKey(): Boolean {
+    val lower = lowercase()
+    return lower.contains("image") ||
+        lower.contains("artwork") ||
+        lower.contains("picture") ||
+        lower.contains("thumbnail") ||
+        lower == "cover" ||
+        lower.endsWith("cover") ||
+        lower.contains("coverart")
+}
 
 private fun Throwable.safeReason(): String = when (this) {
     is HttpException -> "http-${code()}"
