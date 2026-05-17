@@ -2,8 +2,8 @@ package com.tidal.wear.ui.art
 
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
+import android.util.LruCache
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
-import coil.ImageLoader
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.size.Size
 import com.tidal.wear.core.model.TidalTrack
@@ -24,7 +24,13 @@ import kotlinx.coroutines.withContext
 data class AlbumArt(
     val bitmap: ImageBitmap?,
     val palette: AlbumPalette,
+    val byteCount: Int = 0,
 )
+
+private val albumArtCache = object : LruCache<String, AlbumArt>(4 * 1024) {
+    override fun sizeOf(key: String, value: AlbumArt): Int =
+        (value.byteCount / 1024).coerceAtLeast(1)
+}
 
 @Composable
 fun rememberAlbumArt(track: TidalTrack?): AlbumArt? {
@@ -37,40 +43,54 @@ fun rememberArtworkPalette(
     requestSize: Size = Size(160, 160),
 ): AlbumArt {
     val context = LocalContext.current
-    var bitmap by remember(artworkUrl, requestSize) { mutableStateOf<Bitmap?>(null) }
-    var art by remember(artworkUrl, requestSize) { mutableStateOf(AlbumArt(null, AlbumPalette.Default)) }
+    val appContext = context.applicationContext
+    val cacheKey = remember(artworkUrl, requestSize) { artworkCacheKey(artworkUrl, requestSize) }
+    var art by remember(cacheKey) {
+        mutableStateOf(cacheKey?.let(::cachedAlbumArt) ?: AlbumArt(null, AlbumPalette.Default))
+    }
 
-    LaunchedEffect(artworkUrl, requestSize) {
-        val url = artworkUrl
-        if (url.isNullOrBlank()) {
-            bitmap = null
+    LaunchedEffect(cacheKey) {
+        val url = artworkUrl?.trim()
+        val key = cacheKey
+        if (url.isNullOrBlank() || key == null) {
             art = AlbumArt(null, AlbumPalette.Default)
             return@LaunchedEffect
         }
+        cachedAlbumArt(key)?.let {
+            art = it
+            return@LaunchedEffect
+        }
         val loaded = withContext(Dispatchers.IO) {
-            val request = ImageRequest.Builder(context)
+            val request = ImageRequest.Builder(appContext)
                 .data(url)
                 .allowHardware(false)
                 .size(requestSize)
+                .memoryCacheKey(key)
+                .diskCacheKey(url)
                 .build()
-            (ImageLoader(context).execute(request).drawable as? BitmapDrawable)?.bitmap
+            (appContext.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
         }
-        bitmap = loaded
         art = loaded?.let {
             AlbumArt(
                 bitmap = it.asImageBitmap(),
                 palette = it.toAlbumPalette(),
+                byteCount = it.allocationByteCount,
             )
         } ?: AlbumArt(null, AlbumPalette.Default)
-    }
-
-    DisposableEffect(artworkUrl, requestSize) {
-        onDispose {
-            bitmap?.takeIf { !it.isRecycled }?.recycle()
-            bitmap = null
-        }
+        putAlbumArt(key, art)
     }
     return art
+}
+
+private fun artworkCacheKey(artworkUrl: String?, requestSize: Size): String? =
+    artworkUrl?.trim()?.takeIf(String::isNotBlank)?.let { "$it|$requestSize" }
+
+private fun cachedAlbumArt(key: String): AlbumArt? = synchronized(albumArtCache) { albumArtCache.get(key) }
+
+private fun putAlbumArt(key: String, art: AlbumArt) {
+    if (art.bitmap != null) {
+        synchronized(albumArtCache) { albumArtCache.put(key, art) }
+    }
 }
 
 private fun Bitmap.toAlbumPalette(): AlbumPalette {

@@ -79,6 +79,8 @@ import com.tidal.wear.ui.playlist.PlaylistScreen
 import com.tidal.wear.ui.search.SearchScreen
 import com.tidal.wear.ui.settings.SettingsScreen
 import com.tidal.wear.ui.theme.TidalColors
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private val HomePrimarySurface = Color(0xFF1A1A1A)
 private val HomeSecondarySurface = Color(0xFF1A1A1A)
@@ -116,6 +118,11 @@ private object Routes {
     fun playlist(playlistId: String): String = "playlist/${Uri.encode(playlistId)}"
 }
 
+private data class HomePlaybackSummary(
+    val track: TidalTrack? = null,
+    val isPlaying: Boolean = false,
+)
+
 @Composable
 private fun TidalWearApp() {
     MaterialTheme {
@@ -125,7 +132,11 @@ private fun TidalWearApp() {
             val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
             val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
             val nowPlayingViewModel = viewModel<NowPlayingViewModel>()
-            val nowPlaying by nowPlayingViewModel.state.collectAsState()
+            val homePlayback by remember(nowPlayingViewModel) {
+                nowPlayingViewModel.state
+                    .map { HomePlaybackSummary(track = it.track, isPlaying = it.isPlaying) }
+                    .distinctUntilChanged()
+            }.collectAsState(initial = HomePlaybackSummary())
             val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
 
             LaunchedEffect(authState) {
@@ -166,11 +177,11 @@ private fun TidalWearApp() {
                     HomeScreen(
                         navController = navController,
                         authState = authState,
-                        track = nowPlaying.track,
-                        isPlaying = nowPlaying.isPlaying,
+                        track = homePlayback.track,
+                        isPlaying = homePlayback.isPlaying,
                         onNowPlaying = ::openPlayer,
                         onResume = {
-                            nowPlaying.track?.let {
+                            homePlayback.track?.let {
                                 context.resumeTrackPlayback()
                                 openPlayer()
                             } ?: navController.navigate(Routes.Search)

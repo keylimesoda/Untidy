@@ -12,10 +12,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -49,9 +52,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,6 +80,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private const val KeyboardInputHostAlpha = 0.02f
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(
     apiClient: TidalApiClient,
@@ -89,13 +97,15 @@ fun SearchScreen(
     val focusRequester = remember { FocusRequester() }
     val context = LocalContext.current
     val sidePadding = (LocalConfiguration.current.screenWidthDp * 0.12f).dp
-    var query by remember { mutableStateOf("") }
+    val imeVisible = WindowInsets.isImeVisible
+    var query by remember { mutableStateOf(TextFieldValue("")) }
     var submittedQuery by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<TidalSearchResult?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var requestKeyboardTick by remember { mutableIntStateOf(1) }
     var inputFocusedOnce by remember { mutableStateOf(false) }
+    var keyboardShownOnce by remember { mutableStateOf(false) }
 
     LaunchedEffect(requestKeyboardTick) {
         if (requestKeyboardTick > 0) {
@@ -105,8 +115,16 @@ fun SearchScreen(
         }
     }
 
+    LaunchedEffect(imeVisible, inputFocusedOnce, query.text, submittedQuery) {
+        if (imeVisible) {
+            keyboardShownOnce = true
+        } else if (keyboardShownOnce && inputFocusedOnce && query.text.isBlank() && submittedQuery.isBlank()) {
+            onCancel()
+        }
+    }
+
     fun searchNow() {
-        val q = query.trim()
+        val q = query.text.trim()
         if (q.isBlank() || loading) return
         submittedQuery = q
         result = null
@@ -129,19 +147,21 @@ fun SearchScreen(
     }
 
     fun resetSearch() {
-        query = ""
+        query = TextFieldValue("")
         submittedQuery = ""
         result = null
         error = null
         inputFocusedOnce = false
+        keyboardShownOnce = false
         requestKeyboardTick += 1
     }
 
     fun editSearch() {
-        query = submittedQuery
+        query = TextFieldValue(submittedQuery, selection = TextRange(submittedQuery.length))
         submittedQuery = ""
         error = null
         inputFocusedOnce = false
+        keyboardShownOnce = false
         requestKeyboardTick += 1
     }
 
@@ -158,11 +178,11 @@ fun SearchScreen(
                     onFocusChanged = { isFocused ->
                         if (isFocused) {
                             inputFocusedOnce = true
-                        } else if (inputFocusedOnce && query.isBlank() && submittedQuery.isBlank()) {
+                        } else if (inputFocusedOnce && query.text.isBlank() && submittedQuery.isBlank()) {
                             onCancel()
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = sidePadding).alpha(0f),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = sidePadding).alpha(KeyboardInputHostAlpha),
                 )
             }
         } else {
@@ -413,8 +433,8 @@ private fun SearchingIndicator() {
 
 @Composable
 private fun SearchInput(
-    query: String,
-    onQueryChange: (String) -> Unit,
+    query: TextFieldValue,
+    onQueryChange: (TextFieldValue) -> Unit,
     onSearch: () -> Unit,
     focusRequester: FocusRequester,
     onFocusChanged: (Boolean) -> Unit,
@@ -439,7 +459,7 @@ private fun SearchInput(
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                if (query.isBlank()) {
+                if (query.text.isBlank()) {
                     Text("Search TIDAL", color = TidalColors.OnSurfaceMuted, fontSize = 14.sp)
                 }
                 innerTextField()
