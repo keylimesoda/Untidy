@@ -54,6 +54,7 @@ class NowPlayingViewModel(application: Application) : AndroidViewModel(applicati
 class NowPlayingStateHolder(
     private val context: Context,
     private val scope: kotlinx.coroutines.CoroutineScope,
+    private val pollPosition: Boolean = true,
 ) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
     private val _state = MutableStateFlow(
@@ -156,6 +157,8 @@ class NowPlayingStateHolder(
 
     private fun restartPositionPolling(isPlaying: Boolean) {
         positionJob?.cancel()
+        positionJob = null
+        if (!pollPosition) return
         if (!isPlaying) return
         positionJob = scope.launch {
             while (isActive) {
