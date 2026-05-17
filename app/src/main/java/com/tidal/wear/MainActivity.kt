@@ -169,7 +169,12 @@ private fun TidalWearApp() {
                         track = nowPlaying.track,
                         isPlaying = nowPlaying.isPlaying,
                         onNowPlaying = ::openPlayer,
-                        onResume = { nowPlaying.track?.let(::playTrack) ?: navController.navigate(Routes.Search) },
+                        onResume = {
+                            nowPlaying.track?.let {
+                                context.resumeTrackPlayback()
+                                openPlayer()
+                            } ?: navController.navigate(Routes.Search)
+                        },
                         onOffline = { Toast.makeText(context, "Downloads coming soon", Toast.LENGTH_SHORT).show() },
                     )
                 }
@@ -474,6 +479,13 @@ private fun Context.startTrackPlayback(track: TidalTrack) {
         .putExtra(PlaybackActions.EXTRA_ARTIST, track.artist)
         .putExtra(PlaybackActions.EXTRA_ALBUM, track.album)
         .putExtra(PlaybackActions.EXTRA_ARTWORK_URL, track.artworkUrl)
+        .putExtra(PlaybackActions.EXTRA_DURATION_MS, track.durationMs)
+    ContextCompat.startForegroundService(this, intent)
+}
+
+private fun Context.resumeTrackPlayback() {
+    val intent = Intent(this, TidalMediaService::class.java)
+        .setAction(PlaybackActions.ACTION_RESUME)
     ContextCompat.startForegroundService(this, intent)
 }
 

@@ -335,6 +335,7 @@ private fun Intent.toTrackOrNull(): TidalTrack? {
         artist = getStringExtra(PlaybackActions.EXTRA_ARTIST).orEmpty(),
         album = getStringExtra(PlaybackActions.EXTRA_ALBUM).orEmpty(),
         artworkUrl = getStringExtra(PlaybackActions.EXTRA_ARTWORK_URL),
+        durationMs = getLongExtra(PlaybackActions.EXTRA_DURATION_MS, 0L),
     )
 }
 

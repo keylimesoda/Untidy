@@ -14,6 +14,7 @@ object PlaybackActions {
     const val EXTRA_ARTIST = "com.tidal.wear.extra.ARTIST"
     const val EXTRA_ALBUM = "com.tidal.wear.extra.ALBUM"
     const val EXTRA_ARTWORK_URL = "com.tidal.wear.extra.ARTWORK_URL"
+    const val EXTRA_DURATION_MS = "com.tidal.wear.extra.DURATION_MS"
     const val EXTRA_QUEUE_ID = "com.tidal.wear.extra.QUEUE_ID"
     const val EXTRA_QUEUE_START_INDEX = "com.tidal.wear.extra.QUEUE_START_INDEX"
 }
