@@ -5,12 +5,9 @@ import android.content.SharedPreferences
 import android.util.Base64
 import android.util.Log
 import com.tidal.sdk.auth.CredentialsProvider
-import com.tidal.sdk.auth.TidalAuth
-import com.tidal.sdk.auth.model.AuthConfig
 import com.tidal.sdk.auth.model.AuthResult
 import com.tidal.sdk.auth.model.Credentials
 import com.tidal.sdk.auth.model.success
-import com.tidal.sdk.auth.network.NetworkLogLevel
 import com.tidal.sdk.common.TidalMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -301,19 +298,6 @@ class DefaultTidalAuthRepository private constructor(
     override val authState: StateFlow<AuthState> = _authState.asStateFlow()
     private val _accountInfo = MutableStateFlow(readAccountInfo())
     override val accountInfo: StateFlow<TidalAccountInfo?> = _accountInfo.asStateFlow()
-
-    @Suppress("unused")
-    private val tidalAuth = TidalAuth.getInstance(
-        AuthConfig(
-            clientId = clientId,
-            clientSecret = clientSecret.takeIf { it.isNotBlank() },
-            credentialsKey = "tidal-wear",
-            scopes = requestedScopes,
-            enableCertificatePinning = true,
-            logLevel = if (BuildConfig.DEBUG) NetworkLogLevel.BODY else NetworkLogLevel.NONE,
-        ),
-        appContext,
-    )
 
     override val credentialsProvider: CredentialsProvider = StoredCredentialsProvider(
         prefs = prefs,
