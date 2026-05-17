@@ -19,6 +19,7 @@ import coil.request.ImageRequest
 import coil.size.Size
 import com.tidal.wear.core.model.TidalTrack
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 data class AlbumArt(
@@ -32,9 +33,76 @@ private val albumArtCache = object : LruCache<String, AlbumArt>(4 * 1024) {
         (value.byteCount / 1024).coerceAtLeast(1)
 }
 
+private data class RowArtwork(
+    val bitmap: ImageBitmap,
+    val byteCount: Int,
+)
+
+private val rowArtworkCache = object : LruCache<String, RowArtwork>(2 * 1024) {
+    override fun sizeOf(key: String, value: RowArtwork): Int =
+        (value.byteCount / 1024).coerceAtLeast(1)
+}
+
 @Composable
 fun rememberAlbumArt(track: TidalTrack?): AlbumArt? {
     return rememberArtworkPalette(track?.artworkUrl, Size.ORIGINAL)
+}
+
+@Composable
+fun rememberDeferredRowArtwork(
+    artworkUrl: String?,
+    requestSize: Size = Size(96, 96),
+    enabled: Boolean = true,
+    delayMillis: Long = 160L,
+): ImageBitmap? {
+    val context = LocalContext.current
+    val appContext = context.applicationContext
+    val cacheKey = remember(artworkUrl, requestSize) { artworkCacheKey(artworkUrl, requestSize) }
+    var bitmap by remember(cacheKey, enabled) {
+        mutableStateOf(if (enabled && cacheKey != null) cachedRowArtwork(cacheKey)?.bitmap else null)
+    }
+
+    LaunchedEffect(cacheKey, enabled, delayMillis) {
+        val url = artworkUrl?.trim()
+        val key = cacheKey
+        if (!enabled || url.isNullOrBlank() || key == null) {
+            bitmap = null
+            return@LaunchedEffect
+        }
+        cachedRowArtwork(key)?.let {
+            bitmap = it.bitmap
+            return@LaunchedEffect
+        }
+
+        delay(delayMillis)
+        cachedRowArtwork(key)?.let {
+            bitmap = it.bitmap
+            return@LaunchedEffect
+        }
+
+        val loaded = withContext(Dispatchers.IO) {
+            val request = ImageRequest.Builder(appContext)
+                .data(url)
+                .allowHardware(false)
+                .size(requestSize)
+                .memoryCacheKey("row:$key")
+                .diskCacheKey(url)
+                .build()
+            (appContext.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
+        }
+        if (loaded != null) {
+            val rowArtwork = RowArtwork(
+                bitmap = loaded.asImageBitmap(),
+                byteCount = loaded.allocationByteCount,
+            )
+            putRowArtwork(key, rowArtwork)
+            bitmap = rowArtwork.bitmap
+        } else {
+            bitmap = null
+        }
+    }
+
+    return bitmap
 }
 
 @Composable
@@ -91,6 +159,12 @@ private fun putAlbumArt(key: String, art: AlbumArt) {
     if (art.bitmap != null) {
         synchronized(albumArtCache) { albumArtCache.put(key, art) }
     }
+}
+
+private fun cachedRowArtwork(key: String): RowArtwork? = synchronized(rowArtworkCache) { rowArtworkCache.get(key) }
+
+private fun putRowArtwork(key: String, art: RowArtwork) {
+    synchronized(rowArtworkCache) { rowArtworkCache.put(key, art) }
 }
 
 private fun Bitmap.toAlbumPalette(): AlbumPalette {

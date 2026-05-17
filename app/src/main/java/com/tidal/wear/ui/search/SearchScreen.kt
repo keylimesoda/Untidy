@@ -7,7 +7,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -47,7 +46,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -72,7 +70,8 @@ import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
-import com.tidal.wear.ui.art.rememberArtworkPalette
+import com.tidal.wear.ui.art.rememberDeferredRowArtwork
+import com.tidal.wear.ui.components.RowArtworkThumb
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -344,8 +343,8 @@ private fun SearchResultChip(
     fallback: String,
     onClick: () -> Unit,
 ) {
-    val art = rememberArtworkPalette(artworkUrl, Size(96, 96))
-    val accent = art.palette.accentColor()
+    val artwork = rememberDeferredRowArtwork(artworkUrl, Size(96, 96))
+    val accent = TidalColors.Cyan
     val background = lerp(TidalColors.Surface, accent, 0.28f)
     Chip(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -357,10 +356,10 @@ private fun SearchResultChip(
             iconColor = TidalColors.White,
         ),
         icon = {
-            ArtworkThumb(
+            RowArtworkThumb(
                 label = label,
                 fallback = fallback,
-                bitmap = art.bitmap,
+                bitmap = artwork,
                 accent = accent,
             )
         },
@@ -368,38 +367,6 @@ private fun SearchResultChip(
         secondaryLabel = { OneLineText(secondaryLabel) },
         contentPadding = PaddingValues(horizontal = 12.dp),
     )
-}
-
-@Composable
-private fun ArtworkThumb(
-    label: String,
-    fallback: String,
-    bitmap: androidx.compose.ui.graphics.ImageBitmap?,
-    accent: Color,
-) {
-    Box(
-        modifier = Modifier
-            .size(ChipDefaults.LargeIconSize)
-            .clip(RoundedCornerShape(6.dp))
-            .background(lerp(TidalColors.SurfaceHigh, accent, 0.62f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap,
-                contentDescription = label,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            Text(
-                text = label.trim().firstOrNull()?.uppercaseChar()?.toString() ?: fallback,
-                color = TidalColors.White,
-                fontWeight = FontWeight.Black,
-                fontSize = 14.sp,
-            )
-        }
-    }
 }
 
 @Composable

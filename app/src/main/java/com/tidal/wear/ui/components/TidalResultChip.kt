@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -24,7 +25,7 @@ import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Text
 import coil.size.Size
-import com.tidal.wear.ui.art.rememberArtworkPalette
+import com.tidal.wear.ui.art.rememberDeferredRowArtwork
 import com.tidal.wear.ui.theme.TidalColors
 
 @Composable
@@ -35,9 +36,16 @@ fun TidalResultChip(
     fallback: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enableArtwork: Boolean = true,
+    deferArtwork: Boolean = true,
 ) {
-    val art = rememberArtworkPalette(artworkUrl, Size(96, 96))
-    val accent = art.palette.accentColor()
+    val artwork = rememberDeferredRowArtwork(
+        artworkUrl = artworkUrl,
+        requestSize = Size(96, 96),
+        enabled = enableArtwork,
+        delayMillis = if (deferArtwork) 160L else 0L,
+    )
+    val accent = TidalColors.Cyan
     Chip(
         modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp),
         onClick = onClick,
@@ -48,34 +56,49 @@ fun TidalResultChip(
             iconColor = TidalColors.White,
         ),
         icon = {
-            Box(
-                modifier = Modifier
-                    .size(ChipDefaults.LargeIconSize)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(lerp(TidalColors.SurfaceHigh, accent, 0.62f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (art.bitmap != null) {
-                    Image(
-                        bitmap = art.bitmap,
-                        contentDescription = label,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Text(
-                        text = label.trim().firstOrNull()?.uppercaseChar()?.toString() ?: fallback,
-                        color = TidalColors.White,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 14.sp,
-                    )
-                }
-            }
+            RowArtworkThumb(
+                label = label,
+                fallback = fallback,
+                bitmap = artwork,
+                accent = accent,
+            )
         },
         label = { ResultText(label) },
         secondaryLabel = { ResultText(secondaryLabel) },
         contentPadding = PaddingValues(horizontal = 12.dp),
     )
+}
+
+@Composable
+fun RowArtworkThumb(
+    label: String,
+    fallback: String,
+    bitmap: ImageBitmap?,
+    accent: Color = TidalColors.Cyan,
+) {
+    Box(
+        modifier = Modifier
+            .size(ChipDefaults.LargeIconSize)
+            .clip(RoundedCornerShape(6.dp))
+            .background(lerp(TidalColors.SurfaceHigh, accent, 0.62f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = label,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(
+                text = label.trim().firstOrNull()?.uppercaseChar()?.toString() ?: fallback,
+                color = TidalColors.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 14.sp,
+            )
+        }
+    }
 }
 
 @Composable
