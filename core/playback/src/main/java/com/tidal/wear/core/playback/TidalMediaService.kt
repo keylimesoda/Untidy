@@ -196,7 +196,7 @@ class TidalMediaService : MediaLibraryService() {
 
     private fun skipToNextInQueue() {
         val next = currentQueueIndex + 1
-        if (currentQueue.isNotEmpty() && next <= currentQueue.lastIndex) {
+        if (hasNextInQueue()) {
             currentQueueIndex = next
             val track = currentQueue[currentQueueIndex]
             Log.d(PLAYER_LOG_TAG, "queue next index=$currentQueueIndex id=${track.id}")
@@ -205,6 +205,8 @@ class TidalMediaService : MediaLibraryService() {
             Log.d(PLAYER_LOG_TAG, "queue next unavailable size=${currentQueue.size} index=$currentQueueIndex")
         }
     }
+
+    private fun hasNextInQueue(): Boolean = currentQueue.isNotEmpty() && currentQueueIndex + 1 <= currentQueue.lastIndex
 
     private fun skipToPreviousInQueue() {
         val previous = currentQueueIndex - 1
@@ -231,7 +233,13 @@ class TidalMediaService : MediaLibraryService() {
             sessionPlayer?.setBackendPlaybackState(PlaybackBackendState.Idle)
             return
         }
-        skipToNextInQueue()
+        if (hasNextInQueue()) {
+            skipToNextInQueue()
+        } else {
+            Log.d(PLAYER_LOG_TAG, "media ended with no next track; waiting for explicit replay")
+            sessionPlayer?.markPlaybackEnded()
+            currentTrack?.let { publishOngoingActivity(it, isPlaying = false) }
+        }
     }
 
     private fun logPlaybackContext(label: String, context: PlaybackDiagnosticContext) {
@@ -350,6 +358,7 @@ private class TidalSessionPlayer(
     private var durationMs = C.TIME_UNSET
     private var basePositionMs = 0L
     private var baseElapsedMs = android.os.SystemClock.elapsedRealtime()
+    private var endedAwaitingReplay = false
 
     fun loadTrack(track: TidalTrack) {
         Log.d(PLAYER_LOG_TAG, "SessionPlayer loadTrack id=${track.id} title=${track.title}")
@@ -369,11 +378,14 @@ private class TidalSessionPlayer(
         baseElapsedMs = android.os.SystemClock.elapsedRealtime()
         playbackState = Player.STATE_BUFFERING
         playWhenReady = true
+        endedAwaitingReplay = false
         invalidateState()
     }
 
     fun setBackendPlaybackState(state: PlaybackBackendState) {
         Log.d(PLAYER_LOG_TAG, "SessionPlayer setBackendPlaybackState $state")
+        if (endedAwaitingReplay && state != PlaybackBackendState.Playing) return
+        if (state == PlaybackBackendState.Playing) endedAwaitingReplay = false
         playbackState = when (state) {
             PlaybackBackendState.Idle -> Player.STATE_IDLE
             PlaybackBackendState.Playing -> Player.STATE_READY
@@ -383,6 +395,15 @@ private class TidalSessionPlayer(
         playWhenReady = state == PlaybackBackendState.Playing
         if (!playWhenReady) basePositionMs = currentPositionInternal()
         baseElapsedMs = android.os.SystemClock.elapsedRealtime()
+        invalidateState()
+    }
+
+    fun markPlaybackEnded() {
+        playWhenReady = false
+        basePositionMs = if (durationMs == C.TIME_UNSET) currentPositionInternal() else durationMs
+        baseElapsedMs = android.os.SystemClock.elapsedRealtime()
+        playbackState = Player.STATE_ENDED
+        endedAwaitingReplay = true
         invalidateState()
     }
 
@@ -422,6 +443,12 @@ private class TidalSessionPlayer(
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<Any> {
         this.playWhenReady = playWhenReady
         if (playWhenReady) {
+            if (endedAwaitingReplay || playbackState == Player.STATE_ENDED) {
+                endedAwaitingReplay = false
+                basePositionMs = 0L
+                playbackBackend.seek(0f)
+                playbackState = Player.STATE_BUFFERING
+            }
             baseElapsedMs = android.os.SystemClock.elapsedRealtime()
             playbackBackend.play()
         } else {
@@ -437,8 +464,10 @@ private class TidalSessionPlayer(
             Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> onSkipNext()
             Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> onSkipPrevious()
             else -> if (positionMs != C.TIME_UNSET) {
+                endedAwaitingReplay = false
                 basePositionMs = positionMs.coerceAtLeast(0L)
                 baseElapsedMs = android.os.SystemClock.elapsedRealtime()
+                if (playbackState == Player.STATE_ENDED) playbackState = Player.STATE_READY
                 playbackBackend.seek(basePositionMs / 1000f)
             }
         }
@@ -449,6 +478,7 @@ private class TidalSessionPlayer(
     override fun handleRelease(): ListenableFuture<Any> = Futures.immediateFuture(Any())
 
     private fun currentPositionInternal(): Long {
+        if (endedAwaitingReplay) return basePositionMs.coerceAtLeast(0L)
         val backendPositionMs = playbackBackend.positionMs
         if (backendPositionMs > 0L) return backendPositionMs
         val estimated = if (playWhenReady && playbackState == Player.STATE_READY) {
