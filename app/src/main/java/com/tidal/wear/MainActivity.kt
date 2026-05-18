@@ -65,6 +65,7 @@ import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.AuthState
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.TidalAlbum
+import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.PlaybackActions
@@ -72,6 +73,7 @@ import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
 import com.tidal.wear.playback.NowPlayingStateHolder
 import com.tidal.wear.ui.album.AlbumScreen
+import com.tidal.wear.ui.artist.ArtistScreen
 import com.tidal.wear.ui.discover.DiscoverScreen
 import com.tidal.wear.ui.library.LibraryScreen
 import com.tidal.wear.ui.onboarding.OnboardingScreen
@@ -111,11 +113,13 @@ private object Routes {
     const val Search = "search"
     const val Album = "album/{albumId}"
     const val Playlist = "playlist/{playlistId}"
+    const val Artist = "artist/{artistId}"
     const val Library = "library"
     const val Settings = "settings"
 
     fun album(albumId: String): String = "album/${Uri.encode(albumId)}"
     fun playlist(playlistId: String): String = "playlist/${Uri.encode(playlistId)}"
+    fun artist(artistId: String): String = "artist/${Uri.encode(artistId)}"
 }
 
 private data class HomePlaybackSummary(
@@ -172,6 +176,10 @@ private fun TidalWearApp() {
                 PlaylistSelectionStore.put(playlist)
                 navController.navigate(Routes.playlist(playlist.id))
             }
+            fun openArtist(artist: TidalArtist) {
+                ArtistSelectionStore.put(artist)
+                navController.navigate(Routes.artist(artist.id))
+            }
 
             SwipeDismissableNavHost(navController = navController, startDestination = Routes.Onboarding) {
                 composable(Routes.Onboarding) {
@@ -201,6 +209,7 @@ private fun TidalWearApp() {
                         apiClient = apiClient,
                         onOpenAlbum = ::openAlbum,
                         onOpenPlaylist = ::openPlaylist,
+                        onOpenArtist = ::openArtist,
                         onPlayTrack = ::playTrack,
                         onPlayQueue = ::playQueue,
                     )
@@ -211,6 +220,7 @@ private fun TidalWearApp() {
                         onPlayTrack = ::playTrack,
                         onOpenAlbum = ::openAlbum,
                         onOpenPlaylist = ::openPlaylist,
+                        onOpenArtist = ::openArtist,
                         onCancel = {
                             if (!navController.popBackStack()) {
                                 navController.navigateAndClear(Routes.Home)
@@ -236,11 +246,25 @@ private fun TidalWearApp() {
                         onPlayQueue = ::playQueue,
                     )
                 }
+                composable(Routes.Artist) { entry ->
+                    val artistId = entry.arguments?.getString("artistId")?.let(Uri::decode).orEmpty()
+                    ArtistScreen(
+                        apiClient = apiClient,
+                        artistId = artistId,
+                        initialArtist = ArtistSelectionStore.get(artistId),
+                        onPlayTrack = ::playTrack,
+                        onPlayQueue = ::playQueue,
+                        onOpenAlbum = ::openAlbum,
+                        onOpenPlaylist = ::openPlaylist,
+                        onOpenArtist = ::openArtist,
+                    )
+                }
                 composable(Routes.Library) {
                     LibraryScreen(
                         apiClient = apiClient,
                         onOpenAlbum = ::openAlbum,
                         onOpenPlaylist = ::openPlaylist,
+                        onOpenArtist = ::openArtist,
                         onPlayTrack = ::playTrack,
                     )
                 }
@@ -531,6 +555,16 @@ private object PlaylistSelectionStore {
     }
 
     fun get(playlistId: String): TidalPlaylist? = playlists[playlistId]
+}
+
+private object ArtistSelectionStore {
+    private val artists = java.util.concurrent.ConcurrentHashMap<String, TidalArtist>()
+
+    fun put(artist: TidalArtist) {
+        if (artist.id.isNotBlank()) artists[artist.id] = artist
+    }
+
+    fun get(artistId: String): TidalArtist? = artists[artistId]
 }
 
 private fun NavHostController.navigateAndClear(route: String) {

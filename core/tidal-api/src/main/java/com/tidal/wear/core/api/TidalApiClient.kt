@@ -159,6 +159,22 @@ interface TidalApiService {
         @Query("countryCode") countryCode: String,
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
+
+    @GET("artists/{id}/relationships/tracks")
+    suspend fun artistTracks(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "tracks,tracks.albums",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("artists/{id}/relationships/albums")
+    suspend fun artistAlbums(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "albums",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
 }
 
 interface TidalLegacyApiService {
@@ -186,6 +202,32 @@ interface TidalLegacyApiService {
         @Query("countryCode") countryCode: String,
         @Query("token") token: String,
         @Query("limit") limit: Int = 50,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET("artists/{id}")
+    suspend fun artist(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET("artists/{id}/toptracks")
+    suspend fun artistTopTracks(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Query("limit") limit: Int = 25,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET("artists/{id}/albums")
+    suspend fun artistAlbums(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("token") token: String,
+        @Query("limit") limit: Int = 25,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
 
@@ -249,6 +291,29 @@ interface TidalDesktopApiService {
         @Url url: String,
         @Query("countryCode") countryCode: String,
         @Query("limit") limit: Int = 50,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET
+    suspend fun artist(
+        @Url url: String,
+        @Query("countryCode") countryCode: String,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET
+    suspend fun artistTopTracks(
+        @Url url: String,
+        @Query("countryCode") countryCode: String,
+        @Query("limit") limit: Int = 25,
+        @Header("accept") accept: String = "application/json",
+    ): JsonElement
+
+    @GET
+    suspend fun artistAlbums(
+        @Url url: String,
+        @Query("countryCode") countryCode: String,
+        @Query("limit") limit: Int = 25,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
 }
@@ -389,7 +454,37 @@ class TidalApiClient(
         }
     }
     suspend fun track(id: String): TidalTrack? = service.track(id, countryCode).dataObjects().firstOrNull()?.toTrack()
-    suspend fun artist(id: String): TidalArtist? = service.artist(id, countryCode).dataObjects().firstOrNull()?.toArtist()
+    suspend fun artist(id: String): TidalArtist? = try {
+        val v2Artist = service.artist(id, countryCode).dataObjects().firstOrNull()?.toArtist()
+        if (v2Artist != null && !v2Artist.artworkUrl.isNullOrBlank()) v2Artist else legacyArtist(id) ?: v2Artist
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        Log.d(API_LOG_TAG, "artist v2 failed reason=${t.safeReason()}")
+        legacyArtist(id)
+    }
+
+    suspend fun artistContent(id: String): TidalSearchResult {
+        val v2Tracks = runCatching {
+            val root = service.artistTracks(id, countryCode)
+            val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+            root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }.distinctBy { it.id }
+        }.getOrElse { t ->
+            if (t is CancellationException) throw t
+            Log.d(API_LOG_TAG, "artist tracks v2 failed reason=${t.safeReason()}")
+            emptyList()
+        }
+        val tracks = v2Tracks.ifEmpty { legacyArtistTopTracks(id) }
+        val v2Albums = runCatching {
+            service.artistAlbums(id, countryCode).allResourceObjects().mapNotNull { it.toAlbum() }.distinctBy { it.id }
+        }.getOrElse { t ->
+            if (t is CancellationException) throw t
+            Log.d(API_LOG_TAG, "artist albums v2 failed reason=${t.safeReason()}")
+            emptyList()
+        }
+        val albums = v2Albums.ifEmpty { legacyArtistAlbums(id) }
+        return TidalSearchResult(tracks = tracks, albums = albums)
+    }
 
     suspend fun homeSections(): List<TidalSection> {
         val result = search("TIDAL")
@@ -619,6 +714,42 @@ class TidalApiClient(
             .also { Log.d(API_LOG_TAG, "album tracks ok count=${it.size}") }
     }
 
+    private suspend fun legacyArtist(id: String): TidalArtist? {
+        val clientId = authRepository.getClientIdForApi()
+        return runCatching { (legacyService.artist(id, countryCode, token = clientId) as? JsonObject)?.toLegacyArtist() }
+            .recoverCatching {
+                Log.d(API_LOG_TAG, "artist v1 failed reason=${it.safeReason()}, trying desktop")
+                (desktopService.artist("https://listen.tidal.com/v1/artists/$id", countryCode) as? JsonObject)?.toLegacyArtist()
+            }
+            .onFailure { Log.d(API_LOG_TAG, "artist desktop failed reason=${it.safeReason()}") }
+            .getOrNull()
+    }
+
+    private suspend fun legacyArtistTopTracks(id: String): List<TidalTrack> {
+        val clientId = authRepository.getClientIdForApi()
+        return runCatching { parseLegacyTracks(legacyService.artistTopTracks(id, countryCode, token = clientId)) }
+            .recoverCatching {
+                Log.d(API_LOG_TAG, "artist top tracks v1 failed reason=${it.safeReason()}, trying desktop")
+                parseLegacyTracks(desktopService.artistTopTracks("https://listen.tidal.com/v1/artists/$id/toptracks", countryCode))
+            }
+            .onFailure { Log.d(API_LOG_TAG, "artist top tracks desktop failed reason=${it.safeReason()}") }
+            .getOrDefault(emptyList())
+            .also { Log.d(API_LOG_TAG, "artist top tracks ok count=${it.size}") }
+    }
+
+    private suspend fun legacyArtistAlbums(id: String): List<TidalAlbum> {
+        val clientId = authRepository.getClientIdForApi()
+        return runCatching {
+            parseLegacyObjects(legacyService.artistAlbums(id, countryCode, token = clientId)).mapNotNull { it.toLegacyAlbum() }.distinctBy { it.id }
+        }.recoverCatching {
+            Log.d(API_LOG_TAG, "artist albums v1 failed reason=${it.safeReason()}, trying desktop")
+            parseLegacyObjects(desktopService.artistAlbums("https://listen.tidal.com/v1/artists/$id/albums", countryCode)).mapNotNull { it.toLegacyAlbum() }.distinctBy { it.id }
+        }.onFailure {
+            Log.d(API_LOG_TAG, "artist albums desktop failed reason=${it.safeReason()}")
+        }.getOrDefault(emptyList())
+            .also { Log.d(API_LOG_TAG, "artist albums ok count=${it.size}") }
+    }
+
     private fun parseLegacyTracks(element: JsonElement): List<TidalTrack> {
         val root = element as? JsonObject
         val albumArtist = root?.legacyAlbumArtist().orEmpty()
@@ -632,7 +763,9 @@ class TidalApiClient(
             .distinctBy { it.id }
     }
 
-    private fun parseLegacyFavoriteObjects(element: JsonElement): List<JsonObject> {
+    private fun parseLegacyFavoriteObjects(element: JsonElement): List<JsonObject> = parseLegacyObjects(element)
+
+    private fun parseLegacyObjects(element: JsonElement): List<JsonObject> {
         val root = element as? JsonObject
         return when {
             root == null -> (element as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
