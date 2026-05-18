@@ -95,9 +95,11 @@ fun TidalPlayerScreen(
     viewModel: NowPlayingViewModel,
     isAmbient: Boolean,
     ambientOffset: Pair<Int, Int>,
+    deviceHasLowBitAmbient: Boolean,
+    burnInProtectionRequired: Boolean,
 ) {
     val state by viewModel.state.collectAsState()
-    val albumArt = rememberAlbumArt(state.track)
+    val albumArt = if (isAmbient) null else rememberAlbumArt(state.track)
     val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.Cyan
     val context = LocalContext.current
     var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.NotDownloaded) }
@@ -110,10 +112,16 @@ fun TidalPlayerScreen(
         }
     }
 
-    BackHandler { (context as? Activity)?.finish() }
+    BackHandler { (context as? Activity)?.moveTaskToBack(true) }
 
     if (isAmbient) {
-        TidalPlayerAmbient(state.track, albumArt, ambientOffset)
+        TidalPlayerAmbient(
+            track = state.track,
+            isPlaying = state.isPlaying,
+            ambientOffset = ambientOffset,
+            deviceHasLowBitAmbient = deviceHasLowBitAmbient,
+            burnInProtectionRequired = burnInProtectionRequired,
+        )
     } else {
         TidalPlayerNonAmbient(
             state = state,
@@ -437,48 +445,63 @@ private fun TransportButton(
 @Composable
 private fun TidalPlayerAmbient(
     track: TidalTrack?,
-    albumArt: AlbumArt?,
+    isPlaying: Boolean,
     ambientOffset: Pair<Int, Int>,
+    deviceHasLowBitAmbient: Boolean,
+    burnInProtectionRequired: Boolean,
 ) {
     val scale = playerLayoutScale()
+    val primary = if (deviceHasLowBitAmbient) Color.White else Color.White.copy(alpha = 0.82f)
+    val secondary = if (deviceHasLowBitAmbient) Color.White else Color.White.copy(alpha = 0.56f)
+    val offset = if (burnInProtectionRequired) ambientOffset else 0 to 0
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(TidalColors.Black)
             .graphicsLayer {
-                translationX = ambientOffset.first.toFloat()
-                translationY = ambientOffset.second.toFloat()
+                translationX = offset.first.toFloat()
+                translationY = offset.second.toFloat()
             },
     ) {
-        CircularPerimeterProgress(
-            progress = 1f,
-            modifier = Modifier.fillMaxSize().padding(3.dp * scale),
-            trackColor = TidalColors.White.copy(alpha = 0.30f),
-            progressColor = TidalColors.White.copy(alpha = 0.30f),
-            strokeWidth = 2.dp * scale,
-        )
         Column(
-            modifier = Modifier.fillMaxSize().padding(top = 34.dp * scale),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 26.dp * scale, vertical = 36.dp * scale),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            AlbumArtCard(bitmap = albumArt?.bitmap, accent = TidalColors.White, sizeDp = (64 * scale).roundToInt())
             Text(
                 text = track?.title ?: "Untidy",
                 style = MaterialTheme.typography.caption1,
-                color = TidalColors.White,
-                fontWeight = FontWeight.Black,
-                fontSize = 13.sp,
+                color = primary,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(132.dp * scale).padding(top = 10.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
-            Box(Modifier.height(42.dp * scale))
+            Text(
+                text = track?.artist?.takeIf { it.isNotBlank() } ?: if (isPlaying) "Playing" else "Paused",
+                color = secondary,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            )
+            Text(
+                text = if (isPlaying) "Playing" else "Paused",
+                color = secondary,
+                fontSize = 11.sp,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 14.dp),
+            )
             Text(
                 text = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
-                fontSize = 32.sp,
-                fontWeight = FontWeight.W100,
-                color = TidalColors.White,
+                fontSize = if (deviceHasLowBitAmbient) 24.sp else 28.sp,
+                fontWeight = FontWeight.Light,
+                color = primary,
+                modifier = Modifier.padding(top = 18.dp),
             )
         }
     }

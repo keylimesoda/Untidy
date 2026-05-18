@@ -17,19 +17,25 @@ import com.tidal.wear.ui.player.TidalPlayerScreen
 class PlayerActivity : ComponentActivity() {
     private var isAmbient by mutableStateOf(false)
     private var ambientOffset by mutableStateOf(0 to 0)
+    private var deviceHasLowBitAmbient by mutableStateOf(false)
+    private var burnInProtectionRequired by mutableStateOf(false)
 
     private val ambientCallback = object : AmbientLifecycleObserver.AmbientLifecycleCallback {
         override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) {
             isAmbient = true
+            deviceHasLowBitAmbient = ambientDetails.deviceHasLowBitAmbient
+            burnInProtectionRequired = ambientDetails.burnInProtectionRequired
         }
 
         override fun onExitAmbient() {
             isAmbient = false
             ambientOffset = 0 to 0
+            deviceHasLowBitAmbient = false
+            burnInProtectionRequired = false
         }
 
         override fun onUpdateAmbient() {
-            ambientOffset = (-6..6).random() to (-6..6).random()
+            ambientOffset = if (burnInProtectionRequired) (-4..4).random() to (-4..4).random() else 0 to 0
         }
     }
 
@@ -46,6 +52,8 @@ class PlayerActivity : ComponentActivity() {
                         viewModel = viewModel<NowPlayingViewModel>(),
                         isAmbient = isAmbient,
                         ambientOffset = ambientOffset,
+                        deviceHasLowBitAmbient = deviceHasLowBitAmbient,
+                        burnInProtectionRequired = burnInProtectionRequired,
                     )
                 }
             }
