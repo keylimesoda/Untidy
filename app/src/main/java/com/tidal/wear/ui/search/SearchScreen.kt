@@ -1,6 +1,5 @@
 package com.tidal.wear.ui.search
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -47,7 +46,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
@@ -67,6 +65,7 @@ import androidx.wear.compose.material.Text
 import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalAlbum
+import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
@@ -88,13 +87,13 @@ fun SearchScreen(
     onPlayTrack: (TidalTrack) -> Unit,
     onOpenAlbum: (TidalAlbum) -> Unit,
     onOpenPlaylist: (TidalPlaylist) -> Unit,
+    onOpenArtist: (TidalArtist) -> Unit,
     onCancel: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
-    val context = LocalContext.current
     val sidePadding = (LocalConfiguration.current.screenWidthDp * 0.12f).dp
     val imeVisible = WindowInsets.isImeVisible
     var query by remember { mutableStateOf(TextFieldValue("")) }
@@ -226,7 +225,7 @@ fun SearchScreen(
                                 secondaryLabel = "Artist",
                                 artworkUrl = artist.artworkUrl,
                                 fallback = "★",
-                                onClick = { Toast.makeText(context, "Artists coming soon", Toast.LENGTH_SHORT).show() },
+                                onClick = { onOpenArtist(artist) },
                             )
                         }
                         section("Playlists", safeResult.playlists.take(4)) { playlist ->

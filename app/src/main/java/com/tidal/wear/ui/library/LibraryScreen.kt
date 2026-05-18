@@ -1,6 +1,5 @@
 package com.tidal.wear.ui.library
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -31,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,9 +58,9 @@ fun LibraryScreen(
     apiClient: TidalApiClient,
     onOpenAlbum: (TidalAlbum) -> Unit,
     onOpenPlaylist: (TidalPlaylist) -> Unit,
+    onOpenArtist: (TidalArtist) -> Unit,
     onPlayTrack: (TidalTrack) -> Unit,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var favorites by remember { mutableStateOf<TidalSearchResult?>(null) }
     var selectedCategory by remember { mutableStateOf<LibraryCategory?>(null) }
@@ -182,7 +180,7 @@ fun LibraryScreen(
                                     secondaryLabel = "Artist",
                                     artworkUrl = artist.artworkUrl,
                                     fallback = "★",
-                                    onClick = { Toast.makeText(context, "Artists coming soon", Toast.LENGTH_SHORT).show() },
+                                    onClick = { onOpenArtist(artist) },
                                 )
                             }
                         }
