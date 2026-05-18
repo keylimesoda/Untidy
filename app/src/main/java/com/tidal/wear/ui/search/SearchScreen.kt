@@ -62,6 +62,7 @@ import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.rememberScalingLazyListState
 import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalAlbum
@@ -71,6 +72,7 @@ import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.art.rememberDeferredRowArtwork
 import com.tidal.wear.ui.components.RowArtworkThumb
+import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -94,6 +96,7 @@ fun SearchScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val sidePadding = (LocalConfiguration.current.screenWidthDp * 0.12f).dp
     val imeVisible = WindowInsets.isImeVisible
     var query by remember { mutableStateOf(TextFieldValue("")) }
@@ -119,6 +122,10 @@ fun SearchScreen(
         } else if (keyboardShownOnce && inputFocusedOnce && query.text.isBlank() && submittedQuery.isBlank()) {
             onCancel()
         }
+    }
+
+    LaunchedEffect(submittedQuery, loading) {
+        if (submittedQuery.isNotBlank() && !loading) listState.scrollToItem(0)
     }
 
     fun searchNow() {
@@ -185,7 +192,8 @@ fun SearchScreen(
             }
         } else {
             ScalingLazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 item {

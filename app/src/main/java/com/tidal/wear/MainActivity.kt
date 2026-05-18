@@ -64,6 +64,7 @@ import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.AuthState
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
+import com.tidal.wear.core.model.ReleaseVersionPreference
 import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalPlaylist
@@ -73,12 +74,15 @@ import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
 import com.tidal.wear.playback.NowPlayingStateHolder
 import com.tidal.wear.ui.album.AlbumScreen
+import com.tidal.wear.ui.artist.ArtistAlbumsScreen
 import com.tidal.wear.ui.artist.ArtistScreen
+import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.discover.DiscoverScreen
 import com.tidal.wear.ui.library.LibraryScreen
 import com.tidal.wear.ui.onboarding.OnboardingScreen
 import com.tidal.wear.ui.playlist.PlaylistScreen
 import com.tidal.wear.ui.search.SearchScreen
+import com.tidal.wear.ui.settings.SettingsRepository
 import com.tidal.wear.ui.settings.SettingsScreen
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -114,12 +118,14 @@ private object Routes {
     const val Album = "album/{albumId}"
     const val Playlist = "playlist/{playlistId}"
     const val Artist = "artist/{artistId}"
+    const val ArtistAlbums = "artist/{artistId}/albums"
     const val Library = "library"
     const val Settings = "settings"
 
     fun album(albumId: String): String = "album/${Uri.encode(albumId)}"
     fun playlist(playlistId: String): String = "playlist/${Uri.encode(playlistId)}"
     fun artist(artistId: String): String = "artist/${Uri.encode(artistId)}"
+    fun artistAlbums(artistId: String): String = "artist/${Uri.encode(artistId)}/albums"
 }
 
 private data class HomePlaybackSummary(
@@ -134,6 +140,7 @@ private fun TidalWearApp() {
             val navController = rememberSwipeDismissableNavController()
             val context = LocalContext.current
             val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
+            val settingsRepository = remember(context) { SettingsRepository(context.applicationContext) }
             val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
             val appContext = remember(context) { context.applicationContext }
             val nowPlayingScope = rememberCoroutineScope()
@@ -149,6 +156,7 @@ private fun TidalWearApp() {
                     .distinctUntilChanged()
             }.collectAsState(initial = HomePlaybackSummary())
             val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
+            val releaseVersionPreference by settingsRepository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
 
             LaunchedEffect(authState) {
                 when (authState) {
@@ -179,6 +187,10 @@ private fun TidalWearApp() {
             fun openArtist(artist: TidalArtist) {
                 ArtistSelectionStore.put(artist)
                 navController.navigate(Routes.artist(artist.id))
+            }
+            fun openArtistAlbums(artist: TidalArtist) {
+                ArtistSelectionStore.put(artist)
+                navController.navigate(Routes.artistAlbums(artist.id))
             }
 
             SwipeDismissableNavHost(navController = navController, startDestination = Routes.Onboarding) {
@@ -257,6 +269,18 @@ private fun TidalWearApp() {
                         onOpenAlbum = ::openAlbum,
                         onOpenPlaylist = ::openPlaylist,
                         onOpenArtist = ::openArtist,
+                        onOpenAlbums = ::openArtistAlbums,
+                        releaseVersionPreference = releaseVersionPreference,
+                    )
+                }
+                composable(Routes.ArtistAlbums) { entry ->
+                    val artistId = entry.arguments?.getString("artistId")?.let(Uri::decode).orEmpty()
+                    ArtistAlbumsScreen(
+                        apiClient = apiClient,
+                        artistId = artistId,
+                        initialArtist = ArtistSelectionStore.get(artistId),
+                        onOpenAlbum = ::openAlbum,
+                        releaseVersionPreference = releaseVersionPreference,
                     )
                 }
                 composable(Routes.Library) {
@@ -285,11 +309,13 @@ private fun HomeScreen(
     onOffline: () -> Unit,
 ) {
     val signedIn = authState == AuthState.UserSignedIn
+    val scrollState = rememberScrollState()
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
+                .rotaryScrollableWithFocus(scrollState)
                 .padding(top = 20.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),

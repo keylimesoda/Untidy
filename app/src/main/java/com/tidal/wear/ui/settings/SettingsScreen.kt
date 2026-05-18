@@ -31,8 +31,11 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.ToggleChip
 import androidx.wear.compose.material.ToggleChipDefaults
 import androidx.wear.compose.material.ScalingLazyColumn
+import androidx.wear.compose.material.rememberScalingLazyListState
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
+import com.tidal.wear.core.model.ReleaseVersionPreference
+import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.components.tidalSecondaryChipColors
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.launch
@@ -45,12 +48,17 @@ fun SettingsScreen(
     val context = LocalContext.current
     val repository = remember(context) { SettingsRepository(context.applicationContext) }
     val preset by repository.preset.collectAsState(initial = AudioPreset.BatterySaver)
+    val releaseVersionPreference by repository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
     val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
     val accountInfo by authRepository.accountInfo.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
     var confirmErase by remember { mutableStateOf(false) }
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
-        ScalingLazyColumn(modifier = Modifier.fillMaxSize()) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
+        ) {
                 item { SectionHeader("Account") }
                 if (accountInfo != null) {
                     item {
@@ -127,6 +135,27 @@ fun SettingsScreen(
                 item {
                     PresetChip("High", AudioPreset.High, preset) {
                         scope.launch { repository.setPreset(AudioPreset.High) }
+                    }
+                }
+
+                item { SectionHeader("Catalog") }
+                item {
+                    Text(
+                        text = "Duplicate releases",
+                        style = MaterialTheme.typography.caption1,
+                        color = TidalColors.OnSurfaceDim,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                item {
+                    ReleaseVersionChip("Prefer explicit", ReleaseVersionPreference.Explicit, releaseVersionPreference) {
+                        scope.launch { repository.setReleaseVersionPreference(ReleaseVersionPreference.Explicit) }
+                    }
+                }
+                item {
+                    ReleaseVersionChip("Prefer clean", ReleaseVersionPreference.Clean, releaseVersionPreference) {
+                        scope.launch { repository.setReleaseVersionPreference(ReleaseVersionPreference.Clean) }
                     }
                 }
 
@@ -208,6 +237,35 @@ private fun DisabledSettingChip(label: String, secondary: String) {
 
 @Composable
 private fun PresetChip(label: String, value: AudioPreset, selected: AudioPreset, onClick: () -> Unit) {
+    ToggleChip(
+        checked = value == selected,
+        onCheckedChange = { onClick() },
+        label = { Text(label) },
+        toggleControl = {
+            Icon(
+                imageVector = ToggleChipDefaults.radioIcon(checked = value == selected),
+                contentDescription = null,
+                tint = if (value == selected) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
+            )
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        colors = ToggleChipDefaults.toggleChipColors(
+            checkedStartBackgroundColor = TidalColors.Surface,
+            checkedEndBackgroundColor = TidalColors.Surface,
+            checkedContentColor = TidalColors.White,
+            uncheckedStartBackgroundColor = Color.Transparent,
+            uncheckedContentColor = TidalColors.OnSurfaceDim,
+        ),
+    )
+}
+
+@Composable
+private fun ReleaseVersionChip(
+    label: String,
+    value: ReleaseVersionPreference,
+    selected: ReleaseVersionPreference,
+    onClick: () -> Unit,
+) {
     ToggleChip(
         checked = value == selected,
         onCheckedChange = { onClick() },

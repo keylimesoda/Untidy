@@ -26,18 +26,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.material.Chip
+import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.rememberScalingLazyListState
 import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
+import com.tidal.wear.core.model.ReleaseVersionPreference
 import com.tidal.wear.core.model.TidalAlbum
+import com.tidal.wear.core.model.TidalArtistAlbums
 import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalPlaylist
-import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.art.rememberArtworkPalette
 import com.tidal.wear.ui.components.TidalResultChip
+import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -53,34 +57,47 @@ fun ArtistScreen(
     onOpenAlbum: (TidalAlbum) -> Unit,
     onOpenPlaylist: (TidalPlaylist) -> Unit,
     onOpenArtist: (TidalArtist) -> Unit,
+    onOpenAlbums: (TidalArtist) -> Unit,
+    releaseVersionPreference: ReleaseVersionPreference,
 ) {
     var artist by remember(artistId, initialArtist) { mutableStateOf(initialArtist) }
-    var result by remember(artistId) { mutableStateOf<TidalSearchResult?>(null) }
+    var tracks by remember(artistId) { mutableStateOf<List<TidalTrack>?>(null) }
+    var albumGroups by remember(artistId) { mutableStateOf<TidalArtistAlbums?>(null) }
     var loading by remember(artistId) { mutableStateOf(true) }
     var error by remember(artistId) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(artistId) {
+    LaunchedEffect(artistId, releaseVersionPreference) {
         loading = true
         error = null
         try {
             val loadedArtist = withContext(Dispatchers.IO) { runCatching { apiClient.artist(artistId) }.getOrNull() }
-            val loadedResult = withContext(Dispatchers.IO) { apiClient.artistContent(artistId) }
+            val loadedTracks = withContext(Dispatchers.IO) { apiClient.artistTracks(artistId) }
+            val loadedAlbumGroups = withContext(Dispatchers.IO) {
+                apiClient.artistAlbumGroups(
+                    artistId,
+                    limitPerGroup = ARTIST_ALBUM_PREVIEW_COUNT,
+                    releaseVersionPreference = releaseVersionPreference,
+                )
+            }
             artist = loadedArtist?.copy(
                 name = loadedArtist.name.ifBlank { initialArtist?.name.orEmpty() },
                 artworkUrl = loadedArtist.artworkUrl ?: initialArtist?.artworkUrl,
             ) ?: initialArtist
-            result = loadedResult
+            tracks = loadedTracks
+            albumGroups = loadedAlbumGroups
         } catch (e: CancellationException) {
             throw e
         } catch (_: Throwable) {
-            result = null
+            tracks = null
+            albumGroups = null
             error = "Artist unavailable"
         } finally {
             loading = false
         }
     }
 
-    val safeResult = result ?: TidalSearchResult()
+    val safeTracks = tracks.orEmpty()
+    val safeAlbumGroups = albumGroups ?: TidalArtistAlbums()
     val title = artist?.name ?: "Artist"
     val artworkUrl = artist?.artworkUrl
     val art = rememberArtworkPalette(artworkUrl, Size(160, 160))
@@ -94,7 +111,7 @@ fun ArtistScreen(
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {
@@ -107,49 +124,33 @@ fun ArtistScreen(
             when {
                 loading -> item { StatusText("Loading artist…") }
                 error != null -> item { StatusText(error.orEmpty()) }
-                safeResult.isEmpty() -> item { StatusText("No artist content found") }
+                safeTracks.isEmpty() && safeAlbumGroups.all.isEmpty() -> item { StatusText("No artist content found") }
                 else -> {
-                    section("Tracks", safeResult.tracks.take(12)) { track ->
+                    section("Top Tracks", safeTracks.take(12)) { track ->
                         TidalResultChip(
                             label = track.title,
                             secondaryLabel = listOf(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Track" },
                             artworkUrl = track.artworkUrl,
                             fallback = "♪",
                             onClick = {
-                                if (safeResult.tracks.size > 1) {
-                                    onPlayQueue(safeResult.tracks, safeResult.tracks.indexOfFirst { it.id == track.id }.coerceAtLeast(0))
+                                if (safeTracks.size > 1) {
+                                    onPlayQueue(safeTracks, safeTracks.indexOfFirst { it.id == track.id }.coerceAtLeast(0))
                                 } else {
                                     onPlayTrack(track)
                                 }
                             },
                         )
                     }
-                    section("Albums", safeResult.albums.take(12)) { album ->
-                        TidalResultChip(
-                            label = album.title,
-                            secondaryLabel = album.artist.ifBlank { title },
-                            artworkUrl = album.artworkUrl,
-                            fallback = "▣",
-                            onClick = { onOpenAlbum(album) },
-                        )
-                    }
-                    section("Playlists", safeResult.playlists.take(8)) { playlist ->
-                        TidalResultChip(
-                            label = playlist.title,
-                            secondaryLabel = playlist.creator.ifBlank { "Playlist" },
-                            artworkUrl = playlist.artworkUrl,
-                            fallback = "≡",
-                            onClick = { onOpenPlaylist(playlist) },
-                        )
-                    }
-                    section("Related artists", safeResult.artists.take(8)) { relatedArtist ->
-                        TidalResultChip(
-                            label = relatedArtist.name,
-                            secondaryLabel = "Artist",
-                            artworkUrl = relatedArtist.artworkUrl,
-                            fallback = "★",
-                            onClick = { onOpenArtist(relatedArtist) },
-                        )
+                    albumSection("Albums", safeAlbumGroups.albums, title, onOpenAlbum)
+                    albumSection("EPs & Singles", safeAlbumGroups.epsAndSingles, title, onOpenAlbum)
+                    albumSection("Compilations", safeAlbumGroups.compilations, title, onOpenAlbum)
+                    albumSection("Other", safeAlbumGroups.other, title, onOpenAlbum)
+                    if (safeAlbumGroups.all.isNotEmpty()) {
+                        item {
+                            MoreAlbumsChip {
+                                onOpenAlbums(artist ?: TidalArtist(artistId, title, artworkUrl))
+                            }
+                        }
                     }
                 }
             }
@@ -157,8 +158,88 @@ fun ArtistScreen(
     }
 }
 
-private fun TidalSearchResult.isEmpty(): Boolean =
-    tracks.isEmpty() && albums.isEmpty() && playlists.isEmpty() && artists.isEmpty()
+@Composable
+fun ArtistAlbumsScreen(
+    apiClient: TidalApiClient,
+    artistId: String,
+    initialArtist: TidalArtist?,
+    onOpenAlbum: (TidalAlbum) -> Unit,
+    releaseVersionPreference: ReleaseVersionPreference,
+) {
+    var artist by remember(artistId, initialArtist) { mutableStateOf(initialArtist) }
+    var albumGroups by remember(artistId) { mutableStateOf<TidalArtistAlbums?>(null) }
+    var loading by remember(artistId) { mutableStateOf(true) }
+    var error by remember(artistId) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(artistId, releaseVersionPreference) {
+        loading = true
+        error = null
+        try {
+            val loadedArtist = withContext(Dispatchers.IO) { runCatching { apiClient.artist(artistId) }.getOrNull() }
+            val loadedAlbums = withContext(Dispatchers.IO) {
+                apiClient.artistAlbumGroups(
+                    artistId,
+                    limitPerGroup = ARTIST_ALBUM_FULL_LIMIT,
+                    releaseVersionPreference = releaseVersionPreference,
+                )
+            }
+            artist = loadedArtist?.copy(
+                name = loadedArtist.name.ifBlank { initialArtist?.name.orEmpty() },
+                artworkUrl = loadedArtist.artworkUrl ?: initialArtist?.artworkUrl,
+            ) ?: initialArtist
+            albumGroups = loadedAlbums
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            albumGroups = null
+            error = "Albums unavailable"
+        } finally {
+            loading = false
+        }
+    }
+
+    val safeAlbumGroups = albumGroups ?: TidalArtistAlbums()
+    val title = artist?.name ?: "Artist"
+    val artworkUrl = artist?.artworkUrl
+    val art = rememberArtworkPalette(artworkUrl, Size(160, 160))
+    val accent = art.palette.accentColor()
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+
+    LaunchedEffect(artistId, loading) {
+        if (!loading) listState.scrollToItem(0)
+    }
+
+    Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item {
+                ArtistHeader(
+                    name = title,
+                    bitmap = art.bitmap,
+                    accent = accent,
+                )
+            }
+            item { SectionHeader("Albums") }
+            when {
+                loading -> item { StatusText("Loading albums…") }
+                error != null -> item { StatusText(error.orEmpty()) }
+                safeAlbumGroups.all.isEmpty() -> item { StatusText("No albums found") }
+                else -> {
+                    albumSection("Albums", safeAlbumGroups.albums, title, onOpenAlbum)
+                    albumSection("EPs & Singles", safeAlbumGroups.epsAndSingles, title, onOpenAlbum)
+                    albumSection("Compilations", safeAlbumGroups.compilations, title, onOpenAlbum)
+                    albumSection("Other", safeAlbumGroups.other, title, onOpenAlbum)
+                }
+            }
+        }
+    }
+}
+
+private const val ARTIST_ALBUM_PREVIEW_COUNT = 12
+private const val ARTIST_ALBUM_FULL_LIMIT = 100
 
 private fun <T> androidx.wear.compose.material.ScalingLazyListScope.section(
     title: String,
@@ -168,6 +249,65 @@ private fun <T> androidx.wear.compose.material.ScalingLazyListScope.section(
     if (items.isEmpty()) return
     item { SectionHeader(title) }
     items.forEach { element -> item { itemContent(element) } }
+}
+
+private fun androidx.wear.compose.material.ScalingLazyListScope.albumSection(
+    title: String,
+    albums: List<TidalAlbum>,
+    fallbackArtist: String,
+    onOpenAlbum: (TidalAlbum) -> Unit,
+) {
+    section(title, albums) { album ->
+        AlbumChip(album = album, fallbackArtist = fallbackArtist, onOpenAlbum = onOpenAlbum)
+    }
+}
+
+@Composable
+private fun AlbumChip(
+    album: TidalAlbum,
+    fallbackArtist: String,
+    onOpenAlbum: (TidalAlbum) -> Unit,
+) {
+    TidalResultChip(
+        label = album.title,
+        secondaryLabel = album.artist.ifBlank { fallbackArtist },
+        artworkUrl = album.artworkUrl,
+        fallback = "▣",
+        onClick = { onOpenAlbum(album) },
+    )
+}
+
+@Composable
+private fun MoreAlbumsChip(onClick: () -> Unit) {
+    Chip(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        onClick = onClick,
+        label = {
+            Text(
+                text = "View full discography",
+                color = TidalColors.Black,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        secondaryLabel = {
+            Text(
+                text = "All releases",
+                color = TidalColors.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        colors = ChipDefaults.primaryChipColors(
+            backgroundColor = TidalColors.Cyan,
+            contentColor = TidalColors.Black,
+        ),
+    )
 }
 
 @Composable

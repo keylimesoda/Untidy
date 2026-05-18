@@ -40,6 +40,7 @@ import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.ScalingLazyColumn
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.rememberScalingLazyListState
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalArtist
@@ -47,6 +48,7 @@ import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.components.TidalResultChip
+import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +69,7 @@ fun LibraryScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf(false) }
     var loadTick by remember { mutableStateOf(0) }
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
 
     fun loadLibrary() {
         loading = true
@@ -86,11 +89,15 @@ fun LibraryScreen(
     }
 
     LaunchedEffect(loadTick) { loadLibrary() }
+    LaunchedEffect(selectedCategory, loading) {
+        if (!loading) listState.scrollToItem(0)
+    }
     BackHandler(enabled = selectedCategory != null) { selectedCategory = null }
 
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {

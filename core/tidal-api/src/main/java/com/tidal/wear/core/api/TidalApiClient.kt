@@ -3,7 +3,10 @@ package com.tidal.wear.core.api
 import android.util.Log
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.tidal.wear.core.auth.TidalAuthRepository
+import com.tidal.wear.core.model.ReleaseVersionPreference
 import com.tidal.wear.core.model.TidalAlbum
+import com.tidal.wear.core.model.TidalAlbumReleaseType
+import com.tidal.wear.core.model.TidalArtistAlbums
 import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalDiscoverSection
 import com.tidal.wear.core.model.TidalPlaylist
@@ -18,6 +21,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -172,6 +176,8 @@ interface TidalApiService {
     suspend fun artistAlbums(
         @Path("id") id: String,
         @Query("countryCode") countryCode: String,
+        @Query("page[limit]") pageLimit: Int? = null,
+        @Query("page[cursor]") pageCursor: String? = null,
         @Query("include") include: String = "albums",
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
@@ -228,6 +234,8 @@ interface TidalLegacyApiService {
         @Query("countryCode") countryCode: String,
         @Query("token") token: String,
         @Query("limit") limit: Int = 25,
+        @Query("offset") offset: Int = 0,
+        @Query("filter") filter: String? = null,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
 
@@ -314,6 +322,8 @@ interface TidalDesktopApiService {
         @Url url: String,
         @Query("countryCode") countryCode: String,
         @Query("limit") limit: Int = 25,
+        @Query("offset") offset: Int = 0,
+        @Query("filter") filter: String? = null,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
 }
@@ -464,7 +474,17 @@ class TidalApiClient(
         legacyArtist(id)
     }
 
-    suspend fun artistContent(id: String): TidalSearchResult {
+    suspend fun artistContent(
+        id: String,
+        albumLimit: Int = ARTIST_ALBUM_PREVIEW_LIMIT,
+        releaseVersionPreference: ReleaseVersionPreference = ReleaseVersionPreference.Explicit,
+    ): TidalSearchResult {
+        val tracks = artistTracks(id)
+        val albums = artistAlbumGroups(id, albumLimit, releaseVersionPreference).albums
+        return TidalSearchResult(tracks = tracks, albums = albums)
+    }
+
+    suspend fun artistTracks(id: String): List<TidalTrack> {
         val v2Tracks = runCatching {
             val root = service.artistTracks(id, countryCode)
             val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
@@ -474,16 +494,36 @@ class TidalApiClient(
             Log.d(API_LOG_TAG, "artist tracks v2 failed reason=${t.safeReason()}")
             emptyList()
         }
-        val tracks = v2Tracks.ifEmpty { legacyArtistTopTracks(id) }
-        val v2Albums = runCatching {
-            service.artistAlbums(id, countryCode).allResourceObjects().mapNotNull { it.toAlbum() }.distinctBy { it.id }
-        }.getOrElse { t ->
+        return v2Tracks.ifEmpty { legacyArtistTopTracks(id) }
+    }
+
+    suspend fun artistAlbums(
+        id: String,
+        limit: Int = 25,
+        releaseVersionPreference: ReleaseVersionPreference = ReleaseVersionPreference.Explicit,
+    ): List<TidalAlbum> {
+        return artistAlbumGroups(id, limit, releaseVersionPreference).all
+    }
+
+    suspend fun artistAlbumGroups(
+        id: String,
+        limitPerGroup: Int = 25,
+        releaseVersionPreference: ReleaseVersionPreference = ReleaseVersionPreference.Explicit,
+    ): TidalArtistAlbums {
+        val legacyGroups = runCatching { legacyArtistAlbumGroups(id, limitPerGroup) }
+            .getOrElse { t ->
+                if (t is CancellationException) throw t
+                Log.d(API_LOG_TAG, "artist albums filtered legacy failed reason=${t.safeReason()}")
+                TidalArtistAlbums()
+            }
+        if (legacyGroups.all.isNotEmpty()) return legacyGroups.collapseDuplicateReleases(releaseVersionPreference)
+
+        val v2Albums = runCatching { v2ArtistAlbums(id, limitPerGroup) }.getOrElse { t ->
             if (t is CancellationException) throw t
             Log.d(API_LOG_TAG, "artist albums v2 failed reason=${t.safeReason()}")
             emptyList()
         }
-        val albums = v2Albums.ifEmpty { legacyArtistAlbums(id) }
-        return TidalSearchResult(tracks = tracks, albums = albums)
+        return v2Albums.toArtistAlbumGroups().collapseDuplicateReleases(releaseVersionPreference)
     }
 
     suspend fun homeSections(): List<TidalSection> {
@@ -737,17 +777,85 @@ class TidalApiClient(
             .also { Log.d(API_LOG_TAG, "artist top tracks ok count=${it.size}") }
     }
 
-    private suspend fun legacyArtistAlbums(id: String): List<TidalAlbum> {
+    private suspend fun legacyArtistAlbumGroups(id: String, limitPerGroup: Int): TidalArtistAlbums =
+        TidalArtistAlbums(
+            albums = legacyArtistAlbums(id, limitPerGroup, "ALBUMS", TidalAlbumReleaseType.Album),
+            epsAndSingles = legacyArtistAlbums(id, limitPerGroup, "EPSANDSINGLES", TidalAlbumReleaseType.EpSingle),
+            compilations = legacyArtistAlbums(id, limitPerGroup, "COMPILATIONS", TidalAlbumReleaseType.Compilation),
+        )
+
+    private suspend fun legacyArtistAlbums(
+        id: String,
+        limit: Int,
+        filter: String,
+        releaseType: TidalAlbumReleaseType,
+    ): List<TidalAlbum> {
         val clientId = authRepository.getClientIdForApi()
         return runCatching {
-            parseLegacyObjects(legacyService.artistAlbums(id, countryCode, token = clientId)).mapNotNull { it.toLegacyAlbum() }.distinctBy { it.id }
+            pagedLegacyArtistAlbums(limit) { offset, pageSize ->
+                legacyService.artistAlbums(
+                    id = id,
+                    countryCode = countryCode,
+                    token = clientId,
+                    limit = pageSize,
+                    offset = offset,
+                    filter = filter,
+                )
+            }.mapNotNull { it.toLegacyAlbum(releaseType) }.distinctBy { it.id }
         }.recoverCatching {
-            Log.d(API_LOG_TAG, "artist albums v1 failed reason=${it.safeReason()}, trying desktop")
-            parseLegacyObjects(desktopService.artistAlbums("https://listen.tidal.com/v1/artists/$id/albums", countryCode)).mapNotNull { it.toLegacyAlbum() }.distinctBy { it.id }
+            Log.d(API_LOG_TAG, "artist albums v1 failed filter=$filter reason=${it.safeReason()}, trying desktop")
+            pagedLegacyArtistAlbums(limit) { offset, pageSize ->
+                desktopService.artistAlbums(
+                    url = "https://listen.tidal.com/v1/artists/$id/albums",
+                    countryCode = countryCode,
+                    limit = pageSize,
+                    offset = offset,
+                    filter = filter,
+                )
+            }.mapNotNull { it.toLegacyAlbum(releaseType) }.distinctBy { it.id }
         }.onFailure {
-            Log.d(API_LOG_TAG, "artist albums desktop failed reason=${it.safeReason()}")
+            Log.d(API_LOG_TAG, "artist albums desktop failed filter=$filter reason=${it.safeReason()}")
         }.getOrDefault(emptyList())
-            .also { Log.d(API_LOG_TAG, "artist albums ok count=${it.size}") }
+            .also { Log.d(API_LOG_TAG, "artist albums ok filter=$filter count=${it.size}") }
+    }
+
+    private suspend fun v2ArtistAlbums(id: String, limit: Int): List<TidalAlbum> {
+        val albums = mutableListOf<TidalAlbum>()
+        var cursor: String? = null
+        var pageCount = 0
+        val pageSize = minOf(ARTIST_ALBUM_PAGE_SIZE, limit.coerceAtLeast(1))
+        do {
+            val root = service.artistAlbums(id, countryCode, pageLimit = pageSize, pageCursor = cursor)
+            val pageAlbums = root.allResourceObjects().mapNotNull { it.toAlbum() }
+            albums += pageAlbums
+            cursor = root.nextPageCursor()
+            pageCount += 1
+        } while (
+            albums.size < limit &&
+            !cursor.isNullOrBlank() &&
+            pageAlbums.isNotEmpty() &&
+            pageCount < ARTIST_ALBUM_MAX_PAGES
+        )
+        return albums.distinctBy { it.id }.take(limit)
+    }
+
+    private suspend fun pagedLegacyArtistAlbums(
+        limit: Int,
+        load: suspend (offset: Int, pageSize: Int) -> JsonElement,
+    ): List<JsonObject> {
+        val items = mutableListOf<JsonObject>()
+        val pageSize = minOf(ARTIST_ALBUM_PAGE_SIZE, limit.coerceAtLeast(1))
+        var offset = 0
+        var pageCount = 0
+        while (items.size < limit && pageCount < ARTIST_ALBUM_MAX_PAGES) {
+            val page = parseLegacyObjects(load(offset, pageSize))
+            if (page.isEmpty()) break
+            items += page
+            if (page.size < pageSize) break
+            offset += pageSize
+            pageCount += 1
+        }
+        return items.take(limit)
     }
 
     private fun parseLegacyTracks(element: JsonElement): List<TidalTrack> {
@@ -785,6 +893,62 @@ private fun List<TidalSearchResult>.mergeSearchResults(): TidalSearchResult = Ti
     playlists = flatMap { it.playlists }.distinctBy { it.id },
 )
 
+private fun List<TidalAlbum>.toArtistAlbumGroups(): TidalArtistAlbums {
+    val distinct = distinctBy { it.id }
+    return TidalArtistAlbums(
+        albums = distinct.filter { it.releaseType == TidalAlbumReleaseType.Album },
+        epsAndSingles = distinct.filter { it.releaseType == TidalAlbumReleaseType.EpSingle },
+        compilations = distinct.filter { it.releaseType == TidalAlbumReleaseType.Compilation },
+        other = distinct.filter { it.releaseType == TidalAlbumReleaseType.Other || it.releaseType == TidalAlbumReleaseType.Unknown },
+    )
+}
+
+private fun TidalArtistAlbums.collapseDuplicateReleases(
+    releaseVersionPreference: ReleaseVersionPreference,
+): TidalArtistAlbums {
+    val albums = albums.collapseDuplicateReleaseTitles(releaseVersionPreference)
+    val albumIds = albums.map { it.id }.toSet()
+    val epsAndSingles = epsAndSingles.filterNot { it.id in albumIds }.collapseDuplicateReleaseTitles(releaseVersionPreference)
+    val albumAndEpIds = albumIds + epsAndSingles.map { it.id }
+    val compilations = compilations.filterNot { it.id in albumAndEpIds }.collapseDuplicateReleaseTitles(releaseVersionPreference)
+    val usedIds = albumAndEpIds + compilations.map { it.id }
+    val other = other.filterNot { it.id in usedIds }.collapseDuplicateReleaseTitles(releaseVersionPreference)
+    return TidalArtistAlbums(
+        albums = albums,
+        epsAndSingles = epsAndSingles,
+        compilations = compilations,
+        other = other,
+    )
+}
+
+private fun List<TidalAlbum>.collapseDuplicateReleaseTitles(
+    releaseVersionPreference: ReleaseVersionPreference,
+): List<TidalAlbum> =
+    groupBy { it.releaseTitleKey() }
+        .values
+        .map { releases ->
+            releases.maxWithOrNull(
+                compareBy<TidalAlbum> { it.matchesReleaseVersionPreference(releaseVersionPreference) }
+                    .thenBy { !it.artworkUrl.isNullOrBlank() }
+                    .thenBy { it.trackCount }
+                    .thenBy { it.releaseDate },
+            ) ?: releases.first()
+        }
+
+private fun TidalAlbum.releaseTitleKey(): String =
+    title.lowercase(Locale.US)
+        .replace(Regex("""\s+[\[(](explicit|clean)[\])]"""), "")
+        .replace(Regex("""[^a-z0-9]+"""), " ")
+        .trim()
+
+private fun TidalAlbum.matchesReleaseVersionPreference(preference: ReleaseVersionPreference): Boolean {
+    val isExplicit = explicit || titleLooksExplicit(title)
+    return when (preference) {
+        ReleaseVersionPreference.Explicit -> isExplicit
+        ReleaseVersionPreference.Clean -> !isExplicit
+    }
+}
+
 private fun JsonElement.allResourceObjects(): List<JsonObject> = dataObjects() + includedObjects()
 
 private fun JsonElement.dataObjects(): List<JsonObject> {
@@ -799,6 +963,15 @@ private fun JsonElement.dataObjects(): List<JsonObject> {
 private fun JsonElement.includedObjects(): List<JsonObject> {
     val root = this as? JsonObject ?: return emptyList()
     return (root["included"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+}
+
+private fun JsonElement.nextPageCursor(): String? {
+    val root = this as? JsonObject ?: return null
+    val links = root["links"] as? JsonObject ?: return null
+    val next = links.string("next") ?: return null
+    val encoded = Regex("""page%5Bcursor%5D=([^&]+)""").find(next)?.groupValues?.getOrNull(1)
+    val plain = Regex("""page\[cursor\]=([^&]+)""").find(next)?.groupValues?.getOrNull(1)
+    return (encoded ?: plain)?.takeIf { it.isNotBlank() }
 }
 
 private fun JsonObject.toTrack(): TidalTrack? {
@@ -827,11 +1000,22 @@ private fun JsonObject.toTrack(includedByKey: Map<String, JsonObject>): TidalTra
 private fun JsonObject.toAlbum(): TidalAlbum? {
     if (!typeMatches("album", "albums")) return null
     val attrs = attributes
+    val releaseType = albumReleaseType(
+        attrs.string("type", "albumType", "releaseType", "productType"),
+        primitive("albumType")?.contentOrNull,
+        primitive("releaseType")?.contentOrNull,
+        primitive("productType")?.contentOrNull,
+    )
+    val title = attrs.string("title", "name") ?: return null
     return TidalAlbum(
         id = id ?: return null,
-        title = attrs.string("title", "name") ?: return null,
+        title = title,
         artist = attrs.string("artistName", "artist") ?: "",
         artworkUrl = attrs.imageUrl(320),
+        releaseType = releaseType,
+        releaseDate = attrs.string("releaseDate", "releaseDateTime", "releaseYear") ?: "",
+        trackCount = attrs.int("numberOfTracks", "trackCount", "numberOfItems") ?: 0,
+        explicit = attrs.bool("explicit", "explicitContent", "isExplicit") ?: titleLooksExplicit(title),
     )
 }
 
@@ -875,12 +1059,14 @@ private fun JsonObject.toLegacyTrack(): TidalTrack? {
     )
 }
 
-private fun JsonObject.toLegacyAlbum(): TidalAlbum? {
+private fun JsonObject.toLegacyAlbum(defaultReleaseType: TidalAlbumReleaseType = TidalAlbumReleaseType.Unknown): TidalAlbum? {
     val resource = legacyWrappedObject("album", "item")
     val id = resource.primitive("id")?.contentOrNull ?: return null
     val title = resource.string("title", "name") ?: return null
     val artist = resource.legacyAlbumArtist()
     val artworkUrl = resource.imageUrl(320)
+    val parsedReleaseType = albumReleaseType(resource.string("type", "albumType", "releaseType", "productType"))
+    val releaseType = if (parsedReleaseType == TidalAlbumReleaseType.Unknown) defaultReleaseType else parsedReleaseType
     if (artist.isBlank() || artworkUrl.isNullOrBlank()) {
         Log.d(API_LOG_TAG, "album metadata parse incomplete art=${!artworkUrl.isNullOrBlank()} artist=${artist.isNotBlank()} keys=${resource.keysSummary()}")
     }
@@ -889,6 +1075,10 @@ private fun JsonObject.toLegacyAlbum(): TidalAlbum? {
         title = title,
         artist = artist,
         artworkUrl = artworkUrl,
+        releaseType = releaseType,
+        releaseDate = resource.string("releaseDate", "releaseDateTime", "releaseYear") ?: "",
+        trackCount = resource.int("numberOfTracks", "trackCount", "numberOfItems") ?: 0,
+        explicit = resource.bool("explicit", "explicitContent", "isExplicit") ?: titleLooksExplicit(title),
     )
 }
 
@@ -974,6 +1164,53 @@ private fun JsonObject.long(vararg names: String): Long? {
     return null
 }
 
+private fun JsonObject.int(vararg names: String): Int? {
+    names.forEach { name ->
+        primitive(name)?.contentOrNull?.toIntOrNull()?.let { return it }
+    }
+    return null
+}
+
+private fun JsonObject.bool(vararg names: String): Boolean? {
+    names.forEach { name ->
+        primitive(name)?.let { value ->
+            value.booleanOrNull?.let { return it }
+            when (value.contentOrNull?.lowercase(Locale.US)) {
+                "true", "1", "yes" -> return true
+                "false", "0", "no" -> return false
+            }
+        }
+    }
+    return null
+}
+
+private fun titleLooksExplicit(title: String): Boolean =
+    title.contains(Regex("""[\[(]\s*explicit\s*[\])]""", RegexOption.IGNORE_CASE))
+
+private fun albumReleaseType(vararg values: String?): TidalAlbumReleaseType {
+    values.forEach { value ->
+        val normalized = value
+            ?.uppercase(Locale.US)
+            ?.replace("_", "")
+            ?.replace("-", "")
+            ?.replace(" ", "")
+            .orEmpty()
+        when {
+            normalized.isBlank() -> Unit
+            normalized == "ALBUM" || normalized == "ALBUMS" -> return TidalAlbumReleaseType.Album
+            normalized == "EP" ||
+                normalized == "EPS" ||
+                normalized == "SINGLE" ||
+                normalized == "SINGLES" ||
+                normalized == "EPSANDSINGLES" ||
+                normalized == "SINGLESANDEPS" -> return TidalAlbumReleaseType.EpSingle
+            normalized == "COMPILATION" || normalized == "COMPILATIONS" -> return TidalAlbumReleaseType.Compilation
+            else -> return TidalAlbumReleaseType.Other
+        }
+    }
+    return TidalAlbumReleaseType.Unknown
+}
+
 private fun JsonObject.imageUrl(size: Int = 320): String? {
     directImageUrl(size)?.let { return it }
     listOf("album", "item", "track", "artist", "playlist", "image", "picture").forEach { name ->
@@ -1057,4 +1294,6 @@ private fun Throwable.safeReason(): String = when (this) {
 
 private const val JSON_API_ACCEPT = "application/vnd.api+json"
 private const val API_LOG_TAG = "Untidy/API"
-
+private const val ARTIST_ALBUM_PREVIEW_LIMIT = 12
+private const val ARTIST_ALBUM_PAGE_SIZE = 25
+private const val ARTIST_ALBUM_MAX_PAGES = 8
