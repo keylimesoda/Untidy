@@ -159,11 +159,15 @@ private fun TidalWearApp() {
             val releaseVersionPreference by settingsRepository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
 
             LaunchedEffect(authState) {
+                val currentRoute = navController.currentDestination?.route
                 when (authState) {
-                    AuthState.UserSignedIn -> navController.navigateAndClear(Routes.Home)
-                    AuthState.Anonymous,
-                    AuthState.Initializing,
-                    -> navController.navigateAndClear(Routes.Onboarding)
+                    AuthState.UserSignedIn -> if (currentRoute == null || currentRoute == Routes.Onboarding) {
+                        navController.navigateAndClear(Routes.Home)
+                    }
+                    AuthState.Anonymous -> if (currentRoute != Routes.Onboarding) {
+                        navController.navigateAndClear(Routes.Onboarding)
+                    }
+                    AuthState.Initializing -> Unit
                 }
             }
 

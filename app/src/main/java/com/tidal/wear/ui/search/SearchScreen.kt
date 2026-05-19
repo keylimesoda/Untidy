@@ -1,5 +1,13 @@
 package com.tidal.wear.ui.search
 
+import android.graphics.Color as AndroidColor
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -10,20 +18,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
@@ -34,29 +36,20 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
@@ -82,7 +75,6 @@ import kotlinx.coroutines.withContext
 
 private const val KeyboardInputHostAlpha = 0.02f
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(
     apiClient: TidalApiClient,
@@ -93,34 +85,22 @@ fun SearchScreen(
     onCancel: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusRequester = remember { FocusRequester() }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    val sidePadding = (LocalConfiguration.current.screenWidthDp * 0.12f).dp
-    val imeVisible = WindowInsets.isImeVisible
-    var query by remember { mutableStateOf(TextFieldValue("")) }
+    var inputView by remember { mutableStateOf<EditText?>(null) }
+    var query by remember { mutableStateOf("") }
     var submittedQuery by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<TidalSearchResult?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var requestKeyboardTick by remember { mutableIntStateOf(1) }
-    var inputFocusedOnce by remember { mutableStateOf(false) }
-    var keyboardShownOnce by remember { mutableStateOf(false) }
 
-    LaunchedEffect(requestKeyboardTick) {
+    LaunchedEffect(requestKeyboardTick, inputView) {
         if (requestKeyboardTick > 0) {
             delay(120)
-            focusRequester.requestFocus()
-            keyboardController?.show()
-        }
-    }
-
-    LaunchedEffect(imeVisible, inputFocusedOnce, query.text, submittedQuery) {
-        if (imeVisible) {
-            keyboardShownOnce = true
-        } else if (keyboardShownOnce && inputFocusedOnce && query.text.isBlank() && submittedQuery.isBlank()) {
-            onCancel()
+            inputView?.let { editText ->
+                editText.requestFocus()
+                editText.showKeyboard()
+            }
         }
     }
 
@@ -129,14 +109,16 @@ fun SearchScreen(
     }
 
     fun searchNow() {
-        val q = query.text.trim()
+        val q = query.trim()
         if (q.isBlank() || loading) return
         submittedQuery = q
         result = null
         error = null
         loading = true
-        focusManager.clearFocus()
-        keyboardController?.hide()
+        inputView?.let { editText ->
+            editText.clearFocus()
+            editText.hideKeyboard()
+        }
         scope.launch {
             try {
                 result = withContext(Dispatchers.IO) { apiClient.search(q) }
@@ -152,21 +134,17 @@ fun SearchScreen(
     }
 
     fun resetSearch() {
-        query = TextFieldValue("")
+        query = ""
         submittedQuery = ""
         result = null
         error = null
-        inputFocusedOnce = false
-        keyboardShownOnce = false
         requestKeyboardTick += 1
     }
 
     fun editSearch() {
-        query = TextFieldValue(submittedQuery, selection = TextRange(submittedQuery.length))
+        query = submittedQuery
         submittedQuery = ""
         error = null
-        inputFocusedOnce = false
-        keyboardShownOnce = false
         requestKeyboardTick += 1
     }
 
@@ -179,15 +157,8 @@ fun SearchScreen(
                     query = query,
                     onQueryChange = { query = it },
                     onSearch = ::searchNow,
-                    focusRequester = focusRequester,
-                    onFocusChanged = { isFocused ->
-                        if (isFocused) {
-                            inputFocusedOnce = true
-                        } else if (inputFocusedOnce && query.text.isBlank() && submittedQuery.isBlank()) {
-                            onCancel()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = sidePadding).alpha(KeyboardInputHostAlpha),
+                    onInputReady = { inputView = it },
+                    modifier = Modifier.size(1.dp).alpha(KeyboardInputHostAlpha),
                 )
             }
         } else {
@@ -407,39 +378,71 @@ private fun SearchingIndicator() {
 
 @Composable
 private fun SearchInput(
-    query: TextFieldValue,
-    onQueryChange: (TextFieldValue) -> Unit,
+    query: String,
+    onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    focusRequester: FocusRequester,
-    onFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onInputReady: (EditText) -> Unit,
 ) {
-    BasicTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = modifier
-            .focusRequester(focusRequester)
-            .onFocusChanged { onFocusChanged(it.isFocused) },
-        singleLine = true,
-        textStyle = TextStyle(color = TidalColors.White, fontSize = 14.sp, textAlign = TextAlign.Center),
-        cursorBrush = SolidColor(TidalColors.Cyan),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        decorationBox = { innerTextField ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(TidalColors.Surface, RoundedCornerShape(18.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (query.text.isBlank()) {
-                    Text("Search TIDAL", color = TidalColors.OnSurfaceMuted, fontSize = 14.sp)
+    val currentOnQueryChange by rememberUpdatedState(onQueryChange)
+    val currentOnSearch by rememberUpdatedState(onSearch)
+
+    AndroidView(
+        modifier = modifier,
+        factory = { context ->
+            EditText(context).apply {
+                isSingleLine = true
+                isFocusableInTouchMode = true
+                imeOptions = EditorInfo.IME_ACTION_SEARCH
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                setBackgroundColor(AndroidColor.TRANSPARENT)
+                setTextColor(AndroidColor.TRANSPARENT)
+                setHintTextColor(AndroidColor.TRANSPARENT)
+                isCursorVisible = false
+                setPadding(0, 0, 0, 0)
+                setOnEditorActionListener { _, actionId, event ->
+                    val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
+                    val isEnterKey = event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP
+                    if (isSearchAction || isEnterKey) {
+                        currentOnSearch()
+                        true
+                    } else {
+                        false
+                    }
                 }
-                innerTextField()
+                addTextChangedListener(
+                    object : TextWatcher {
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                        override fun afterTextChanged(s: Editable?) {
+                            currentOnQueryChange(s?.toString().orEmpty())
+                        }
+                    },
+                )
+                onInputReady(this)
+            }
+        },
+        update = { editText ->
+            onInputReady(editText)
+            if (editText.text.toString() != query) {
+                editText.setText(query)
+                editText.setSelection(query.length)
             }
         },
     )
+}
+
+private fun EditText.showKeyboard() {
+    post {
+        requestFocus()
+        context.getSystemService(InputMethodManager::class.java)
+            ?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+    }
+}
+
+private fun EditText.hideKeyboard() {
+    context.getSystemService(InputMethodManager::class.java)
+        ?.hideSoftInputFromWindow(windowToken, 0)
 }
 
 @Composable

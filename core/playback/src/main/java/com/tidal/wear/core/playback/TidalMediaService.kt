@@ -97,7 +97,9 @@ class TidalMediaService : MediaLibraryService() {
             this,
             sessionPlayer!!,
             object : MediaLibrarySession.Callback {},
-        ).build()
+        )
+            .setSessionActivity(playerActivityPendingIntent())
+            .build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
@@ -268,12 +270,7 @@ class TidalMediaService : MediaLibraryService() {
     }
 
     private fun publishOngoingActivity(track: TidalTrack, isPlaying: Boolean) {
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent().setClassName(packageName, "com.tidal.wear.PlayerActivity"),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        val contentIntent = playerActivityPendingIntent()
         val builder = NotificationCompat.Builder(this, MEDIA_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(track.title.ifBlank { "TIDAL" })
@@ -301,6 +298,13 @@ class TidalMediaService : MediaLibraryService() {
 
         startForeground(MEDIA_NOTIFICATION_ID, builder.build())
     }
+
+    private fun playerActivityPendingIntent(): PendingIntent = PendingIntent.getActivity(
+        this,
+        0,
+        Intent().setClassName(packageName, "com.tidal.wear.PlayerActivity"),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     private fun serviceAction(action: String, requestCode: Int): PendingIntent = PendingIntent.getService(
         this,
