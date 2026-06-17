@@ -81,6 +81,9 @@ import com.tidal.wear.BuildConfig
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
+import com.tidal.wear.core.playback.offline.markOfflineTrackDownloaded
+import com.tidal.wear.core.playback.offline.removeOfflineTrackDownload
 import com.tidal.wear.playback.NowPlayingUiState
 import com.tidal.wear.playback.NowPlayingViewModel
 import com.tidal.wear.ui.art.AlbumArt
@@ -129,7 +132,7 @@ fun TidalPlayerScreen(
             delay(1_000)
             val proof = withContext(Dispatchers.IO) { context.latestOfflineProofFor(track.id) }
             if (proof == true) {
-                withContext(Dispatchers.IO) { context.markOfflineProofDownloaded(track) }
+                withContext(Dispatchers.IO) { context.markOfflineTrackDownloaded(track) }
                 downloadState = DownloadState.Downloaded
                 return@LaunchedEffect
             }
@@ -161,6 +164,17 @@ fun TidalPlayerScreen(
         }
     }
 
+    fun removeCurrentDownload(): String? {
+        val track = currentTrack ?: return "Nothing playing"
+        return if (context.removeOfflineTrackDownload(track.id)) {
+            downloadState = DownloadState.NotDownloaded
+            Toast.makeText(context, "Download removed", Toast.LENGTH_SHORT).show()
+            "Download removed"
+        } else {
+            "Couldn't remove download"
+        }
+    }
+
     BackHandler { (context as? Activity)?.moveTaskToBack(true) }
 
     if (isAmbient) {
@@ -180,6 +194,7 @@ fun TidalPlayerScreen(
             apiClient = apiClient,
             downloadState = downloadState,
             onDownload = ::startDebugDownloadProof,
+            onRemoveDownload = ::removeCurrentDownload,
             onOpenAlbum = onOpenAlbum,
             onOpenArtist = onOpenArtist,
         )
@@ -196,6 +211,7 @@ private fun TidalPlayerNonAmbient(
     apiClient: TidalApiClient,
     downloadState: DownloadState,
     onDownload: () -> Unit,
+    onRemoveDownload: () -> String?,
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
 ) {
@@ -456,6 +472,7 @@ private fun TidalPlayerNonAmbient(
                     downloadState = downloadState,
                     outputOptions = rememberAudioOutputOptions(),
                     onDownload = onDownload,
+                    onRemoveDownload = onRemoveDownload,
                     onQueue = { showQueue = true },
                     onOutputSettings = {
                         runCatching {
@@ -606,23 +623,9 @@ private fun TransportButton(
 private fun Context.initialDownloadState(track: TidalTrack?): DownloadState = when {
     !BuildConfig.DEBUG -> DownloadState.Unavailable
     track?.isDownloadProofEligible() != true -> DownloadState.Unavailable
-    isOfflineProofDownloaded(track.id) -> DownloadState.Downloaded
+    isOfflineTrackDownloaded(track.id) -> DownloadState.Downloaded
     else -> DownloadState.NotDownloaded
 }
-
-private fun Context.markOfflineProofDownloaded(track: TidalTrack) {
-    getSharedPreferences("offline-downloads", Context.MODE_PRIVATE)
-        .edit()
-        .putBoolean("downloaded:${track.id}", true)
-        .putString("title:${track.id}", track.title)
-        .putString("artist:${track.id}", track.artist)
-        .putLong("downloadedAt:${track.id}", System.currentTimeMillis())
-        .apply()
-}
-
-private fun Context.isOfflineProofDownloaded(trackId: String): Boolean =
-    getSharedPreferences("offline-downloads", Context.MODE_PRIVATE)
-        .getBoolean("downloaded:$trackId", false)
 
 private fun TidalTrack.isDownloadProofEligible(): Boolean = id.isNotBlank() &&
     id != "tidal-current" &&

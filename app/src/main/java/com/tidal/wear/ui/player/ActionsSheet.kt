@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -55,6 +56,7 @@ fun ActionsSheet(
     downloadState: DownloadState,
     outputOptions: List<AudioOutputOption>,
     onDownload: () -> Unit,
+    onRemoveDownload: () -> String?,
     onQueue: () -> Unit,
     onOutputSettings: () -> Unit,
     onAddToPlaylist: () -> String?,
@@ -63,6 +65,7 @@ fun ActionsSheet(
     modifier: Modifier = Modifier,
 ) {
     var outputExpanded by remember { mutableStateOf(false) }
+    var confirmRemoveDownload by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     val preferredOutput = outputOptions.firstOrNull { it.preferred } ?: outputOptions.firstOrNull()
     fun runAction(action: () -> String?) {
@@ -105,8 +108,41 @@ fun ActionsSheet(
                         else -> TidalColors.White
                     },
                     enabled = downloadAvailable,
-                    onClick = onDownload,
+                    onClick = {
+                        if (downloadState == DownloadState.Downloaded) {
+                            confirmRemoveDownload = true
+                            actionMessage = "Keeps it in TIDAL"
+                        } else {
+                            onDownload()
+                        }
+                    },
                 )
+            }
+            if (confirmRemoveDownload) {
+                item {
+                    ActionRow(
+                        icon = Icons.Filled.Delete,
+                        label = "Remove download",
+                        rightIndicator = null,
+                        iconTint = TidalColors.Cyan,
+                        onClick = {
+                            actionMessage = onRemoveDownload()
+                            confirmRemoveDownload = false
+                        },
+                    )
+                }
+                item {
+                    ActionRow(
+                        icon = Icons.Filled.Check,
+                        label = "Cancel",
+                        rightIndicator = null,
+                        iconTint = TidalColors.OnSurfaceMuted,
+                        onClick = {
+                            confirmRemoveDownload = false
+                            actionMessage = null
+                        },
+                    )
+                }
             }
             item {
                 ActionRow(

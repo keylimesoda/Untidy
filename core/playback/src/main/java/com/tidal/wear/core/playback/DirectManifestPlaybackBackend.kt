@@ -22,6 +22,8 @@ import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
+import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
+import com.tidal.wear.core.playback.offline.offlineTrackCacheDir
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -169,10 +171,8 @@ internal class DirectManifestPlaybackBackend(
     }
 
     private fun downloadedTrackCache(trackId: String): SimpleCache? {
-        if (!appContext.getSharedPreferences("offline-downloads", Context.MODE_PRIVATE).getBoolean("downloaded:$trackId", false)) {
-            return null
-        }
-        val cacheDir = File(appContext.filesDir, "offline-proof-cachefill/cache-$trackId")
+        if (!appContext.isOfflineTrackDownloaded(trackId)) return null
+        val cacheDir = appContext.offlineTrackCacheDir(trackId)
         if (!cacheDir.isDirectory) return null
         return offlineCaches.computeIfAbsent(trackId) {
             SimpleCache(cacheDir, NoOpCacheEvictor(), databaseProvider)
@@ -183,8 +183,7 @@ internal class DirectManifestPlaybackBackend(
         dataSpec.key ?: "untidy-download-proof-$trackId-${sha256Short(dataSpec.uri.toString())}"
     }
 
-    private fun isMarkedDownloaded(trackId: String): Boolean =
-        appContext.getSharedPreferences("offline-downloads", Context.MODE_PRIVATE).getBoolean("downloaded:$trackId", false)
+    private fun isMarkedDownloaded(trackId: String): Boolean = appContext.isOfflineTrackDownloaded(trackId)
 
     private fun fetchPlaybackManifest(trackId: String): ResolvedManifest {
         val token = kotlinx.coroutines.runBlocking { authRepository.getAccessToken() }
