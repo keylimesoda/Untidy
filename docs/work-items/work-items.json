@@ -748,7 +748,7 @@
     "id": "UNTIDY-025",
     "title": "Wire offline download/replay into end-user UX",
     "type": "feature",
-    "status": "in-progress",
+    "status": "review",
     "priority": "P0",
     "area": "offline",
     "owner": "Tommy",
@@ -774,7 +774,11 @@
       "DirectManifestPlaybackBackend now requests usage=DOWNLOAD manifest first for marked downloaded tracks.",
       "Downloaded DASH playback uses app-private SimpleCache plus canonical cache-key factory.",
       "Runtime artifact reports app-authored playback route uses openapi-trackManifests-DOWNLOAD and offline cache: reports/offline-ux-2026-06-17-1422-download-manifest-route/.",
-      "Verification passed: :core:playback:compileDebugKotlin :app:compileDebugKotlin, assembleDebug, git diff --check."
+      "Verification passed: :core:playback:compileDebugKotlin :app:compileDebugKotlin, assembleDebug, git diff --check.",
+      "Finish validation artifact: reports/offline-ux-2026-06-17-1444-finish-him/.",
+      "Artifact summary: download_marker_persisted=True, download_manifest_used=True, offline_cache_route_used=True, backend_load_completed=True, backend_play_completed=True, no_android_runtime_error=True.",
+      "Log evidence shows source=openapi-trackManifests-DOWNLOAD and using offline cache for downloaded track id=5120026.",
+      "Caveat: literal app action-sheet screenshot remains flaky on emulator due notification shade gesture; real-watch/manual tap validation remains release-readiness item."
     ],
     "acceptance": [
       "A user-accessible or explicitly debug-gated UI path can download one track.",
@@ -783,7 +787,7 @@
       "Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.",
       "Narrow Gradle gate passes."
     ],
-    "next": "Run literal tap-through UI validation from Now Playing: tap Download, wait for Downloaded, disable network, and play from app UI. App-authored playback route already uses DOWNLOAD manifest + offline cache for marked downloaded tracks.",
+    "next": "Review app-authored offline UX validation. Release checklist still needs real-watch/manual literal tap-through validation because emulator gesture capture hit notification shade.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/26",
     "githubNumber": 26,
     "phase": "implement"

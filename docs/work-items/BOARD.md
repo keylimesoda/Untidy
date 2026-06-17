@@ -4,23 +4,6 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
-### UNTIDY-025 — Wire offline download/replay into end-user UX
-
-- Priority: P0
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: offline, downloads, ux, single-track-mvp
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/26
-- Next: Run literal tap-through UI validation from Now Playing: tap Download, wait for Downloaded, disable network, and play from app UI. App-authored playback route already uses DOWNLOAD manifest + offline cache for marked downloaded tracks.
-- Acceptance:
-  - A user-accessible or explicitly debug-gated UI path can download one track.
-  - Downloaded state persists across app/service restart.
-  - Network-disabled playback of that downloaded track succeeds from app UI.
-  - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
-  - Narrow Gradle gate passes.
-
 ### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
 
 - Priority: P2
@@ -38,6 +21,23 @@ _Generated from `work-items.json`._
   - Relevant compile/lint gate passes.
 
 ## review
+
+### UNTIDY-025 — Wire offline download/replay into end-user UX
+
+- Priority: P0
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, ux, single-track-mvp
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/26
+- Next: Review app-authored offline UX validation. Release checklist still needs real-watch/manual literal tap-through validation because emulator gesture capture hit notification shade.
+- Acceptance:
+  - A user-accessible or explicitly debug-gated UI path can download one track.
+  - Downloaded state persists across app/service restart.
+  - Network-disabled playback of that downloaded track succeeds from app UI.
+  - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
+  - Narrow Gradle gate passes.
 
 ### UNTIDY-014 — Release readiness / ship checklist
 
