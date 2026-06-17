@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: downloads, offline, drm, tidal
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Probe endpoint-shape alternates from bytecode results: retry UserOfflineMixes relationships with omitted cursor/non-user IDs or discovered mix IDs, inspect models for download/offline relationship ids, and if still empty, build a compile-only OfflinePlayProvider/cache harness to prove local SDK playback wiring while server task/id orchestration remains unresolved.
+- Next: Inspect generated model relationships / SDK metadata for offline task, download, or user-offline-mix ids and hidden required query/header fields; provider/cache wiring is now proven locally, so next proof must find the sanctioned server-side id/license/task source before one-track cache fill.
 - Acceptance:
   - Determine whether TIDAL API/SDK permits offline storage for this app
   - If viable, define single-track MVP implementation plan

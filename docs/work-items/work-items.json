@@ -319,16 +319,18 @@
       "Ric corrected blocker: offline/download is not permission-blocked in principle; proceed to sanctioned SDK/API implementation proof while avoiding STREAM manifest caching.",
       "2026-06-17 11:00 PT: debug-only OfflineProof runner proved authenticated usage=DOWNLOAD manifest (200) and SDK PlaybackMode.OFFLINE playback-info returns manifest-bearing PlaybackInfo.Track; downloads/{trackId}=500 and offlineTasks=400, so next seam is installation inventory/task/download id orchestration. Artifact: reports/offline-proof-2026-06-17-1100/latest.json.",
       "2026-06-17 11:15 PT: extended OfflineProof runner to probe installation registration/inventory and bytecode-derived OfflineTasks query shapes. Live result: installations lookup 400 GENERIC_REQUEST_ERROR, installations create 500 INTERNAL_SERVER_ERROR, offlineTasks generated/first-page shapes still 400 MISSING_REQUIRED_PARAMETER. Artifact: reports/offline-proof-2026-06-17-1115/latest.json.",
-      "2026-06-17 11:30 PT: decompiled Retrofit annotations and corrected POST semantics: installationsPost and offlineInventory POST use Idempotency-Key header, not countryCode query. Updated debug runner accordingly and added discovery probes for downloads?filter[id], installations?filter[owners.id], and UserOfflineMixes. Live result: DOWNLOAD manifest still 200; corrected installations create still 500; downloads list/filter 500; owner installation lookup 500; UserOfflineMix by user id 404; UserOfflineMix items with page cursor 0 returned 400 INVALID_CURSOR. Artifact: reports/offline-proof-2026-06-17-1130-discovery/latest.json."
+      "2026-06-17 11:30 PT: decompiled Retrofit annotations and corrected POST semantics: installationsPost and offlineInventory POST use Idempotency-Key header, not countryCode query. Updated debug runner accordingly and added discovery probes for downloads?filter[id], installations?filter[owners.id], and UserOfflineMixes. Live result: DOWNLOAD manifest still 200; corrected installations create still 500; downloads list/filter 500; owner installation lookup 500; UserOfflineMix by user id 404; UserOfflineMix items with page cursor 0 returned 400 INVALID_CURSOR. Artifact: reports/offline-proof-2026-06-17-1130-discovery/latest.json.",
+      "2026-06-17 11:45 PT: debug-only runner proved local OfflinePlayProvider + OfflineCacheProvider + Encryption wiring with app-private Media3 SimpleCache; artifact reports PlaybackInfo.Offline.Track construction and cache UID present. Server orchestration id/license seam remains unresolved."
     ],
     "acceptance": [
       "Determine whether TIDAL API/SDK permits offline storage for this app",
       "If viable, define single-track MVP implementation plan",
       "If not viable, remove/neutralize fake download affordances"
     ],
-    "next": "Probe endpoint-shape alternates from bytecode results: retry UserOfflineMixes relationships with omitted cursor/non-user IDs or discovered mix IDs, inspect models for download/offline relationship ids, and if still empty, build a compile-only OfflinePlayProvider/cache harness to prove local SDK playback wiring while server task/id orchestration remains unresolved.",
+    "next": "Inspect generated model relationships / SDK metadata for offline task, download, or user-offline-mix ids and hidden required query/header fields; provider/cache wiring is now proven locally, so next proof must find the sanctioned server-side id/license/task source before one-track cache fill.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/11",
-    "githubNumber": 11
+    "githubNumber": 11,
+    "phase": "validate"
   },
   {
     "id": "UNTIDY-012",

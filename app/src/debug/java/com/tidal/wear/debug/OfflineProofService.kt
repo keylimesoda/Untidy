@@ -5,9 +5,22 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.cache.Cache
+import androidx.media3.datasource.cache.NoOpCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
 import com.tidal.sdk.eventproducer.EventProducer
 import com.tidal.sdk.eventproducer.model.EventsConfig
 import com.tidal.sdk.player.common.model.AudioQuality
+import com.tidal.sdk.player.common.model.AssetPresentation
+import com.tidal.sdk.player.common.model.AudioMode
+import com.tidal.sdk.player.offlineplay.OfflinePlayProvider
+import com.tidal.sdk.player.playbackengine.Encryption
+import com.tidal.sdk.player.playbackengine.offline.cache.OfflineCacheProvider
+import com.tidal.sdk.player.streamingapi.offline.Storage
+import com.tidal.sdk.player.streamingapi.playbackinfo.model.ManifestMimeType
+import com.tidal.sdk.player.streamingapi.playbackinfo.model.PlaybackInfo
+import com.tidal.sdk.player.streamingapi.playbackinfo.offline.OfflinePlaybackInfoProvider
 import com.tidal.sdk.player.streamingapi.playbackinfo.model.PlaybackMode
 import com.tidal.wear.BuildConfig
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
@@ -171,6 +184,7 @@ class OfflineProofService : Service() {
             }
         }
 
+        results += offlineProviderWiringProbe(trackId)
         results += sdkOfflinePlaybackProbe(trackId, authRepository)
 
         val path = writeArtifact(startedAt, trackId, countryCode, results)
@@ -383,6 +397,79 @@ class OfflineProofService : Service() {
             results += getJsonProbe("userOfflineMixItemsByUserId", offlineMixItemsUrl.toString(), token, clientId) { root ->
                 summarizeRelationshipItems(root)
             }
+        }
+    }
+
+    private fun offlineProviderWiringProbe(trackId: String): JsonObject {
+        var cache: SimpleCache? = null
+        return runCatching {
+            val cacheDir = File(filesDir, "offline-proof/cache-$trackId").apply { mkdirs() }
+            cache = SimpleCache(cacheDir, NoOpCacheEvictor(), StandaloneDatabaseProvider(applicationContext))
+            val storage = Storage(externalStorage = false, path = cacheDir.absolutePath)
+            val track = PlaybackInfo.Track(
+                trackId.toIntOrNull() ?: 0,
+                AudioQuality.LOW,
+                AssetPresentation.FULL,
+                AudioMode.STEREO,
+                "untidy-proof-manifest-hash",
+                null,
+                "untidy-proof-session-${UUID.randomUUID()}",
+                ManifestMimeType.DASH,
+                "untidy-proof-manifest-placeholder",
+                "",
+                0f,
+                0f,
+                0f,
+                0f,
+                0L,
+                0L,
+            )
+            val offlineTrack = PlaybackInfo.Offline.Track(
+                track = track,
+                offlineLicense = "",
+                storage = storage,
+                partiallyEncrypted = false,
+            )
+            val provider = OfflinePlayProvider(
+                offlinePlaybackInfoProvider = object : OfflinePlaybackInfoProvider {
+                    override suspend fun getOfflineTrackPlaybackInfo(trackId: String, streamingSessionId: String): PlaybackInfo = offlineTrack
+                    override suspend fun getOfflineVideoPlaybackInfo(videoId: String, streamingSessionId: String): PlaybackInfo {
+                        throw UnsupportedOperationException("video offline proof not implemented")
+                    }
+                },
+                offlineCacheProvider = object : OfflineCacheProvider {
+                    override fun getExternal(path: String): Cache = requireNotNull(cache) { "cache released" }
+                    override fun getInternal(path: String): Cache = requireNotNull(cache) { "cache released" }
+                },
+                encryption = object : Encryption {
+                    override val secretKey: ByteArray = MessageDigest.getInstance("SHA-256")
+                        .digest("untidy-debug-offline-proof".toByteArray())
+                    override fun getDecryptedHeader(pathOrKey: String): ByteArray = ByteArray(0)
+                },
+            )
+            val resolvedInfo = kotlinx.coroutines.runBlocking {
+                requireNotNull(provider.offlinePlaybackInfoProvider).getOfflineTrackPlaybackInfo(trackId, "proof-session")
+            }
+            val internalCache = requireNotNull(provider.offlineCacheProvider).getInternal(storage.path)
+            event("offlineProviderWiring", buildJsonObject {
+                put("providerConstructed", true)
+                put("offlineInfoClass", resolvedInfo.javaClass.name)
+                put("offlineLicensePresent", (resolvedInfo as? PlaybackInfo.Offline.Track)?.offlineLicense?.isNotBlank() == true)
+                put("storageExternal", (resolvedInfo as? PlaybackInfo.Offline.Track)?.storage?.externalStorage ?: true)
+                put("storagePathHash", sha256Short((resolvedInfo as? PlaybackInfo.Offline.Track)?.storage?.path.orEmpty()))
+                put("cacheClass", internalCache.javaClass.name)
+                put("cacheUidPresent", internalCache.uid != Cache.UID_UNSET)
+                put("cacheKeysCount", internalCache.keys.size)
+                put("secretKeyLength", requireNotNull(provider.encryption).secretKey.size)
+                put("decryptedHeaderLength", requireNotNull(provider.encryption).getDecryptedHeader("proof").size)
+            })
+        }.getOrElse {
+            event("offlineProviderWiring", buildJsonObject {
+                put("exception", it::class.java.simpleName)
+                put("message", it.message.orEmpty().take(180))
+            })
+        }.also {
+            runCatching { cache?.release() }
         }
     }
 

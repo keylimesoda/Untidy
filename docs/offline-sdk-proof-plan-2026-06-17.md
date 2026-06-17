@@ -601,3 +601,31 @@ Redacted live results for track `5120026` / country `US`:
 | `GET /v2/offlineTasks` generated shapes | `400 MISSING_REQUIRED_PARAMETER` | Still likely needs a valid installation id or task id before listing works. |
 
 Self-unblock outcome: the runner now uses the correct bytecode-derived header/query shapes and explored downloads list, owner installation lookup, and user-offline-mix surfaces. None yielded a valid installation/task/download id. The next proof should either (a) find a valid user-offline-mix id/cursor source by inspecting generated models/relationships or alternative endpoint ids, or (b) pivot to a compile-only/local `OfflinePlayProvider` + `OfflineCacheProvider` harness to prove the SDK offline playback wiring while server-side task/download-id orchestration remains unresolved.
+
+## Offline provider/cache wiring proof — 2026-06-17 11:45 PT
+
+After the server-side discovery probes failed to yield a valid installation/task/download id, the next self-unblock step was to prove the local SDK offline playback seam itself instead of stopping at server orchestration.
+
+The debug-only proof runner now constructs a minimal `OfflinePlayProvider` from real SDK interfaces:
+
+- `OfflinePlaybackInfoProvider` returning a `PlaybackInfo.Offline.Track`
+- `OfflineCacheProvider` returning a Media3 `SimpleCache`
+- `Encryption` returning a stable debug-only 32-byte key and empty decrypted header
+- `Storage(externalStorage=false, path=<app-private proof cache>)`
+
+Artifact copied from the emulator for this pass:
+
+- `reports/offline-proof-2026-06-17-1145-provider-wiring/latest.json` (gitignored local runtime artifact)
+
+Redacted runtime results for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| `offlineProviderWiring` | constructed successfully; resolved `PlaybackInfo$Offline$Track`; `SimpleCache` UID present; `secretKeyLength=32`; app-private storage path recorded only as a hash | The SDK offline-provider/cache/encryption seam compiles and can be instantiated with app-private Media3 cache wiring. This proves the local playback wiring is implementable once sanctioned server-side offline bytes/license/task ids are obtained. |
+| `GET /v2/trackManifests/{id}` with `usage=DOWNLOAD` | still `200`; manifest/hash present | The sanctioned download-manifest probe remains stable. |
+| SDK `PlaybackMode.OFFLINE` playback-info probe | still returns manifest-bearing `PlaybackInfo.Track`; no license URL; offline validity fields `-1` | The SDK OFFLINE request path still works but does not itself return a complete `PlaybackInfo.Offline.Track` or license. |
+| Corrected installation/download/offlineTasks discovery probes | installation create and download-id paths still fail; no task/download id found | Server orchestration remains the unresolved seam, but it is now isolated from local provider/cache wiring. |
+
+Concrete advancement: #11 now has a compile/runtime proof that Untidy can wire the official SDK `OfflinePlayProvider`/`OfflineCacheProvider`/`Encryption` path with app-private Media3 cache. The remaining unknown is not "can the app supply the offline provider?"; it is where TIDAL exposes the sanctioned download resource id/offline license/offline task sequence for this app session.
+
+Next concrete proof step: inspect generated model relationships for offline task/download/user-offline-mix ids and/or decompile SDK network metadata for hidden required query/header fields; only if a real server-side id or license source is found should the runner attempt a one-track cache fill and offline playback replay.
