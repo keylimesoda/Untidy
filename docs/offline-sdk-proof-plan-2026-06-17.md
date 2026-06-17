@@ -568,3 +568,36 @@ Next concrete proof step:
 1. Decompile/search SDK bytecode for callers of `installationsPost`, `installationsIdRelationshipsOfflineInventoryPost`, `offlineTasksGet`, and `downloadsIdGet` to identify the required endpoint/body/query sequence.
 2. If no caller exists in SDK artifacts, build a smaller endpoint-shape probe around `UserOfflineMixes` and installation owner filters; those are the remaining generated offline-adjacent surfaces that may reveal installation/task ids.
 3. Only after a real installation/task/download id is obtained should the proof attempt `Downloads.downloadsIdGet(...)` or an offline cache/provider playback path.
+
+## Endpoint-shape correction and offline-discovery probe — 2026-06-17 11:30 PT
+
+This pass decompiled Retrofit annotations for the remaining offline-adjacent APIs and corrected an important mistake from the prior raw HTTP probe: some methods that looked like they accepted `countryCode` from plain `javap` were actually taking an `Idempotency-Key` header.
+
+Corrected bytecode evidence:
+
+- `Installations.installationsPost(...)` is `POST /v2/installations` with `Header("Idempotency-Key")` and a JSON:API body. It does **not** use `countryCode` as a query parameter.
+- `Installations.installationsIdRelationshipsOfflineInventoryPost(...)` is `POST /v2/installations/{id}/relationships/offlineInventory` with `Header("Idempotency-Key")` and a JSON:API relationship body. It does **not** use `countryCode` as a query parameter.
+- `Installations.installationsIdRelationshipsOfflineInventoryGet(...)` uses `page[cursor]`, `include`, `filter[id]`, `filter[state]`, and `filter[type]`.
+- `Downloads.downloadsGet(...)` uses `include` and `filter[id]`; `downloadsIdGet(...)` uses only path id plus `include`.
+- `UserOfflineMixes.userOfflineMixesIdGet(...)` uses `countryCode`, `locale`, and `include`; `userOfflineMixesIdRelationshipsItemsGet(...)` uses `page[cursor]`, `locale`, and `include`.
+
+The debug-only runner was updated to use `Idempotency-Key` for installation create/offline-inventory add and to probe the remaining official offline discovery surfaces. No production UX was changed and no raw STREAM/PLAYBACK manifest caching was added.
+
+Artifact copied from the emulator for this pass:
+
+- `reports/offline-proof-2026-06-17-1130-discovery/latest.json` (gitignored local runtime artifact)
+
+Redacted live results for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| `GET /v2/trackManifests/{id}` with `usage=DOWNLOAD` | `200`; manifest/hash still present | The sanctioned download-manifest proof remains stable. |
+| `GET /v2/installations?filter[clientProvidedInstallationId]=...` | `400 GENERIC_REQUEST_ERROR` | Lookup shape still not accepted for the current app/session. |
+| Corrected `POST /v2/installations` with `Idempotency-Key` header | `500 INTERNAL_SERVER_ERROR` | The earlier `countryCode` mistake was not the only issue; installation creation still fails for this app/session/body. |
+| `GET /v2/downloads?filter[id]={trackId}&include=owners` | `500 INTERNAL_SERVER_ERROR` | The `downloads` collection does not expose track-id-filtered records for this session, or track id is not the download id. |
+| `GET /v2/installations?filter[owners.id]={userId}` | `500 INTERNAL_SERVER_ERROR` | Owner-filtered installation discovery did not return an installation id. |
+| `GET /v2/userOfflineMixes/{userId}` | `404 NOT_FOUND` | User id is not a valid user-offline-mix id. |
+| `GET /v2/userOfflineMixes/{userId}/relationships/items?page[cursor]=0` | `400 INVALID_CURSOR` | This endpoint exists but needs a valid offline-mix id and/or cursor semantics; user id is not sufficient. |
+| `GET /v2/offlineTasks` generated shapes | `400 MISSING_REQUIRED_PARAMETER` | Still likely needs a valid installation id or task id before listing works. |
+
+Self-unblock outcome: the runner now uses the correct bytecode-derived header/query shapes and explored downloads list, owner installation lookup, and user-offline-mix surfaces. None yielded a valid installation/task/download id. The next proof should either (a) find a valid user-offline-mix id/cursor source by inspecting generated models/relationships or alternative endpoint ids, or (b) pivot to a compile-only/local `OfflinePlayProvider` + `OfflineCacheProvider` harness to prove the SDK offline playback wiring while server-side task/download-id orchestration remains unresolved.

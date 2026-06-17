@@ -116,6 +116,7 @@ class OfflineProofService : Service() {
         }
 
         val installationId = probeInstallationInventory(trackId, countryCode, token, clientId, results)
+        probeOfflineDiscoverySurfaces(trackId, countryCode, token, clientId, account?.userId, results)
 
         val downloadsUrl = "https://openapi.tidal.com/v2/downloads/$trackId".toHttpUrl().newBuilder()
             .addQueryParameter("countryCode", countryCode)
@@ -182,7 +183,7 @@ class OfflineProofService : Service() {
         token: String,
         clientId: String,
         summarize: (JsonObject?) -> JsonObject,
-    ): JsonObject = requestJsonProbe(name, "GET", url, token, clientId, null, summarize)
+    ): JsonObject = requestJsonProbe(name, "GET", url, token, clientId, null, summarize = summarize)
 
     private fun postJsonProbe(
         name: String,
@@ -191,7 +192,17 @@ class OfflineProofService : Service() {
         clientId: String,
         body: JsonObject,
         summarize: (JsonObject?) -> JsonObject,
-    ): JsonObject = requestJsonProbe(name, "POST", url, token, clientId, body, summarize)
+    ): JsonObject = requestJsonProbe(name, "POST", url, token, clientId, body, emptyMap(), summarize)
+
+    private fun postJsonProbeWithHeaders(
+        name: String,
+        url: String,
+        token: String,
+        clientId: String,
+        body: JsonObject,
+        headers: Map<String, String>,
+        summarize: (JsonObject?) -> JsonObject,
+    ): JsonObject = requestJsonProbe(name, "POST", url, token, clientId, body, headers, summarize)
 
     private fun requestJsonProbe(
         name: String,
@@ -200,6 +211,7 @@ class OfflineProofService : Service() {
         token: String,
         clientId: String,
         body: JsonObject?,
+        extraHeaders: Map<String, String> = emptyMap(),
         summarize: (JsonObject?) -> JsonObject,
     ): JsonObject {
         val requestBody = body?.toString()?.toRequestBody(JSON_API_ACCEPT.toMediaType())
@@ -208,6 +220,7 @@ class OfflineProofService : Service() {
             .header("accept", JSON_API_ACCEPT)
             .header("X-Tidal-Token", clientId)
             .header("Authorization", "Bearer $token")
+        extraHeaders.forEach { (key, value) -> builder.header(key, value) }
         if (requestBody != null) {
             builder.header("content-type", JSON_API_ACCEPT).method(method, requestBody)
         } else {
@@ -266,7 +279,6 @@ class OfflineProofService : Service() {
         var installationId = lookup.stringFromSummary("firstId")
         if (installationId.isNullOrBlank()) {
             val createUrl = "https://openapi.tidal.com/v2/installations".toHttpUrl().newBuilder()
-                .addQueryParameter("countryCode", countryCode)
                 .build()
             val createBody = buildJsonObject {
                 put("data", buildJsonObject {
@@ -277,7 +289,14 @@ class OfflineProofService : Service() {
                     })
                 })
             }
-            val create = postJsonProbe("installationsCreate", createUrl.toString(), token, clientId, createBody) { root ->
+            val create = postJsonProbeWithHeaders(
+                "installationsCreateWithIdempotencyKey",
+                createUrl.toString(),
+                token,
+                clientId,
+                createBody,
+                mapOf("Idempotency-Key" to "untidy-installation-$clientProvidedId"),
+            ) { root ->
                 summarizeInstallations(root, clientProvidedId)
             }
             results += create
@@ -289,7 +308,6 @@ class OfflineProofService : Service() {
         }
 
         val inventoryPostUrl = "https://openapi.tidal.com/v2/installations/$installationId/relationships/offlineInventory".toHttpUrl().newBuilder()
-            .addQueryParameter("countryCode", countryCode)
             .build()
         val inventoryBody = buildJsonObject {
             put("data", JsonArray(listOf(buildJsonObject {
@@ -297,22 +315,75 @@ class OfflineProofService : Service() {
                 put("type", "tracks")
             })))
         }
-        results += postJsonProbe("installationOfflineInventoryAddTrack", inventoryPostUrl.toString(), token, clientId, inventoryBody) { root ->
+        results += postJsonProbeWithHeaders(
+            "installationOfflineInventoryAddTrackWithIdempotencyKey",
+            inventoryPostUrl.toString(),
+            token,
+            clientId,
+            inventoryBody,
+            mapOf("Idempotency-Key" to "untidy-inventory-$installationId-$trackId"),
+        ) { root ->
             summarizeRelationshipMutation(root)
         }
 
         val inventoryGetUrl = "https://openapi.tidal.com/v2/installations/$installationId/relationships/offlineInventory".toHttpUrl().newBuilder()
-            .addQueryParameter("countryCode", countryCode)
+            .addQueryParameter("page[cursor]", "0")
+            .addQueryParameter("include", "items")
             .addQueryParameter("filter[state]", "PENDING")
             .addQueryParameter("filter[state]", "STORED")
             .addQueryParameter("filter[type]", "tracks")
-            .addQueryParameter("include", "items")
             .build()
         results += getJsonProbe("installationOfflineInventoryGet", inventoryGetUrl.toString(), token, clientId) { root ->
             summarizeOfflineInventory(root, trackId)
         }
 
         return installationId
+    }
+
+    private fun probeOfflineDiscoverySurfaces(
+        trackId: String,
+        countryCode: String,
+        token: String,
+        clientId: String,
+        userId: String?,
+        results: MutableList<JsonObject>,
+    ) {
+        val downloadsListUrl = "https://openapi.tidal.com/v2/downloads".toHttpUrl().newBuilder()
+            .addQueryParameter("include", "owners")
+            .addQueryParameter("filter[id]", trackId)
+            .build()
+        results += getJsonProbe("downloadsListFilterTrackId", downloadsListUrl.toString(), token, clientId) { root ->
+            summarizeDownloadsList(root)
+        }
+
+        if (!userId.isNullOrBlank()) {
+            val ownerInstallationsUrl = "https://openapi.tidal.com/v2/installations".toHttpUrl().newBuilder()
+                .addQueryParameter("page[cursor]", "0")
+                .addQueryParameter("include", "offlineInventory,owners")
+                .addQueryParameter("filter[owners.id]", userId)
+                .build()
+            results += getJsonProbe("installationsByOwnerId", ownerInstallationsUrl.toString(), token, clientId) { root ->
+                summarizeInstallations(root, clientProvidedId = "")
+            }
+
+            val offlineMixUrl = "https://openapi.tidal.com/v2/userOfflineMixes/$userId".toHttpUrl().newBuilder()
+                .addQueryParameter("countryCode", countryCode)
+                .addQueryParameter("locale", "en_US")
+                .addQueryParameter("include", "items")
+                .build()
+            results += getJsonProbe("userOfflineMixByUserId", offlineMixUrl.toString(), token, clientId) { root ->
+                summarizeUserOfflineMix(root)
+            }
+
+            val offlineMixItemsUrl = "https://openapi.tidal.com/v2/userOfflineMixes/$userId/relationships/items".toHttpUrl().newBuilder()
+                .addQueryParameter("page[cursor]", "0")
+                .addQueryParameter("locale", "en_US")
+                .addQueryParameter("include", "items")
+                .build()
+            results += getJsonProbe("userOfflineMixItemsByUserId", offlineMixItemsUrl.toString(), token, clientId) { root ->
+                summarizeRelationshipItems(root)
+            }
+        }
     }
 
     private suspend fun sdkOfflinePlaybackProbe(trackId: String, authRepository: com.tidal.wear.core.auth.TidalAuthRepository): JsonObject {
@@ -431,6 +502,17 @@ class OfflineProofService : Service() {
         put("formatCount", attrs?.jsonArray("formats")?.size ?: 0)
     }
 
+    private fun summarizeDownloadsList(root: JsonObject?): JsonObject = buildJsonObject {
+        val data = root?.get("data")
+        val items = when (data) {
+            is JsonArray -> data
+            else -> JsonArray(emptyList())
+        }
+        put("count", items.size)
+        put("firstIdPresent", !items.firstOrNull()?.jsonObjectOrNull()?.string("id").isNullOrBlank())
+        put("types", items.mapNotNull { it.jsonObjectOrNull()?.string("type") }.distinct().joinToString(","))
+    }
+
     private fun summarizeDownloads(root: JsonObject?): JsonObject = buildJsonObject {
         val attrs = root?.jsonObject("data")?.jsonObject("attributes")
         val links = attrs?.jsonArray("downloadLinks")
@@ -438,6 +520,24 @@ class OfflineProofService : Service() {
         put("dataIdPresent", !root?.jsonObject("data")?.string("id").isNullOrBlank())
         put("downloadLinkCount", links?.size ?: 0)
         put("anyHrefPresent", links?.any { it.jsonObjectOrNull()?.string("href")?.isNotBlank() == true } == true)
+    }
+
+    private fun summarizeUserOfflineMix(root: JsonObject?): JsonObject = buildJsonObject {
+        val data = root?.jsonObject("data")
+        put("dataType", data?.string("type").orEmpty())
+        put("dataIdPresent", !data?.string("id").isNullOrBlank())
+        put("relationshipKeys", data?.jsonObject("relationships")?.keys?.sorted()?.joinToString(",").orEmpty())
+    }
+
+    private fun summarizeRelationshipItems(root: JsonObject?): JsonObject = buildJsonObject {
+        val data = root?.get("data")
+        val items = when (data) {
+            is JsonArray -> data
+            else -> JsonArray(emptyList())
+        }
+        put("count", items.size)
+        put("types", items.mapNotNull { it.jsonObjectOrNull()?.string("type") }.distinct().joinToString(","))
+        put("firstIdPresent", !items.firstOrNull()?.jsonObjectOrNull()?.string("id").isNullOrBlank())
     }
 
     private fun summarizeOfflineTasks(root: JsonObject?): JsonObject = buildJsonObject {
