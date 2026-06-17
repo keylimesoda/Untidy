@@ -1,6 +1,6 @@
 # Feature Spec: Downloads / Offline Playback
 
-**Status:** Draft spec + Phase 0 spike completed; do not implement product downloads until the sanctioned TIDAL offline path is proven.
+**Status:** Draft spec + Phase 0 spike completed; implementation proof next. Ric confirmed TIDAL already supports/allows offline/download in 1st- and 3rd-party clients; implement only via sanctioned offline SDK/API surfaces, not by caching STREAM manifests.
 **Feature:** #2, Downloads / offline playback
 **Target app:** Untidy Wear OS standalone TIDAL client
 **Audience:** PM, UX, Android playback/storage implementers, reviewers

@@ -2,7 +2,7 @@
 
 **Issue:** #11 / `UNTIDY-011`  
 **Date:** 2026-06-17  
-**Status:** Spike complete; product implementation blocked pending sanctioned TIDAL offline path validation.
+**Status:** Spike complete; implementation proof next. Ric confirmed TIDAL already supports/allows offline/download in 1st- and 3rd-party clients; Untidy should prove and use the sanctioned offline SDK/API path rather than caching STREAM manifests.
 
 ## Executive recommendation
 
@@ -41,7 +41,7 @@ Local Gradle artifacts show TIDAL SDK 0.0.64 contains offline-facing classes:
 - `TrackManifests$UsageTrackManifestsIdGet.DOWNLOAD`
 - generated API groups including `Downloads`, `OfflineTasks`, and installation offline inventory models
 
-This is a useful lead: the official SDK/OpenAPI surface appears to distinguish playback vs download/offline. But Untidy currently bypasses those offline SDK flows and uses direct streaming manifests. The existence of these classes does **not** by itself prove third-party developer apps are permitted to expose consumer downloads or that raw byte caching is allowed.
+This is a useful lead: the official SDK/OpenAPI surface appears to distinguish playback vs download/offline. But Untidy currently bypasses those offline SDK flows and uses direct streaming manifests. Ric confirmed TIDAL already has/allows offline/download in 1st- and 3rd-party clients. Treat these classes as the implementation proof target; they still do not justify raw STREAM URL caching.
 
 ## Android / Media3 feasibility
 
@@ -88,11 +88,10 @@ Promising SDK/API signals:
 
 Required next proof:
 
-1. Confirm TIDAL terms/developer policy allow Untidy to offer offline playback to the signed-in user's watch.
-2. Identify the blessed call sequence for creating an offline task/download and recording installation inventory.
-3. Determine whether the SDK can download/cache media itself or only plays already-provisioned offline storage supplied by an app.
-4. Validate one track using the sanctioned SDK/offline flow on a real authenticated device.
-5. Confirm license expiry/renewal and sign-out cleanup rules.
+1. Identify the blessed call sequence for creating an offline task/download and recording installation inventory.
+2. Determine whether the SDK can download/cache media itself or only plays already-provisioned offline storage supplied by an app.
+3. Validate one track using the sanctioned SDK/offline flow on a real authenticated device.
+4. Confirm license expiry/renewal and sign-out cleanup rules.
 
 ### 4. Full custom downloader with app-private files
 
@@ -119,9 +118,8 @@ Open a narrow follow-up spike: **TIDAL sanctioned offline SDK proof**.
 
 Scope:
 
-1. Use official TIDAL SDK docs/source and developer terms to confirm whether third-party offline playback is allowed.
-2. Inspect SDK test app/source for `OfflinePlayProvider`, `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, `Downloads`, and `OfflineTasks` usage.
-3. If terms allow, build a debug-only proof that requests `usage=DOWNLOAD` / `PlaybackMode.OFFLINE` through official SDK APIs, never by raw stream URL caching.
-4. Only after that succeeds, design Phase 1 state repository and Phase 2 single-track MVP.
+1. Inspect official TIDAL SDK docs/source/test app for `OfflinePlayProvider`, `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, `Downloads`, and `OfflineTasks` usage.
+2. Build a debug-only proof that requests `usage=DOWNLOAD` / `PlaybackMode.OFFLINE` through official SDK APIs, never by raw stream URL caching.
+3. Only after that succeeds, design Phase 1 state repository and Phase 2 single-track MVP.
 
 Recommended issue status: keep #11 open as **blocked/needs upstream TIDAL offline proof**, with fake UI neutralized.

@@ -4,7 +4,20 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
-_None._
+### UNTIDY-011 — Downloads/offline playback capability spike
+
+- Priority: P2
+- Type: spike
+- Area: offline
+- Owner: Tommy
+- Labels: downloads, offline, drm, tidal
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/11
+- Next: Ric confirmed TIDAL offline/download is allowed in 1st/3rd-party clients. Prove the official SDK/API call sequence for one-track offline using DOWNLOAD/OFFLINE surfaces; do not cache STREAM manifests.
+- Acceptance:
+  - Determine whether TIDAL API/SDK permits offline storage for this app
+  - If viable, define single-track MVP implementation plan
+  - If not viable, remove/neutralize fake download affordances
 
 ## review
 
@@ -16,20 +29,7 @@ _None._
 
 ## blocked
 
-### UNTIDY-011 — Downloads/offline playback capability spike
-
-- Priority: P2
-- Type: spike
-- Area: offline
-- Owner: Tommy
-- Labels: downloads, offline, drm, tidal
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Blocked pending sanctioned TIDAL offline/download path validation; fake download UI has been neutralized.
-- Acceptance:
-  - Determine whether TIDAL API/SDK permits offline storage for this app
-  - If viable, define single-track MVP implementation plan
-  - If not viable, remove/neutralize fake download affordances
+_None._
 
 ## done
 
