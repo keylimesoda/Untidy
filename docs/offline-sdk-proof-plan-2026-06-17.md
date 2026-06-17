@@ -538,3 +538,33 @@ Redacted proof result for track `5120026` / country `US`:
 | OpenAPI `GET /v2/offlineTasks` with/without repeated state/action filters | `400 MISSING_REQUIRED_PARAMETER` | The generated method signature is incomplete for live use or requires another required query parameter not yet discovered from bytecode. Offline task creation/orchestration remains the next proof target. |
 
 Concrete advancement: the sanctioned `usage=DOWNLOAD` and `PlaybackMode.OFFLINE` probes now have live authenticated evidence. The next proof step is **not** product implementation yet; it is to identify the missing offline orchestration seam: installation registration/offline inventory POST/GET and the required `offlineTasks` parameter or download resource id source.
+
+## Installation inventory proof result — 2026-06-17 11:15 PT
+
+The debug-only proof runner was extended to probe installation registration, installation offline-inventory relationships, and the `OfflineTasks` query shape discovered from bytecode. No production UX was changed.
+
+Artifact copied from the emulator for this pass:
+
+- `reports/offline-proof-2026-06-17-1115/latest.json` (gitignored local runtime artifact)
+
+Additional SDK/bytecode evidence from this pass:
+
+- `OfflineTasks.offlineTasksGet(...)` Retrofit annotations do **not** use the earlier guessed `countryCode`, `filter[state]`, or `filter[action]` query shape. The actual generated query names are `page[cursor]`, `include`, `filter[id]`, and `filter[installation.id]`.
+- `Installations.installationsGet(...)` uses `page[cursor]`, `include`, `filter[clientProvidedInstallationId]`, `filter[id]`, and `filter[owners.id]`.
+- Installation offline inventory GET uses `filter[state]`, `filter[type]`, `page[cursor]`, and `include`; POST uses `countryCode` plus a JSON:API relationship body.
+
+Redacted live proof result for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| `GET /v2/installations?filter[clientProvidedInstallationId]=...&include=offlineInventory,owners` | `400 GENERIC_REQUEST_ERROR` | The generated query shape is known, but the current user/app session cannot list/reuse this debug installation by client-provided id through this endpoint shape. |
+| `POST /v2/installations?countryCode=US` with `data.type=installations`, `attributes.clientProvidedInstallationId`, and `attributes.name` | `500 INTERNAL_SERVER_ERROR` | Installation creation is not accepted for this current app/session/body shape; no installation id was returned, so inventory POST could not safely proceed. |
+| `GET /v2/offlineTasks` using both guessed and generated shapes, including `include=item,collection,owners` and `page[cursor]=0` | `400 MISSING_REQUIRED_PARAMETER` | The earlier missing parameter is not solved by `countryCode`, state/action filters, generated include-only shape, or first-page cursor. A valid installation id and/or server-created task id likely has to exist before task listing can work. |
+
+Self-unblock attempted in the same pass: after installation creation failed, the runner tested the bytecode-derived `OfflineTasks` query shape without `countryCode` and with `page[cursor]`; it still returned `MISSING_REQUIRED_PARAMETER`. This narrows the missing seam: the next proof should search/decompile first-party SDK call sites or generated docs for **how a valid installation/offline task is created**, not keep guessing IDs.
+
+Next concrete proof step:
+
+1. Decompile/search SDK bytecode for callers of `installationsPost`, `installationsIdRelationshipsOfflineInventoryPost`, `offlineTasksGet`, and `downloadsIdGet` to identify the required endpoint/body/query sequence.
+2. If no caller exists in SDK artifacts, build a smaller endpoint-shape probe around `UserOfflineMixes` and installation owner filters; those are the remaining generated offline-adjacent surfaces that may reveal installation/task ids.
+3. Only after a real installation/task/download id is obtained should the proof attempt `Downloads.downloadsIdGet(...)` or an offline cache/provider playback path.

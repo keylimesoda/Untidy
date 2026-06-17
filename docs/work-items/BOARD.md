@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: downloads, offline, drm, tidal
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Probe installation registration/offline inventory and the missing offlineTasks/download resource-id seam after live DOWNLOAD/OFFLINE proof succeeded.
+- Next: Decompile/search SDK bytecode for callers of installation/offlineTasks/download APIs; if absent, probe remaining UserOfflineMixes/owner-filter surfaces to obtain a valid installation/task/download id before attempting downloadsIdGet or offline cache playback.
 - Acceptance:
   - Determine whether TIDAL API/SDK permits offline storage for this app
   - If viable, define single-track MVP implementation plan
