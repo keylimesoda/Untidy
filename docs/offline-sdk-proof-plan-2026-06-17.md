@@ -691,3 +691,65 @@ Next concrete proof step:
 
 1. Build a debug-only compile/runtime harness around the real `TidalMediaSourceCreator` offline branch using a synthetic redacted `PlaybackInfo.Offline.Track` and app-private `Storage`, to prove which offline branch/factory path Untidy will hit for DASH vs progressive manifests without real download bytes.
 2. In parallel or next run, search/decompile any available first-party sample/app artifacts for implementations of `OfflinePlaybackInfoProvider`; that interface remains the likely boundary where TIDAL's official app/client injects server-side offline license/storage state.
+
+
+## TidalMediaSourceCreator compile-only harness attempt — 2026-06-17 12:26 PT
+
+Next proof target from the previous pass was to build a debug-only harness around the real `TidalMediaSourceCreator` offline branch with synthetic `PlaybackInfo.Offline.Track` and app-private `Storage`.
+
+Result: the direct app/debug-source harness is **not the correct integration seam**. The compile attempt failed because the media-source branch and most of its factory dependencies are Kotlin `internal` inside the TIDAL SDK artifacts:
+
+- `TidalMediaSourceCreator`
+- `PlayerProgressiveOfflineMediaSourceFactory`
+- `PlayerDashOfflineMediaSourceFactory`
+- `OfflineStorageProvider`
+- `OfflinePlayDataSourceFactoryHelper`
+- `OfflinePlayDrmDataSourceFactoryHelper`
+- `OfflineDrmHelper`
+- `DefaultBtsManifestFactory` / `DashManifestFactory`
+- `DrmSessionManagerFactory` / `DrmSessionManagerProviderFactory` / `TidalMediaDrmCallbackFactory`
+
+Verification/self-unblock sequence:
+
+1. Tried the debug-only compile harness against `app/src/debug/java/com/tidal/wear/debug/OfflineProofService.kt`.
+2. Ran `source scripts/env-android.sh >/dev/null && bash ./gradlew :app:compileDebugKotlin --no-daemon`.
+3. Reverted the failed app-source change so the repo stayed compileable.
+4. Recorded the failed attempt locally at `reports/offline-proof-2026-06-17-1226-media-source-creator-compile/README.md` (gitignored proof artifact; no secrets).
+5. Re-ran `:app:compileDebugKotlin` and `git diff --check`; both passed after revert/docs-only changes.
+6. Inspected public SDK bytecode and found the higher-level public seam:
+
+```text
+public final class com.tidal.sdk.player.Player {
+  public Player(
+    Application,
+    CredentialsProvider,
+    EventSender,
+    ...,
+    CacheProvider,
+    ...,
+    PlaybackPrivilegeProvider,
+    OfflinePlayProvider,
+    String,
+    String,
+    String
+  );
+}
+
+public final class com.tidal.sdk.player.offlineplay.OfflinePlayProvider {
+  public OfflinePlayProvider(
+    OfflinePlaybackInfoProvider,
+    OfflineCacheProvider,
+    Encryption
+  );
+  public OfflinePlayProvider();
+}
+
+public interface OfflinePlaybackInfoProvider {
+  getOfflineTrackPlaybackInfo(String, String, Continuation<PlaybackInfo>);
+  getOfflineVideoPlaybackInfo(String, String, Continuation<PlaybackInfo>);
+}
+```
+
+Interpretation: Untidy should not instantiate `TidalMediaSourceCreator` or offline media-source factories directly. Those classes are internal implementation details. The sanctioned app-facing proof seam is `Player(..., OfflinePlayProvider, ...)` plus a custom/debug `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, and `Encryption`.
+
+Next concrete proof step: build a minimal compile-only `Player` construction harness using a debug `OfflinePlayProvider` at the public constructor seam. The harness should not play media yet and should keep synthetic offline playback info redacted; the goal is to prove Untidy can inject the provider into the SDK `Player` without touching internal media-source classes. If construction compiles, follow with a runtime proof that requests `PlaybackMode.OFFLINE` through the player/load path and captures only class/status/shape evidence.
