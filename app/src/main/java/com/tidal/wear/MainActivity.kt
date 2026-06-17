@@ -353,7 +353,13 @@ private fun TidalWearApp(
                         onPlayTrack = ::playTrack,
                     )
                 }
-                composable(Routes.Settings) { SettingsScreen(authRepository = authRepository, onSignedOut = { navController.navigateAndClear(Routes.Onboarding) }) }
+                composable(Routes.Settings) {
+                    SettingsScreen(
+                        authRepository = authRepository,
+                        onOpenDownloads = { navController.navigate(Routes.Downloads) },
+                        onSignedOut = { navController.navigateAndClear(Routes.Onboarding) },
+                    )
+                }
             }
         }
     }

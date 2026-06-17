@@ -63,8 +63,27 @@ fun Context.removeOfflineTrackDownload(trackId: String): Boolean {
     return true
 }
 
+/**
+ * Removes all Untidy-local downloaded track state and cache bytes from this watch.
+ * This never mutates TIDAL library, playlists, playlist membership, or remote assets.
+ */
+fun Context.removeAllOfflineTrackDownloads(): Boolean =
+    readOfflineDownloadedTracks().map { removeOfflineTrackDownload(it.id) }.all { it }
+
+fun Context.offlineDownloadsStorageBytes(): Long =
+    readOfflineDownloadedTracks()
+        .sumOf { offlineTrackCacheDir(it.id).directorySizeBytes() }
+
 fun Context.offlineTrackCacheDir(trackId: String): File =
     File(filesDir, "offline-proof-cachefill/cache-$trackId")
+
+private fun File.directorySizeBytes(): Long {
+    if (!exists()) return 0L
+    if (isFile) return length()
+    return walkTopDown()
+        .filter { it.isFile }
+        .sumOf { it.length() }
+}
 
 private const val OFFLINE_DOWNLOAD_PREFS = "offline-downloads"
 private const val DOWNLOADED_PREFIX = "downloaded:"

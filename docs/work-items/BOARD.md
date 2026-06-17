@@ -244,8 +244,6 @@ _Generated from `work-items.json`._
   - Empty states remain clear and non-alarming.
   - Relevant compile/lint gate passes.
 
-## todo
-
 ### UNTIDY-030 — Enable minimal Settings Downloads controls
 
 - Priority: P2
@@ -255,7 +253,15 @@ _Generated from `work-items.json`._
 - Labels: settings, downloads, storage, ux
 - Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/31
-- Next: Enable coherent Downloads settings/storage summary and update sign-out copy for local downloads.
+- Next: Review minimal Settings Downloads controls and local-only cleanup copy. Runtime evidence: reports/settings-downloads-controls-2026-06-17-1611/.
+- Acceptance:
+  - Settings Downloads section is coherent with the productized single-track MVP.
+  - Settings can open Manage downloads and shows count/storage summary when available.
+  - Remove all downloads is local-only and confirms that TIDAL library is kept.
+  - Sign-out copy explicitly distinguishes account sign-out from local downloads.
+  - No Settings release copy says proof/proof-in-progress.
+
+## todo
 
 ### UNTIDY-031 — Add album/playlist collection download UX
 

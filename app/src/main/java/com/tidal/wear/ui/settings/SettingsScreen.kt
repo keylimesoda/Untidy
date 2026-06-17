@@ -35,6 +35,9 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.ReleaseVersionPreference
+import com.tidal.wear.core.playback.offline.offlineDownloadsStorageBytes
+import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
+import com.tidal.wear.core.playback.offline.removeAllOfflineTrackDownloads
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.components.tidalSecondaryChipColors
@@ -44,6 +47,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     authRepository: TidalAuthRepository,
+    onOpenDownloads: () -> Unit,
     onSignedOut: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -54,6 +58,10 @@ fun SettingsScreen(
     val accountInfo by authRepository.accountInfo.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
     var confirmErase by remember { mutableStateOf(false) }
+    var confirmRemoveDownloads by remember { mutableStateOf(false) }
+    var downloadsRefreshTick by remember { mutableStateOf(0) }
+    val downloadedTracks = remember(downloadsRefreshTick) { context.readOfflineDownloadedTracks() }
+    val downloadsStorageBytes = remember(downloadsRefreshTick) { context.offlineDownloadsStorageBytes() }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(
@@ -75,7 +83,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                             onClick = { confirmErase = true },
                             label = { Text("Erase account") },
-                            secondaryLabel = { Text("Sign out on this watch") },
+                            secondaryLabel = { Text(accountEraseSecondary(downloadedTracks.size)) },
                             colors = tidalSecondaryChipColors(),
                         )
                     }
@@ -99,7 +107,7 @@ fun SettingsScreen(
                                     }
                                 },
                                 label = { Text("Confirm erase") },
-                                secondaryLabel = { Text("Remove account from watch") },
+                                secondaryLabel = { Text(accountEraseConfirmSecondary(downloadedTracks.size)) },
                                 colors = ChipDefaults.primaryChipColors(backgroundColor = TidalColors.Cyan, contentColor = TidalColors.Black),
                             )
                         }
@@ -162,10 +170,54 @@ fun SettingsScreen(
                 }
 
                 item { SectionHeader("Downloads") }
-                item { DisabledSettingChip("Offline playback", "Download proof in progress") }
-                item { DisabledSettingChip("Download quality", "Disabled until supported") }
-                item { DisabledSettingChip("Download over LTE", "Disabled until supported") }
-                item { DisabledSettingChip("Storage limit", "Disabled until supported") }
+                item {
+                    Chip(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        onClick = onOpenDownloads,
+                        label = { Text("Manage downloads") },
+                        secondaryLabel = { Text(downloadsSummary(downloadedTracks.size, downloadsStorageBytes)) },
+                        colors = tidalSecondaryChipColors(),
+                    )
+                }
+                item { DisabledSettingChip("Download quality", "Battery Saver · track MVP") }
+                item { DisabledSettingChip("Download over LTE", "Wi-Fi recommended · deferred") }
+                item { DisabledSettingChip("Storage limit", "Manual cleanup for MVP") }
+                if (downloadedTracks.isNotEmpty()) {
+                    item {
+                        Chip(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                            onClick = { confirmRemoveDownloads = true },
+                            label = { Text("Remove all downloads") },
+                            secondaryLabel = { Text("Local files only") },
+                            colors = tidalSecondaryChipColors(),
+                        )
+                    }
+                    if (confirmRemoveDownloads) {
+                        item {
+                            Chip(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                onClick = { confirmRemoveDownloads = false },
+                                label = { Text("Cancel") },
+                                secondaryLabel = { Text("Keeps local downloads") },
+                                colors = tidalSecondaryChipColors(),
+                            )
+                        }
+                        item {
+                            Chip(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                onClick = {
+                                    if (context.removeAllOfflineTrackDownloads()) {
+                                        confirmRemoveDownloads = false
+                                        downloadsRefreshTick++
+                                    }
+                                },
+                                label = { Text("Remove local copies?") },
+                                secondaryLabel = { Text("Keeps TIDAL library") },
+                                colors = ChipDefaults.primaryChipColors(backgroundColor = TidalColors.Cyan, contentColor = TidalColors.Black),
+                            )
+                        }
+                    }
+                }
 
                 item { SectionHeader("About") }
                 item { DisabledSettingChip("Untidy", "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") }
@@ -296,4 +348,27 @@ private fun AuthState.label(): String = when (this) {
     AuthState.Initializing -> "Initializing"
     AuthState.UserSignedIn -> "User signed in"
 }
+
+private fun downloadsSummary(count: Int, bytes: Long): String {
+    val countText = when (count) {
+        0 -> "No downloads"
+        1 -> "1 track"
+        else -> "$count tracks"
+    }
+    val sizeText = formatStorageBytes(bytes)
+    return if (bytes > 0L) "$countText · $sizeText" else countText
+}
+
+private fun formatStorageBytes(bytes: Long): String = when {
+    bytes >= 1_000_000_000L -> "%.1f GB".format(bytes / 1_000_000_000.0)
+    bytes >= 1_000_000L -> "%.0f MB".format(bytes / 1_000_000.0)
+    bytes >= 1_000L -> "%.0f KB".format(bytes / 1_000.0)
+    else -> "0 MB"
+}
+
+private fun accountEraseSecondary(downloadCount: Int): String =
+    if (downloadCount > 0) "Signs out · keeps downloads" else "Sign out on this watch"
+
+private fun accountEraseConfirmSecondary(downloadCount: Int): String =
+    if (downloadCount > 0) "Keeps local downloads" else "Remove account from watch"
 
