@@ -70,9 +70,12 @@ class PlayerActivity : ComponentActivity() {
     }
 
     private fun openMainRoute(route: String) {
+        // Wear OS recents treats CLEAR_TOP-style task surgery poorly. MainActivity is
+        // singleTop with an empty taskAffinity, so REORDER_TO_FRONT reuses the
+        // existing authenticated task and still delivers the route through onNewIntent.
         startActivity(
             Intent(this, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(MainActivity.EXTRA_ROUTE, route),
         )
     }
