@@ -160,7 +160,7 @@ fun SettingsScreen(
                 }
 
                 item { SectionHeader("Downloads") }
-                item { DisabledSettingChip("Offline playback", "Needs sanctioned TIDAL support") }
+                item { DisabledSettingChip("Offline playback", "Download proof in progress") }
                 item { DisabledSettingChip("Download quality", "Disabled until supported") }
                 item { DisabledSettingChip("Download over LTE", "Disabled until supported") }
                 item { DisabledSettingChip("Storage limit", "Disabled until supported") }

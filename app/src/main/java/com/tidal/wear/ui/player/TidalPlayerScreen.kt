@@ -113,7 +113,7 @@ fun TidalPlayerScreen(
     val downloadState = DownloadState.Unavailable
 
     fun showDownloadUnavailable() {
-        Toast.makeText(context, "Offline playback needs a sanctioned TIDAL download path", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Offline download proof is in progress", Toast.LENGTH_LONG).show()
     }
 
     BackHandler { (context as? Activity)?.moveTaskToBack(true) }

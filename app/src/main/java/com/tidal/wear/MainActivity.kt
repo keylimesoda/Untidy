@@ -395,7 +395,7 @@ private fun HomeScreen(
                 )
                 HomeListChip(
                     label = "Downloads",
-                    secondaryLabel = "Coming soon",
+                    secondaryLabel = "Proof in progress",
                     icon = Icons.Filled.Download,
                     enabled = false,
                     onClick = onOffline,
