@@ -185,6 +185,7 @@ class OfflineProofService : Service() {
         }
 
         results += offlineProviderWiringProbe(trackId)
+        results += playerOfflineProviderInjectionProbe(trackId, authRepository)
         results += sdkOfflinePlaybackProbe(trackId, authRepository)
 
         val path = writeArtifact(startedAt, trackId, countryCode, results)
@@ -468,7 +469,7 @@ class OfflineProofService : Service() {
                 encryption = object : Encryption {
                     override val secretKey: ByteArray = MessageDigest.getInstance("SHA-256")
                         .digest("untidy-debug-offline-proof".toByteArray())
-                    override fun getDecryptedHeader(pathOrKey: String): ByteArray = ByteArray(0)
+                    override fun getDecryptedHeader(productId: String): ByteArray = ByteArray(0)
                 },
             )
             val resolvedInfo = kotlinx.coroutines.runBlocking {
@@ -489,6 +490,97 @@ class OfflineProofService : Service() {
             })
         }.getOrElse {
             event("offlineProviderWiring", buildJsonObject {
+                put("exception", it::class.java.simpleName)
+                put("message", it.message.orEmpty().take(180))
+            })
+        }.also {
+            runCatching { cache?.release() }
+        }
+    }
+
+    private suspend fun playerOfflineProviderInjectionProbe(trackId: String, authRepository: com.tidal.wear.core.auth.TidalAuthRepository): JsonObject {
+        var cache: SimpleCache? = null
+        return runCatching {
+            val cacheDir = File(filesDir, "offline-proof/player-cache-$trackId").apply { mkdirs() }
+            cache = SimpleCache(cacheDir, NoOpCacheEvictor(), StandaloneDatabaseProvider(applicationContext))
+            val storage = Storage(externalStorage = false, path = cacheDir.absolutePath)
+            val track = PlaybackInfo.Track(
+                trackId.toIntOrNull() ?: 0,
+                AudioQuality.LOW,
+                AssetPresentation.FULL,
+                AudioMode.STEREO,
+                "untidy-proof-player-manifest-hash",
+                null,
+                "untidy-proof-player-session-${UUID.randomUUID()}",
+                ManifestMimeType.DASH,
+                "untidy-proof-player-manifest-placeholder",
+                "",
+                0f,
+                0f,
+                0f,
+                0f,
+                0L,
+                0L,
+            )
+            val offlineTrack = PlaybackInfo.Offline.Track(
+                track = track,
+                offlineLicense = "",
+                storage = storage,
+                partiallyEncrypted = false,
+            )
+            val offlineProvider = OfflinePlayProvider(
+                offlinePlaybackInfoProvider = object : OfflinePlaybackInfoProvider {
+                    override suspend fun getOfflineTrackPlaybackInfo(trackId: String, streamingSessionId: String): PlaybackInfo = offlineTrack
+                    override suspend fun getOfflineVideoPlaybackInfo(videoId: String, streamingSessionId: String): PlaybackInfo {
+                        throw UnsupportedOperationException("video offline proof not implemented")
+                    }
+                },
+                offlineCacheProvider = object : OfflineCacheProvider {
+                    override fun getExternal(path: String): Cache = requireNotNull(cache) { "cache released" }
+                    override fun getInternal(path: String): Cache = requireNotNull(cache) { "cache released" }
+                },
+                encryption = object : Encryption {
+                    override val secretKey: ByteArray = MessageDigest.getInstance("SHA-256")
+                        .digest("untidy-debug-player-offline-provider".toByteArray())
+                    override fun getDecryptedHeader(productId: String): ByteArray = ByteArray(0)
+                },
+            )
+            val eventProducer = EventProducer.getInstance(
+                credentialsProvider = authRepository.credentialsProvider,
+                config = EventsConfig(maxDiskUsageBytes = 1_000_000, blockedConsentCategories = emptySet(), appVersion = "0.1.0-debug"),
+                context = applicationContext,
+                coroutineScope = scope,
+            )
+            val player = com.tidal.sdk.player.Player(
+                application = applicationContext as Application,
+                credentialsProvider = authRepository.credentialsProvider,
+                eventSender = eventProducer.eventSender,
+                useLibflacAudioRenderer = false,
+                enableDecoderFallback = true,
+                offlinePlayProvider = offlineProvider,
+                version = "0.1.0-debug",
+            )
+            try {
+                val info = player.streamingApi.getOfflineTrackPlaybackInfo(trackId, "proof-session-${UUID.randomUUID()}")
+                val offline = info as? PlaybackInfo.Offline.Track
+                event("playerOfflineProviderInjection", buildJsonObject {
+                    put("playerConstructed", true)
+                    put("providerInjected", true)
+                    put("offlineInfoReturned", offline != null)
+                    put("offlineInfoClass", info.javaClass.name)
+                    put("manifestPresent", reflectedString(info, "getManifest")?.isNotBlank() == true)
+                    put("offlineLicensePresent", offline?.offlineLicense?.isNotBlank() == true)
+                    put("storagePathHash", sha256Short(offline?.storage?.path.orEmpty()))
+                    put("storageExternal", offline?.storage?.externalStorage ?: true)
+                    put("cacheUidPresent", cache?.uid != Cache.UID_UNSET)
+                    put("cacheKeysCount", cache?.keys?.size ?: 0)
+                    put("secretKeyLength", requireNotNull(offlineProvider.encryption).secretKey.size)
+                })
+            } finally {
+                player.release()
+            }
+        }.getOrElse {
+            event("playerOfflineProviderInjection", buildJsonObject {
                 put("exception", it::class.java.simpleName)
                 put("message", it.message.orEmpty().take(180))
             })

@@ -753,3 +753,34 @@ public interface OfflinePlaybackInfoProvider {
 Interpretation: Untidy should not instantiate `TidalMediaSourceCreator` or offline media-source factories directly. Those classes are internal implementation details. The sanctioned app-facing proof seam is `Player(..., OfflinePlayProvider, ...)` plus a custom/debug `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, and `Encryption`.
 
 Next concrete proof step: build a minimal compile-only `Player` construction harness using a debug `OfflinePlayProvider` at the public constructor seam. The harness should not play media yet and should keep synthetic offline playback info redacted; the goal is to prove Untidy can inject the provider into the SDK `Player` without touching internal media-source classes. If construction compiles, follow with a runtime proof that requests `PlaybackMode.OFFLINE` through the player/load path and captures only class/status/shape evidence.
+
+
+## Public Player OfflinePlayProvider injection proof — 2026-06-17 12:36 PT
+
+The previous direct `TidalMediaSourceCreator` harness failed because that media-source branch is SDK-internal. This pass moved up to the public app-facing seam: `Player(..., OfflinePlayProvider, ...)`.
+
+Debug-only code in `app/src/debug/java/com/tidal/wear/debug/OfflineProofService.kt` now builds a synthetic/redacted `OfflinePlayProvider` and injects it into a real SDK `Player` constructor. The provider supplies:
+
+- `OfflinePlaybackInfoProvider` returning `PlaybackInfo.Offline.Track`
+- `OfflineCacheProvider` backed by app-private Media3 `SimpleCache`
+- `Encryption` with a stable debug-only 32-byte key and empty decrypted header
+- `Storage(externalStorage=false, path=<app-private proof cache>)`
+
+No playback was attempted, no production UX was changed, and no stream/playback manifest caching was added. This proof only validates public SDK constructor injection and the offline playback-info provider boundary.
+
+Artifact copied from the emulator for this pass:
+
+- `reports/offline-proof-2026-06-17-1236-player-provider-injection/latest.json` (gitignored local runtime artifact)
+
+Redacted runtime results for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| `trackManifestDownload` | `200`; manifest/hash present | The sanctioned `usage=DOWNLOAD` manifest probe remains stable. |
+| `offlineProviderWiring` | constructed successfully; `PlaybackInfo.Offline.Track`; app-private `SimpleCache` UID present | The provider/cache/encryption pieces still instantiate independently. |
+| `playerOfflineProviderInjection` | `playerConstructed=true`; `providerInjected=true`; `offlineInfoReturned=true`; class `PlaybackInfo$Offline$Track`; manifest present; storage external false; cache UID present; secret key length 32 | Untidy can inject a custom offline provider into the official SDK `Player` at the public seam and have the player-facing offline playback-info call return the synthetic offline track object. |
+| SDK `PlaybackMode.OFFLINE` playback-info probe | still returns manifest-bearing `PlaybackInfo.Track`; no license URL; offline validity `-1` | The SDK network OFFLINE call is not the complete offline object source by itself. |
+
+Concrete advancement: the public `Player`/`OfflinePlayProvider` seam is now proven at compile and runtime. The remaining blocker is no longer local player construction or internal media-source access; it is the sanctioned provisioning source for a **real** `PlaybackInfo.Offline.Track`: `offlineLicense`, `Storage.path`, and cached bytes/download resource ids.
+
+Next concrete proof step: search/decompile any available first-party/sample artifacts or SDK call sites for an `OfflinePlaybackInfoProvider` implementation or provisioning path. Avoid repeating lower-value guesses already ruled out (`downloads/{trackId}`, user id as offline-mix id, and cursor `0` as first page).
