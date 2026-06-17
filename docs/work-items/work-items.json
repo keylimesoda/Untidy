@@ -428,7 +428,7 @@
     "id": "UNTIDY-015",
     "title": "Resolve WearRecents/task-affinity lint warnings",
     "type": "cleanup",
-    "status": "todo",
+    "status": "review",
     "priority": "P2",
     "area": "ui",
     "owner": "Tommy",
@@ -440,7 +440,10 @@
     ],
     "spec": "docs/refactor-backlog.md",
     "evidence": [
-      "Chat-history audit found remaining WearRecents lint warning in PlayerActivity FLAG_ACTIVITY_CLEAR_TOP and debug manifest task-affinity warning."
+      "Chat-history audit found remaining WearRecents lint warning in PlayerActivity FLAG_ACTIVITY_CLEAR_TOP and debug manifest task-affinity warning.",
+      "PlayerActivity.openMainRoute now uses FLAG_ACTIVITY_REORDER_TO_FRONT | FLAG_ACTIVITY_SINGLE_TOP instead of CLEAR_TOP.",
+      "Code rationale added: avoid Wear OS recents task surgery while reusing singleTop MainActivity with empty taskAffinity.",
+      "Verification passed: :app:compileDebugKotlin, git diff --check, and source scan found no FLAG_ACTIVITY_CLEAR_TOP/WearRecents source hit."
     ],
     "acceptance": [
       "WearRecents warnings are fixed or intentionally suppressed with a comment/rationale.",
@@ -448,7 +451,7 @@
       "Navigation from Now Playing remains stable.",
       "Narrow build/lint verification passes."
     ],
-    "next": "Inspect PlayerActivity launch/back-stack behavior and determine Wear-safe alternative or suppression rationale.",
+    "next": "Review Wear-safe route handoff change; PlayerActivity now uses REORDER_TO_FRONT|SINGLE_TOP instead of CLEAR_TOP while preserving authenticated route delivery through MainActivity.onNewIntent.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/16",
     "githubNumber": 16
   },

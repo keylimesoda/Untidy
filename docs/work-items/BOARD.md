@@ -104,6 +104,22 @@ _Generated from `work-items.json`._
   - No delete path is introduced.
   - Relevant compile/test gate passes.
 
+### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
+
+- Priority: P2
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: wear-os, recents, lint, navigation
+- Spec: `docs/refactor-backlog.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/16
+- Next: Review Wear-safe route handoff change; PlayerActivity now uses REORDER_TO_FRONT|SINGLE_TOP instead of CLEAR_TOP while preserving authenticated route delivery through MainActivity.onNewIntent.
+- Acceptance:
+  - WearRecents warnings are fixed or intentionally suppressed with a comment/rationale.
+  - Back from View Album/View Artist remains fixed.
+  - Navigation from Now Playing remains stable.
+  - Narrow build/lint verification passes.
+
 ### UNTIDY-017 — Normalize offline/download docs to corrected #11 framing
 
 - Priority: P2
@@ -137,22 +153,6 @@ _Generated from `work-items.json`._
   - Relevant compile/lint gate passes.
 
 ## todo
-
-### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
-
-- Priority: P2
-- Type: cleanup
-- Area: ui
-- Owner: Tommy
-- Labels: wear-os, recents, lint, navigation
-- Spec: `docs/refactor-backlog.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/16
-- Next: Inspect PlayerActivity launch/back-stack behavior and determine Wear-safe alternative or suppression rationale.
-- Acceptance:
-  - WearRecents warnings are fixed or intentionally suppressed with a comment/rationale.
-  - Back from View Album/View Artist remains fixed.
-  - Navigation from Now Playing remains stable.
-  - Narrow build/lint verification passes.
 
 ### UNTIDY-016 — Dispose ExportedService lint warning with documented security posture
 
