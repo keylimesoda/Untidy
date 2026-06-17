@@ -14,7 +14,7 @@ Recommendation: **do not implement user-visible downloads by caching the current
 
 Promising but unproven lead: local TIDAL SDK artifacts expose offline/download surfaces including `PlaybackMode.OFFLINE`, `TrackManifests$UsageTrackManifestsIdGet.DOWNLOAD`, `OfflinePlayProvider`, `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, `OfflineDrmHelper`, `PlaybackInfo.Offline.Track`, `Downloads`, and `OfflineTasks`. Treat these as a follow-up SDK proof target, not as permission to cache streaming URLs.
 
-UI truthfulness update from the spike: the Now Playing action sheet no longer cycles fake download states. Until the SDK/legal path is proven, it renders a disabled **Offline unavailable** row and Settings explains that offline playback needs sanctioned TIDAL support.
+UI truthfulness update from the spike: the Now Playing action sheet no longer cycles fake download states. Until the sanctioned SDK/API provisioning path is implemented, it renders an honest offline proof/unavailable state.
 
 ## 1. PM problem statement
 
@@ -32,7 +32,7 @@ A TIDAL subscriber should be able to choose music while online, download it safe
 
 ### Product principles
 
-1. **Honest capability over fake affordances.** If TIDAL APIs/terms/DRM do not permit offline files for this client, the UI must say so and degrade gracefully.
+1. **Honest capability over fake affordances.** TIDAL offline/download exists for first- and third-party clients; Untidy must only expose it after the sanctioned SDK/API provisioning path works for this app/session. Until then, the UI must be truthful and degrade gracefully.
 2. **Watch-first constraints.** Downloads should default to Wi-Fi + charging, conservative quality, capped storage, and compact UX.
 3. **Playback correctness before breadth.** A single downloaded track/album that plays reliably beats a broad but fragile offline library.
 4. **No DRM bypass.** Untidy must not strip, redistribute, or cache protected audio in a way that violates TIDAL terms or content protection.
@@ -279,7 +279,7 @@ Important: streaming and offline should share queue, metadata, session, Ongoing 
 ### Download pipeline
 
 1. Resolve track metadata and current entitlement.
-2. Request playback/download manifest using a TIDAL-supported offline/download usage if one exists.
+2. Request playback/download manifest using TIDAL-supported offline/download usage (`usage=DOWNLOAD` / `PlaybackMode.OFFLINE`).
 3. Validate response supports local playback and any required DRM/license persistence.
 4. Stream bytes to a temp file under app-private storage.
 5. Verify file length/hash/container if available.
@@ -294,7 +294,7 @@ Recommended default: app-private storage, not public media storage.
 - Use `Context.getNoBackupFilesDir()` only if losing downloads on backup/restore is desired; otherwise app files/cache under internal storage is more straightforward.
 - Use atomic temp files: `trackId.part` -> `trackId.final` only after validation.
 - Store metadata in Room or a small SQLite layer if collection/querying grows; DataStore alone is likely insufficient for per-track download state.
-- Encrypt only if required by TIDAL/license terms; do not invent homegrown DRM.
+- Use TIDAL-provided offline license/provisioning semantics; do not invent homegrown DRM.
 
 ## 8. TIDAL / DRM unknowns and gates
 
@@ -324,8 +324,8 @@ This is the central risk. Implementation must not start until the team answers t
 
 Create a short technical spike before product implementation:
 
-- Inspect official TIDAL SDK/API docs and terms for offline support.
-- Probe manifest endpoints for a sanctioned download/offline usage only if allowed by terms.
+- Inspect official TIDAL SDK/API docs, artifacts, and first-party/sample call sites for offline provisioning.
+- Probe only sanctioned download/offline usage paths; never cache `PLAYBACK`/`STREAM` manifests.
 - Determine whether ExoPlayer/Media3 offline DRM is required and viable on Wear OS.
 - Produce one of three go/no-go outcomes:
   1. **Supported:** implement full offline downloads.
@@ -400,8 +400,8 @@ For debug builds only:
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| TIDAL does not permit third-party offline downloads | Feature cannot ship as imagined | Run DRM/API/legal spike first; remove fake affordance if unsupported |
-| Cached streaming URLs expire or violate terms | Broken playback/legal issue | Do not implement raw URL caching unless explicitly allowed |
+| Sanctioned provisioning source remains undiscovered | Feature cannot ship as imagined | Keep #11 as proof work; remove or neutralize user-visible offline affordance until resolved |
+| Cached streaming URLs expire or bypass the offline contract | Broken playback/supportability issue | Do not implement raw `PLAYBACK`/`STREAM` URL caching |
 | Widevine offline license unsupported or fragile on Wear OS | Offline playback fails in real use | Prototype one licensed track on real device before building UX breadth |
 | Storage pressure on watches | App instability / user frustration | Conservative defaults, hard cap, atomic temp files, cleanup |
 | Battery drain from background downloads | Bad watch experience | Wi-Fi/charging/battery policy; small queue concurrency |
@@ -435,10 +435,9 @@ For debug builds only:
 4. Can Media3 offline DRM APIs persist licenses on the target watch devices?
 5. How does local playback integrate with `MediaLibraryService` exported behavior and external controllers?
 
-### TIDAL/legal
+### TIDAL sanctioned provisioning
 
-1. Are third-party apps allowed to offer offline playback?
-2. Which endpoint/SDK method is sanctioned for downloads?
+1. Which endpoint/SDK method is sanctioned for downloads for this app/session?
 3. What license expiry/renewal rules apply?
 4. Must local files be encrypted or DRM-managed?
 5. Are there reporting/analytics obligations for downloaded playback?
@@ -447,7 +446,7 @@ For debug builds only:
 
 ### Phase 0 — Capability spike / go-no-go
 
-**Goal:** Determine whether the feature is legally and technically possible.
+**Goal:** Determine the sanctioned technical provisioning path for this already-supported class of offline/download capability.
 
 Deliverables:
 
@@ -549,13 +548,13 @@ Work items:
 Exit criteria:
 
 - Offline playback works on target real watches under network-off conditions.
-- No known legal/DRM blockers remain.
+- No known sanctioned-provisioning/DRM blockers remain.
 
 ## 14. Reviewer recommendations
 
 Top recommendations before implementation:
 
-1. **Run the TIDAL/DRM capability spike first.** This feature is dominated by terms, license, and DRM constraints; raw streaming-manifest caching is not a safe assumption.
+1. **Run the TIDAL/DRM provisioning proof first.** This feature is dominated by license, storage, and DRM orchestration; raw streaming-manifest caching is not a safe assumption.
 2. **Remove or neutralize the fake download cycle early.** Even before full implementation, the UI should not imply downloads work.
 3. **Start with a single-track MVP.** It exercises every critical seam — entitlement, file/license storage, policy, local Media3 playback, and restored state — without collection complexity.
 4. **Use a real persisted download store.** Process death/reboot tolerance is required for a watch feature; in-memory state is not acceptable.

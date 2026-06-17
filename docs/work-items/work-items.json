@@ -483,7 +483,7 @@
     "id": "UNTIDY-017",
     "title": "Normalize offline/download docs to corrected #11 framing",
     "type": "cleanup",
-    "status": "todo",
+    "status": "review",
     "priority": "P2",
     "area": "offline",
     "owner": "Tommy",
@@ -495,7 +495,11 @@
     ],
     "spec": "docs/spec-downloads-offline-playback.md",
     "evidence": [
-      "Ric corrected framing: TIDAL already has/allows download/offline in first- and third-party clients; docs still contain stale permission-blocked language."
+      "Ric corrected framing: TIDAL already has/allows download/offline in first- and third-party clients; docs still contain stale permission-blocked language.",
+      "docs/spec-downloads-offline-playback.md normalized to sanctioned provisioning proof framing.",
+      "docs/spike-downloads-offline-playback-2026-06-17.md normalized to in-progress implementation proof framing.",
+      "docs/work-items/WORKFLOW.md updated: #11 is not permission-blocked in principle; blocked means implementation/provisioning proof remains.",
+      "Guardrail preserved: do not implement offline/download by caching PLAYBACK/STREAM manifests."
     ],
     "acceptance": [
       "Docs no longer imply TIDAL offline/download is categorically permission-blocked for this class of client.",
@@ -503,7 +507,7 @@
       "Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.",
       "git diff --check passes."
     ],
-    "next": "Normalize spec/spike/workflow docs while preserving the no-STREAM-manifest-caching guardrail.",
+    "next": "Review normalized offline/download docs; stale permission-blocked language replaced with sanctioned SDK/API provisioning proof framing while retaining no-STREAM-manifest guardrail.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/18",
     "githubNumber": 18
   },

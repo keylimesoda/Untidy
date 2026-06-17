@@ -90,7 +90,7 @@ Required before blocking:
 
 Example:
 
-- Downloads/offline is blocked until a sanctioned TIDAL offline/download path is proven. Fake UI has been neutralized, but product download implementation should not proceed from streaming manifests.
+- Downloads/offline is not permission-blocked in principle: Ric confirmed TIDAL already supports/allows offline/download in first- and third-party clients. Treat #11 as sanctioned SDK/API implementation proof. Product download implementation must still not proceed from `PLAYBACK`/`STREAM` manifests; it needs the official offline/download provisioning path.
 
 ### `status:done`
 

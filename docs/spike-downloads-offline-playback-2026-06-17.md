@@ -8,9 +8,9 @@
 
 Do **not** implement user-visible downloads by caching the current streaming manifest URLs.
 
-Untidy should keep downloads/offline playback disabled until it can use a TIDAL-sanctioned offline/download path that includes entitlement, storage, offline license/expiry, and playback reporting semantics. The current app path is a streaming-only direct-manifest bridge and is not enough to safely store playable offline audio.
+Untidy should keep user-visible downloads/offline playback disabled until it implements the TIDAL-sanctioned offline/download path that includes entitlement, storage, offline license/expiry, and playback reporting semantics. Ric confirmed TIDAL already supports/allows offline/download in first- and third-party clients; the current app gap is implementation/provisioning proof, not a categorical permission blocker. The current app path is a streaming-only direct-manifest bridge and is not enough to safely store playable offline audio.
 
-Immediate product action taken in this spike: the Now Playing action sheet no longer cycles through fake download states. It now renders a disabled **Offline unavailable** row, and Settings explains that offline playback needs sanctioned TIDAL support.
+Immediate product action taken in this spike: the Now Playing action sheet no longer cycles through fake download states. It now renders an honest offline proof/unavailable state while #11 proves the official provisioning path.
 
 ## Evidence from current app
 
@@ -64,7 +64,7 @@ Problems:
 - Current requests explicitly use `usage=PLAYBACK` / `playbackmode=STREAM`, not download/offline usage.
 - Streaming URLs and DASH data may be signed, expiring, watermarked, or governed as transient playback buffers.
 - This path would not capture TIDAL offline entitlement, expiry, renewal, or reporting semantics.
-- It risks violating TIDAL terms by turning streaming delivery into user-visible downloads.
+- It bypasses the official offline/download contract by turning streaming delivery into user-visible downloads.
 
 ### 2. Direct URL caching of BTS URLs
 
@@ -97,7 +97,7 @@ Required next proof:
 
 **Blocked unless TIDAL explicitly permits and documents this.**
 
-Even with app-private storage and encryption, a custom downloader must still respect TIDAL's offline license and terms. Do not invent local DRM or store raw audio from streaming endpoints.
+Even with app-private storage and encryption, a custom downloader must still use TIDAL's offline license/provisioning path. Do not invent local DRM or store raw audio from streaming endpoints.
 
 ## Code changes made
 
@@ -110,7 +110,7 @@ Even with app-private storage and encryption, a custom downloader must still res
   - Hard-wired current state to `DownloadState.Unavailable` until a real repository/backend exists.
   - Retained a defensive toast callback, though the row is disabled.
 - `SettingsScreen.kt`
-  - Updated Downloads section copy to explain support is blocked on sanctioned TIDAL support rather than simply "coming".
+  - Updated Downloads section copy to avoid fake availability while #11 proves the official offline provisioning path.
 
 ## Recommended next action
 
@@ -122,4 +122,4 @@ Scope:
 2. Build a debug-only proof that requests `usage=DOWNLOAD` / `PlaybackMode.OFFLINE` through official SDK APIs, never by raw stream URL caching.
 3. Only after that succeeds, design Phase 1 state repository and Phase 2 single-track MVP.
 
-Recommended issue status: keep #11 open as **blocked/needs upstream TIDAL offline proof**, with fake UI neutralized.
+Recommended issue status: keep #11 open as **in-progress sanctioned offline implementation proof**, with fake UI neutralized until the provisioning source is proven.

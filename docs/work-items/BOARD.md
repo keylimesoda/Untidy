@@ -104,6 +104,22 @@ _Generated from `work-items.json`._
   - No delete path is introduced.
   - Relevant compile/test gate passes.
 
+### UNTIDY-017 — Normalize offline/download docs to corrected #11 framing
+
+- Priority: P2
+- Type: cleanup
+- Area: offline
+- Owner: Tommy
+- Labels: docs, offline, downloads, tidal
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/18
+- Next: Review normalized offline/download docs; stale permission-blocked language replaced with sanctioned SDK/API provisioning proof framing while retaining no-STREAM-manifest guardrail.
+- Acceptance:
+  - Docs no longer imply TIDAL offline/download is categorically permission-blocked for this class of client.
+  - Docs consistently say #11 is an implementation-proof/orchestration task using sanctioned SDK/API surfaces.
+  - Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.
+  - git diff --check passes.
+
 ### UNTIDY-023 — Add watch-friendly retry/error recovery
 
 - Priority: P2
@@ -153,22 +169,6 @@ _Generated from `work-items.json`._
   - Controller access policy tests still pass.
   - Media controls/playback service still function in emulator and preferably real Wear OS validation.
   - Security posture is documented in code or docs.
-
-### UNTIDY-017 — Normalize offline/download docs to corrected #11 framing
-
-- Priority: P2
-- Type: cleanup
-- Area: offline
-- Owner: Tommy
-- Labels: docs, offline, downloads, tidal
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/18
-- Next: Normalize spec/spike/workflow docs while preserving the no-STREAM-manifest-caching guardrail.
-- Acceptance:
-  - Docs no longer imply TIDAL offline/download is categorically permission-blocked for this class of client.
-  - Docs consistently say #11 is an implementation-proof/orchestration task using sanctioned SDK/API surfaces.
-  - Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.
-  - git diff --check passes.
 
 ### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
 
