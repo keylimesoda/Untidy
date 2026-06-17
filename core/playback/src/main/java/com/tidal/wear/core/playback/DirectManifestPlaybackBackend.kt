@@ -10,8 +10,14 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheKeyFactory
+import androidx.media3.datasource.cache.NoOpCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.tidal.wear.core.auth.TidalAuthRepository
@@ -29,7 +35,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -46,6 +54,8 @@ internal class DirectManifestPlaybackBackend(
         .callTimeout(20, TimeUnit.SECONDS)
         .build()
     private val _events = MutableSharedFlow<PlaybackBackendEvent>(extraBufferCapacity = 32)
+    private val databaseProvider = StandaloneDatabaseProvider(appContext)
+    private val offlineCaches = ConcurrentHashMap<String, SimpleCache>()
     private var audioPreset = AudioPreset.BatterySaver
     private var currentManifest: ResolvedManifest? = null
     private val manifestRequests = ConcurrentHashMap<String, Deferred<Result<ResolvedManifest>>>()
@@ -92,8 +102,21 @@ internal class DirectManifestPlaybackBackend(
             currentManifest = manifest
             Log.d(DIRECT_LOG_TAG, "manifest loaded id=$trackId source=${manifest.source} presentation=${manifest.presentation} previewReason=${manifest.previewReason.orEmpty()} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
             val mediaSource = when (manifest.kind) {
-                ManifestKind.Dash -> DashMediaSource.Factory(DefaultDataSource.Factory(appContext))
-                    .createMediaSource(manifest.mediaItem(trackId))
+                ManifestKind.Dash -> {
+                    val offlineCache = downloadedTrackCache(trackId)
+                    val mediaSourceFactory = if (offlineCache != null) {
+                        Log.d(DIRECT_LOG_TAG, "using offline cache for downloaded track id=$trackId")
+                        DashMediaSource.Factory(
+                            CacheDataSource.Factory()
+                                .setCache(offlineCache)
+                                .setCacheKeyFactory(canonicalDownloadCacheKeyFactory(trackId))
+                                .setUpstreamDataSourceFactory(DefaultDataSource.Factory(appContext)),
+                        )
+                    } else {
+                        DashMediaSource.Factory(DefaultDataSource.Factory(appContext))
+                    }
+                    mediaSourceFactory.createMediaSource(manifest.mediaItem(trackId))
+                }
                 ManifestKind.DirectUrl -> ProgressiveMediaSource.Factory(DefaultDataSource.Factory(appContext))
                     .createMediaSource(manifest.mediaItem(trackId))
             }
@@ -141,6 +164,23 @@ internal class DirectManifestPlaybackBackend(
 
     override fun release() {
         player.release()
+        offlineCaches.values.forEach { cache -> runCatching { cache.release() } }
+        offlineCaches.clear()
+    }
+
+    private fun downloadedTrackCache(trackId: String): SimpleCache? {
+        if (!appContext.getSharedPreferences("offline-downloads", Context.MODE_PRIVATE).getBoolean("downloaded:$trackId", false)) {
+            return null
+        }
+        val cacheDir = File(appContext.filesDir, "offline-proof-cachefill/cache-$trackId")
+        if (!cacheDir.isDirectory) return null
+        return offlineCaches.computeIfAbsent(trackId) {
+            SimpleCache(cacheDir, NoOpCacheEvictor(), databaseProvider)
+        }
+    }
+
+    private fun canonicalDownloadCacheKeyFactory(trackId: String): CacheKeyFactory = CacheKeyFactory { dataSpec: DataSpec ->
+        dataSpec.key ?: "untidy-download-proof-$trackId-${sha256Short(dataSpec.uri.toString())}"
     }
 
     private fun fetchPlaybackManifest(trackId: String): ResolvedManifest {
@@ -317,5 +357,10 @@ private fun Int.toBackendState(isPlaying: Boolean): PlaybackBackendState = when 
     -> PlaybackBackendState.Idle
     else -> PlaybackBackendState.NotPlaying
 }
+
+private fun sha256Short(value: String): String = MessageDigest.getInstance("SHA-256")
+    .digest(value.toByteArray())
+    .joinToString("") { "%02x".format(it) }
+    .take(12)
 
 private const val DIRECT_LOG_TAG = "Untidy/DirectPlayback"
