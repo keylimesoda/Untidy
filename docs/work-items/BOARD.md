@@ -30,7 +30,7 @@ _Generated from `work-items.json`._
 - Labels: emulator, auth, playback
 - Spec: `docs/test-plan-thinkpad-emulator.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/2
-- Next: Needs explicit Search returns results evidence before closure; auth, Home/Library, single-track/album/playlist playback, and no-crash evidence are present in issue comments/PR #14.
+- Next: All imported acceptance criteria now have emulator evidence; close after PR lands or maintainer review.
 - Acceptance:
   - Authenticated app reaches Home
   - Search returns results

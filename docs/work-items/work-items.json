@@ -53,7 +53,7 @@
       "Album Play all queues and plays multiple tracks",
       "No AndroidRuntime crash in filtered logcat"
     ],
-    "next": "Needs explicit Search returns results evidence before closure; auth, Home/Library, single-track/album/playlist playback, and no-crash evidence are present in issue comments/PR #14.",
+    "next": "All imported acceptance criteria now have emulator evidence; close after PR lands or maintainer review.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/2",
     "githubNumber": 2
   },

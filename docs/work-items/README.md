@@ -3,6 +3,7 @@
 This is the repo-local tracker for Untidy test work, feature work, decisions, and cleanup.
 
 - Canonical tracker: GitHub Issues at `https://github.com/keylimesoda/Untidy/issues`
+- Workflow rules: `docs/work-items/WORKFLOW.md`
 - Local import mirror: `docs/work-items/work-items.json`
 - Human board: generated at `docs/work-items/BOARD.md`
 - Helper: `scripts/work-items.py`
