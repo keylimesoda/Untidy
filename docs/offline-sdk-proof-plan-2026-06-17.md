@@ -815,3 +815,32 @@ Search/proof steps completed:
 Interpretation: within the public SDK and packaged artifacts available to Untidy, offline playback provisioning is intentionally app-supplied. The TIDAL player SDK can request `usage=DOWNLOAD` manifests and can consume `PlaybackInfo.Offline.Track`, but it does **not** ship a public downloader/offline-task orchestrator or concrete provider implementation. The remaining sanctioned path is therefore an Untidy-owned debug provider/repository that persists only data obtained from offline/download surfaces, paired with TIDAL-generated Downloads/Installations/OfflineTasks APIs where they return usable ids.
 
 Concrete next proof step: build a debug-only `OfflinePlaybackStore` shape plus provider adapter that persists redacted metadata for one `usage=DOWNLOAD` / `PlaybackMode.OFFLINE` probe result into app-private storage and reconstructs `PlaybackInfo.Offline.Track` from that store. This should not download bytes or claim offline playback yet; it proves the missing app-owned persistence boundary and narrows the next runtime gap to sanctioned byte/license acquisition.
+
+## OfflinePlaybackStore/provider adapter proof — 2026-06-17 12:56 PT
+
+The next proof step after the upstream/provider search was to turn the app-owned `OfflinePlaybackInfoProvider` boundary into a small debug-only store adapter. This does **not** claim offline playback and does **not** cache STREAM/PLAYBACK manifests or media bytes. It only proves that Untidy can persist sanctioned DOWNLOAD/OFFLINE metadata in app-private storage and reconstruct a `PlaybackInfo.Offline.Track` through the public SDK provider seam.
+
+Code change:
+
+- `app/src/debug/java/com/tidal/wear/debug/OfflineProofService.kt`
+  - Added `offlinePlaybackStoreAdapter` probe.
+  - Fetches `GET /v2/trackManifests/{trackId}` with `usage=DOWNLOAD`, `manifestType=MPEG_DASH`, `uriScheme=DATA`, `formats=HEAACV1`.
+  - Persists a debug-only app-private JSON record under `files/offline-proof-store/` with the sanctioned DOWNLOAD manifest, manifest hash, optional DRM license URL field, storage path, and empty `offlineLicense`.
+  - Reloads the record and serves it through a real `OfflinePlayProvider` / `OfflinePlaybackInfoProvider` / `OfflineCacheProvider` using app-private Media3 `SimpleCache`.
+  - The public artifact redacts the manifest itself to booleans/lengths/hashes; no bearer token, manifest URI, download href, offline license, or encryption key is logged.
+
+Runtime artifact:
+
+- `reports/offline-proof-2026-06-17-1256-store-adapter/latest.json` (gitignored local runtime artifact)
+
+Redacted live result for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| `trackManifestDownload` | `200`; manifest URI present; manifest hash present; no DRM data | The sanctioned DOWNLOAD manifest surface still works for the signed-in debug session. |
+| `offlinePlaybackStoreAdapter` | persisted app-private record; manifest present length `2657`; manifest hash present; `providerCanServeStoredInfo=true`; app-private storage; `SimpleCache` UID present; `downloadBytesCached=false`; `playbackClaimed=false` | Untidy can now reconstruct a `PlaybackInfo.Offline.Track` from its own app-private offline metadata store/provider boundary. This proves the app-side state/provider shape, not the final offline replay. |
+| `sdkPlaybackModeOffline` | still returns manifest-bearing `PlaybackInfo.Track`, not a complete `PlaybackInfo.Offline.Track`; offline validity fields `-1` | The SDK OFFLINE network call alone is not the complete persisted offline object source. |
+
+Concrete advancement: the app-owned store/provider boundary is now proven end-to-end at debug runtime. The remaining missing input for a true one-track offline replay is narrower: the sanctioned source of **media bytes and/or offline license** that can legally populate the app-private cache/storage referenced by the reconstructed `PlaybackInfo.Offline.Track`.
+
+Next concrete proof step: inspect the DOWNLOAD manifest shape and SDK cache-read expectations to determine whether the sanctioned DOWNLOAD manifest itself contains enough segment addressing for a debug-only cache-fill experiment, while still avoiding STREAM/PLAYBACK manifests and not logging URLs. If it does not, continue searching for the offline license/download-link source before attempting playback.

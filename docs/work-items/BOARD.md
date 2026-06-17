@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: downloads, offline, drm, tidal
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Build a debug-only OfflinePlaybackStore/provider adapter that persists one sanctioned DOWNLOAD/OFFLINE proof result as app-private metadata and reconstructs PlaybackInfo.Offline.Track from local storage; do not download bytes or claim offline playback until a sanctioned byte/license source is proven.
+- Next: Inspect the sanctioned DOWNLOAD manifest shape and SDK cache-read expectations to determine whether it can drive a debug-only cache-fill experiment without STREAM/PLAYBACK manifests; if not, continue searching for the offline license/download-link source before attempting playback.
 - Acceptance:
   - Determine whether TIDAL API/SDK permits offline storage for this app
   - If viable, define single-track MVP implementation plan

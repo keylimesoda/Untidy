@@ -127,6 +127,7 @@ class OfflineProofService : Service() {
         results += getJsonProbe("trackManifestDownload", manifestUrl.toString(), token, clientId) { root ->
             summarizeTrackManifest(root)
         }
+        results += offlinePlaybackStoreAdapterProbe(trackId, countryCode, token, clientId)
 
         val installationId = probeInstallationInventory(trackId, countryCode, token, clientId, results)
         probeOfflineDiscoverySurfaces(trackId, countryCode, token, clientId, account?.userId, results)
@@ -422,6 +423,153 @@ class OfflineProofService : Service() {
             results += getJsonProbe("userOfflineMixItemsByUserIdNoCursorNoInclude", offlineMixItemsNoIncludeUrl.toString(), token, clientId) { root ->
                 summarizeRelationshipItems(root)
             }
+        }
+    }
+
+    private fun offlinePlaybackStoreAdapterProbe(
+        trackId: String,
+        countryCode: String,
+        token: String,
+        clientId: String,
+    ): JsonObject {
+        var cache: SimpleCache? = null
+        return runCatching {
+            val url = "https://openapi.tidal.com/v2/trackManifests/$trackId".toHttpUrl().newBuilder()
+                .addQueryParameter("manifestType", "MPEG_DASH")
+                .addQueryParameter("formats", "HEAACV1")
+                .addQueryParameter("uriScheme", "DATA")
+                .addQueryParameter("usage", "DOWNLOAD")
+                .addQueryParameter("adaptive", "false")
+                .addQueryParameter("countryCode", countryCode)
+                .build()
+            val request = Request.Builder()
+                .url(url)
+                .header("accept", JSON_API_ACCEPT)
+                .header("X-Tidal-Token", clientId)
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                val bodyText = response.body?.string().orEmpty()
+                val root = bodyText.takeIf { it.isNotBlank() }?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
+                val attrs = root?.jsonObject("data")?.jsonObject("attributes")
+                val manifest = attrs?.string("uri").orEmpty()
+                val manifestHash = attrs?.string("hash").orEmpty()
+                val drm = attrs?.jsonObject("drmData")
+                val licenseUrl = drm?.string("licenseUrl").orEmpty()
+                if (!response.isSuccessful || manifest.isBlank()) {
+                    return event("offlinePlaybackStoreAdapter", buildJsonObject {
+                        put("sourceSurface", "trackManifests usage=DOWNLOAD")
+                        put("status", response.code)
+                        put("successful", response.isSuccessful)
+                        put("manifestPresent", manifest.isNotBlank())
+                        put("persisted", false)
+                        put("errorSummary", summarizeErrors(root).toString())
+                    })
+                }
+
+                val storeDir = File(filesDir, "offline-proof-store").apply { mkdirs() }
+                val storageDir = File(storeDir, "cache-$trackId").apply { mkdirs() }
+                val recordFile = File(storeDir, "track-$trackId.json")
+                val storedRecord = buildJsonObject {
+                    put("schema", "untidy-debug-offline-playback-record-v1")
+                    put("sourceSurface", "trackManifests usage=DOWNLOAD")
+                    put("savedAt", Instant.now().toString())
+                    put("trackId", trackId)
+                    put("countryCode", countryCode)
+                    put("manifestMimeType", "DASH")
+                    put("manifest", manifest)
+                    put("manifestHash", manifestHash)
+                    put("licenseUrl", licenseUrl)
+                    put("offlineLicense", "")
+                    put("storageExternal", false)
+                    put("storagePath", storageDir.absolutePath)
+                    put("partiallyEncrypted", false)
+                    put("offlineRevalidateAt", -1L)
+                    put("offlineValidUntil", -1L)
+                }
+                recordFile.writeText(storedRecord.toString())
+
+                val loaded = json.parseToJsonElement(recordFile.readText()).jsonObject
+                cache = SimpleCache(storageDir, NoOpCacheEvictor(), StandaloneDatabaseProvider(applicationContext))
+                val storage = Storage(
+                    externalStorage = loaded.boolean("storageExternal") ?: false,
+                    path = loaded.string("storagePath").orEmpty(),
+                )
+                val track = PlaybackInfo.Track(
+                    loaded.string("trackId")?.toIntOrNull() ?: 0,
+                    AudioQuality.LOW,
+                    AssetPresentation.FULL,
+                    AudioMode.STEREO,
+                    loaded.string("manifestHash").orEmpty(),
+                    null,
+                    "untidy-proof-stored-session-${UUID.randomUUID()}",
+                    ManifestMimeType.DASH,
+                    loaded.string("manifest").orEmpty(),
+                    loaded.string("licenseUrl").orEmpty(),
+                    0f,
+                    0f,
+                    0f,
+                    0f,
+                    loaded.long("offlineRevalidateAt"),
+                    loaded.long("offlineValidUntil"),
+                )
+                val offlineTrack = PlaybackInfo.Offline.Track(
+                    track = track,
+                    offlineLicense = loaded.string("offlineLicense").orEmpty(),
+                    storage = storage,
+                    partiallyEncrypted = loaded.boolean("partiallyEncrypted") ?: false,
+                )
+                val provider = OfflinePlayProvider(
+                    offlinePlaybackInfoProvider = object : OfflinePlaybackInfoProvider {
+                        override suspend fun getOfflineTrackPlaybackInfo(trackId: String, streamingSessionId: String): PlaybackInfo = offlineTrack
+                        override suspend fun getOfflineVideoPlaybackInfo(videoId: String, streamingSessionId: String): PlaybackInfo {
+                            throw UnsupportedOperationException("video offline proof not implemented")
+                        }
+                    },
+                    offlineCacheProvider = object : OfflineCacheProvider {
+                        override fun getExternal(path: String): Cache = requireNotNull(cache) { "cache released" }
+                        override fun getInternal(path: String): Cache = requireNotNull(cache) { "cache released" }
+                    },
+                    encryption = object : Encryption {
+                        override val secretKey: ByteArray = MessageDigest.getInstance("SHA-256")
+                            .digest("untidy-debug-offline-playback-store".toByteArray())
+                        override fun getDecryptedHeader(productId: String): ByteArray = ByteArray(0)
+                    },
+                )
+                val served = kotlinx.coroutines.runBlocking {
+                    requireNotNull(provider.offlinePlaybackInfoProvider)
+                        .getOfflineTrackPlaybackInfo(trackId, "proof-session")
+                } as? PlaybackInfo.Offline.Track
+                event("offlinePlaybackStoreAdapter", buildJsonObject {
+                    put("sourceSurface", "trackManifests usage=DOWNLOAD")
+                    put("status", response.code)
+                    put("successful", response.isSuccessful)
+                    put("persisted", true)
+                    put("recordPathHash", sha256Short(recordFile.absolutePath))
+                    put("manifestPresent", manifest.isNotBlank())
+                    put("manifestLength", manifest.length)
+                    put("manifestHashPresent", manifestHash.isNotBlank())
+                    put("manifestContentHash", sha256Short(manifest))
+                    put("licenseUrlPresent", licenseUrl.isNotBlank())
+                    put("offlineLicensePresent", served?.offlineLicense?.isNotBlank() == true)
+                    put("storageExternal", served?.storage?.externalStorage ?: true)
+                    put("storagePathHash", sha256Short(served?.storage?.path.orEmpty()))
+                    put("cacheUidPresent", cache?.uid != Cache.UID_UNSET)
+                    put("cacheKeysCount", cache?.keys?.size ?: 0)
+                    put("providerCanServeStoredInfo", served != null)
+                    put("downloadBytesCached", false)
+                    put("playbackClaimed", false)
+                    put("nextMissing", "sanctioned media bytes/offline license source")
+                })
+            }
+        }.getOrElse {
+            event("offlinePlaybackStoreAdapter", buildJsonObject {
+                put("exception", it::class.java.simpleName)
+                put("message", it.message.orEmpty().take(180))
+            })
+        }.also {
+            runCatching { cache?.release() }
         }
     }
 
@@ -799,6 +947,8 @@ class OfflineProofService : Service() {
     private fun JsonObject.jsonObject(key: String): JsonObject? = this[key]?.jsonObjectOrNull()
     private fun JsonObject.jsonArray(key: String): JsonArray? = this[key] as? JsonArray
     private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+    private fun JsonObject.long(key: String): Long = (this[key] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: 0L
+    private fun JsonObject.boolean(key: String): Boolean? = (this[key] as? JsonPrimitive)?.booleanOrNull
     private fun JsonElement.jsonObjectOrNull(): JsonObject? = this as? JsonObject
 
     companion object {
