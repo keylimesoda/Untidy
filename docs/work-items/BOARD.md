@@ -97,7 +97,7 @@ _Generated from `work-items.json`._
 - Labels: offline, downloads, cache, media3, tidal
 - Spec: `docs/offline-sdk-proof-plan-2026-06-17.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/25
-- Next: Review canonical cache-key replay proof; next implementation step is controlled UI/debug flow that persists downloaded-track record and routes playback through proven cache/provider path.
+- Next: Review canonical cache-key replay proof. Product UX implementation continues in UNTIDY-025 / GitHub #26.
 - Acceptance:
   - Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.
   - Artifact shows no STREAM/PLAYBACK manifest use and no URL/token/license leakage.
@@ -170,7 +170,22 @@ _Generated from `work-items.json`._
 
 ## todo
 
-_None._
+### UNTIDY-025 — Wire offline download/replay into end-user UX
+
+- Priority: P0
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, ux, single-track-mvp
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/26
+- Next: Implement smallest single-track offline MVP: repository-backed DownloadState, action-sheet Download row, persistent downloaded-track record, cached playback resolver, and end-user network-off validation.
+- Acceptance:
+  - A user-accessible or explicitly debug-gated UI path can download one track.
+  - Downloaded state persists across app/service restart.
+  - Network-disabled playback of that downloaded track succeeds from app UI.
+  - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
+  - Narrow Gradle gate passes.
 
 ## blocked
 

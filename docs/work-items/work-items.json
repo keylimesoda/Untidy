@@ -731,7 +731,8 @@
       "2026-06-17 13:58 PT: canonical cache-key factory wired into both DashDownloader cache fill and DashMediaSource replay in debug proof harness.",
       "Runtime artifact reports network-disabled replay success: offlineUpstreamAttempted=false, reachedReady=true, reachedPlaying=true, playbackState=READY, playbackClaimed=true.",
       "Artifact: reports/offline-proof-2026-06-17-1358-cache-miss-key-probe/latest.json.",
-      "No PLAYBACK/STREAM manifest use and no URL/token/license/key logging in artifact."
+      "No PLAYBACK/STREAM manifest use and no URL/token/license/key logging in artifact.",
+      "End-user UX implementation issue created: https://github.com/keylimesoda/Untidy/issues/26."
     ],
     "acceptance": [
       "Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.",
@@ -739,8 +740,38 @@
       "Single-track MVP implementation plan is updated with exact storage/cache/provider contract.",
       "If production code is touched, narrow Gradle gate and runtime emulator proof pass."
     ],
-    "next": "Review canonical cache-key replay proof; next implementation step is controlled UI/debug flow that persists downloaded-track record and routes playback through proven cache/provider path.",
+    "next": "Review canonical cache-key replay proof. Product UX implementation continues in UNTIDY-025 / GitHub #26.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/25",
     "githubNumber": 25
+  },
+  {
+    "id": "UNTIDY-025",
+    "title": "Wire offline download/replay into end-user UX",
+    "type": "feature",
+    "status": "todo",
+    "priority": "P0",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "offline",
+      "downloads",
+      "ux",
+      "single-track-mvp"
+    ],
+    "spec": "docs/spec-downloads-offline-playback.md",
+    "evidence": [
+      "Created after #25 proved canonical cache-key network-disabled replay in debug harness; feature remains useless until exposed through user flow."
+    ],
+    "acceptance": [
+      "A user-accessible or explicitly debug-gated UI path can download one track.",
+      "Downloaded state persists across app/service restart.",
+      "Network-disabled playback of that downloaded track succeeds from app UI.",
+      "Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.",
+      "Narrow Gradle gate passes."
+    ],
+    "next": "Implement smallest single-track offline MVP: repository-backed DownloadState, action-sheet Download row, persistent downloaded-track record, cached playback resolver, and end-user network-off validation.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/26",
+    "githubNumber": 26,
+    "phase": "implement"
   }
 ]
