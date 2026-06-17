@@ -22,4 +22,5 @@ object PlaybackActions {
     const val EXTRA_QUEUE_PAYLOAD = "com.tidal.wear.extra.QUEUE_PAYLOAD"
     const val EXTRA_QUEUE_START_INDEX = "com.tidal.wear.extra.QUEUE_START_INDEX"
     const val EXTRA_QUEUE_INDEX = "com.tidal.wear.extra.QUEUE_INDEX"
+    const val EXTRA_APP_COMMAND_TOKEN = "com.tidal.wear.extra.APP_COMMAND_TOKEN"
 }

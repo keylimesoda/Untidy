@@ -16,5 +16,14 @@ internal object PlaybackServiceForegroundPolicy {
         PlaybackActions.ACTION_JUMP_TO_QUEUE_INDEX,
     )
 
+    private val customStartActions = playbackControlActions + setOf(
+        PlaybackActions.ACTION_PLAY_FIXTURE,
+        PlaybackActions.ACTION_PROBE_DEVICE_AUTH,
+        PlaybackActions.ACTION_PLAY_TRACK,
+        PlaybackActions.ACTION_PLAY_QUEUE,
+    )
+
     fun shouldStopStartedServiceWhenIdle(action: String?): Boolean = action in playbackControlActions
+
+    fun requiresAppCommandToken(action: String?): Boolean = action in customStartActions
 }

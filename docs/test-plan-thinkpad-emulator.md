@@ -354,6 +354,61 @@ Pass criteria:
 - Logs explain ignored or unavailable requests.
 - Service does not leave a stuck foreground notification for invalid requests.
 
+Security note: these explicit `com.tidal.wear.action.*` service actions are not Media3
+controller connections, so `MediaControllerAccessPolicy` does not gate them. While the
+service remains `android:exported="true"`, every action handled by `onStartCommand()`
+must either be harmless before playback exists, require a valid in-app payload, or stop
+the foreground-service start quickly. Treat any externally startable action that can
+initiate authenticated playback, auth probes, or queue mutation without a trusted
+controller path as a security review item before closing UNTIDY-006.
+
+### 4.4 Non-destructive exported=false experiment
+
+This is a local diagnostic only; do not commit the manifest flip unless the product
+decision changes. It answers whether external/system components can still discover and
+control `TidalMediaService` when the service is private.
+
+1. Save the current manifest state:
+
+   ```bash
+   git diff -- app/src/main/AndroidManifest.xml
+   ```
+
+2. Temporarily change only the service declaration to
+   `android:exported="false"`, then build/install the debug APK.
+
+3. Confirm an explicit external start is denied from shell/another UID:
+
+   ```bash
+   adb shell am start-foreground-service \
+     -n com.tidal.wear/com.tidal.wear.core.playback.TidalMediaService \
+     -a com.tidal.wear.action.PAUSE
+   ```
+
+   Expected diagnostic result: Android reports a permission/export denial for the
+   non-exported service.
+
+4. Without changing code again, verify app-owned flows still start playback from inside
+   Untidy, then inspect system/Wear media integration:
+
+   ```bash
+   adb shell dumpsys media_session | grep -A80 -i 'tidal\|untidy\|com.tidal.wear'
+   adb shell dumpsys notification --noredact | grep -A80 -i 'tidal\|untidy\|com.tidal.wear'
+   adb shell cmd media_session dispatch pause
+   adb shell cmd media_session dispatch play
+   ```
+
+5. Revert the local manifest change immediately after the experiment:
+
+   ```bash
+   git checkout -- app/src/main/AndroidManifest.xml
+   ```
+
+Pass criteria for keeping `exported=false` would be: app-owned playback works, media
+notification appears, Wear/system media controllers still discover the session, and
+media-key dispatch works. If discovery/control breaks or is ambiguous, keep the
+Media3 service exported and rely on controller validation plus explicit-intent hardening.
+
 ---
 
 ## 5. Prioritized smoke-test matrix

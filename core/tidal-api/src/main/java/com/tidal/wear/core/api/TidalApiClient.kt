@@ -463,11 +463,7 @@ class TidalApiClient(
                 countryCode,
                 playlistTrackRelationshipBody(normalizedTrackId),
             )
-            when {
-                response.isSuccessful -> AddTrackToPlaylistOutcome.Added
-                response.code() == 409 -> AddTrackToPlaylistOutcome.AlreadyPresent
-                else -> throw HttpException(response)
-            }.also { outcome ->
+            addTrackToPlaylistOutcome(response).also { outcome ->
                 Log.d(API_LOG_TAG, "playlist add track write ok outcome=$outcome")
             }
         } catch (e: CancellationException) {
@@ -1032,6 +1028,12 @@ internal fun normalizeTrackId(trackId: String): String? = trackId
     .takeIf { it.isNotBlank() && it != "tidal-current" && !it.startsWith("fixture", ignoreCase = true) }
 
 internal fun userCollectionTrackRelationshipBody(trackId: String): JsonObject = playlistTrackRelationshipBody(trackId)
+
+internal fun addTrackToPlaylistOutcome(response: Response<Unit>): AddTrackToPlaylistOutcome = when {
+    response.isSuccessful -> AddTrackToPlaylistOutcome.Added
+    response.code() == 409 -> AddTrackToPlaylistOutcome.AlreadyPresent
+    else -> throw HttpException(response)
+}
 
 internal fun playlistTrackRelationshipBody(trackId: String): JsonObject = buildJsonObject {
     put(

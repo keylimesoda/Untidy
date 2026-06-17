@@ -72,6 +72,7 @@ import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.PlaybackActions
+import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
 import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
 import com.tidal.wear.playback.NowPlayingStateHolder
@@ -587,12 +588,14 @@ private fun Context.startTrackPlayback(track: TidalTrack) {
         .putExtra(PlaybackActions.EXTRA_DURATION_MS, track.durationMs)
         .putExtra(PlaybackActions.EXTRA_ALBUM_ID, track.albumId)
         .putExtra(PlaybackActions.EXTRA_ARTIST_ID, track.artistId)
+        .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
 }
 
 private fun Context.resumeTrackPlayback() {
     val intent = Intent(this, TidalMediaService::class.java)
         .setAction(PlaybackActions.ACTION_RESUME)
+        .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
 }
 
@@ -605,6 +608,7 @@ private fun Context.startQueuePlayback(tracks: List<TidalTrack>, startIndex: Int
         .putExtra(PlaybackActions.EXTRA_QUEUE_ID, queueId)
         .putExtra(PlaybackActions.EXTRA_QUEUE_PAYLOAD, PlaybackQueueStore.payloadFor(playableTracks))
         .putExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, startIndex.coerceIn(0, playableTracks.lastIndex))
+        .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
 }
 

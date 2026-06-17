@@ -139,10 +139,19 @@ class TidalMediaService : MediaLibraryService() {
         Log.d(PLAYER_LOG_TAG, "onStartCommand action=${action ?: "null"}")
 
         // This service is intentionally still exported while MediaLibraryService controller support
-        // is validated. If an external caller starts an idle/no-op control intent via
-        // startForegroundService(), Android requires us to either promote to foreground quickly or
-        // stop this start request. Letting a no-op SKIP/PAUSE/RESUME return without either path can
-        // make ActivityManager kill the process with "still waiting for start foreground".
+        // is validated. Media3 controllers are filtered in onConnect(); explicit custom service
+        // actions must also be app-authored so another package cannot start authenticated playback,
+        // auth probes, queue jumps, or transport controls via startForegroundService().
+        if (PlaybackServiceForegroundPolicy.requiresAppCommandToken(action) &&
+            !PlaybackCommandTokenProvider.isValid(this, intent)
+        ) {
+            Log.w(PLAYER_LOG_TAG, "rejecting service action without app command token action=${action ?: "null"}")
+            stopSelfResult(startId)
+            return result
+        }
+
+        // If an app-authored idle/no-op control intent starts us as a foreground service, Android
+        // still requires us to promote to foreground quickly or stop this start request.
         if (PlaybackServiceForegroundPolicy.shouldStopStartedServiceWhenIdle(action) && currentTrack == null) {
             Log.d(PLAYER_LOG_TAG, "idle control action ignored; stopping foreground-service startId=$startId")
             stopSelfResult(startId)
@@ -386,7 +395,9 @@ class TidalMediaService : MediaLibraryService() {
     private fun serviceAction(action: String, requestCode: Int): PendingIntent = PendingIntent.getService(
         this,
         requestCode,
-        Intent(this, TidalMediaService::class.java).setAction(action),
+        Intent(this, TidalMediaService::class.java)
+            .setAction(action)
+            .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this)),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 

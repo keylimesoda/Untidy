@@ -15,6 +15,7 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.PlaybackActions
+import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
 import com.tidal.wear.core.playback.TidalMediaService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -209,6 +210,7 @@ class NowPlayingStateHolder(
             context,
             android.content.Intent(context, TidalMediaService::class.java)
                 .setAction(action)
+                .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(context))
                 .apply { extras?.let(::putExtras) },
         )
     }

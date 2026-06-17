@@ -4,7 +4,52 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
-_None._
+### UNTIDY-003 — Validate album and playlist play-all behavior
+
+- Priority: P0
+- Type: test
+- Area: playback
+- Owner: Tommy
+- Labels: album, playlist, queue, playback
+- Spec: `docs/test-plan-thinkpad-emulator.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/3
+- Next: Needs multi-page >50-track album or 100-track cap validation plus observed transitions beyond first 1-2 songs; album size 31 and playlist size 20 play-all passed.
+- Acceptance:
+  - Multi-page album queues more than first page
+  - Playlist Play all starts at requested index
+  - 100-track watch cap behavior is acceptable/no silent app crash
+  - Track transitions continue beyond first 1-2 songs
+
+### UNTIDY-004 — Validate playback transition smoothness and prefetch
+
+- Priority: P0
+- Type: test
+- Area: playback
+- Owner: Tommy
+- Labels: prefetch, seamless, media3
+- Spec: `docs/test-plan-thinkpad-emulator.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/4
+- Next: Needs natural end-of-track transition observation and forced manifest/network failure UI validation; start playback and prefetch evidence are present.
+- Acceptance:
+  - Starting a track does not pause/stall unexpectedly
+  - Natural transition to next track is smooth enough for watch use
+  - Playback error UI appears for manifest/network failures
+
+### UNTIDY-010 — Implement Add to Playlist workflow
+
+- Priority: P2
+- Type: feature
+- Area: api
+- Owner: Tommy
+- Labels: playlist, feature, tidal-api, write
+- Spec: `docs/spec-add-to-playlist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/10
+- Next: Start after UNTIDY-008 proves TIDAL write endpoint pattern.
+- Acceptance:
+  - Add current track to existing playlist
+  - Create new playlist and add track
+  - Success/error/loading states on watch UI
+  - Live API write validation passes
 
 ## review
 
@@ -39,37 +84,6 @@ _None._
   - Single-track playback starts
   - Album Play all queues and plays multiple tracks
   - No AndroidRuntime crash in filtered logcat
-
-### UNTIDY-003 — Validate album and playlist play-all behavior
-
-- Priority: P0
-- Type: test
-- Area: playback
-- Owner: Tommy
-- Labels: album, playlist, queue, playback
-- Spec: `docs/test-plan-thinkpad-emulator.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/3
-- Next: Needs multi-page >50-track album or 100-track cap validation plus observed transitions beyond first 1-2 songs; album size 31 and playlist size 20 play-all passed.
-- Acceptance:
-  - Multi-page album queues more than first page
-  - Playlist Play all starts at requested index
-  - 100-track watch cap behavior is acceptable/no silent app crash
-  - Track transitions continue beyond first 1-2 songs
-
-### UNTIDY-004 — Validate playback transition smoothness and prefetch
-
-- Priority: P0
-- Type: test
-- Area: playback
-- Owner: Tommy
-- Labels: prefetch, seamless, media3
-- Spec: `docs/test-plan-thinkpad-emulator.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/4
-- Next: Needs natural end-of-track transition observation and forced manifest/network failure UI validation; start playback and prefetch evidence are present.
-- Acceptance:
-  - Starting a track does not pause/stall unexpectedly
-  - Natural transition to next track is smooth enough for watch use
-  - Playback error UI appears for manifest/network failures
 
 ### UNTIDY-005 — Fix/validate shared settings DataStore crash
 
@@ -110,7 +124,7 @@ _None._
 - Labels: exported-service, security, media-controls
 - Spec: `docs/flow-and-cleanup-audit.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/6
-- Next: Needs exported=false media-control experiment or explicit exported=true risk decision with controller/package validation/documented risk; defensive probes passed but decision is still open.
+- Next: Review-ready after app-private command-token hardening for exported custom service actions; full Gradle gate passed. Remaining residual is real Wear/OEM media-controller validation before final done/merge.
 - Acceptance:
   - Test notification/media controls with exported=true
   - Test whether exported=false breaks Wear/system media controls
@@ -163,22 +177,6 @@ _None._
   - Queue screen shows current track and upcoming tracks
   - Empty queue state is safe
   - Compile/lint passes
-
-### UNTIDY-010 — Implement Add to Playlist workflow
-
-- Priority: P2
-- Type: feature
-- Area: api
-- Owner: Tommy
-- Labels: playlist, feature, tidal-api, write
-- Spec: `docs/spec-add-to-playlist.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/10
-- Next: Start after UNTIDY-008 proves TIDAL write endpoint pattern.
-- Acceptance:
-  - Add current track to existing playlist
-  - Create new playlist and add track
-  - Success/error/loading states on watch UI
-  - Live API write validation passes
 
 ### UNTIDY-012 — Migrate remaining Wear Compose lazy/icon deprecations
 
