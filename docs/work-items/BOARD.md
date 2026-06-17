@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: album, playlist, queue, playback
 - Spec: `docs/test-plan-thinkpad-emulator.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/3
-- Next: Needs multi-page >50-track album or 100-track cap validation plus observed transitions beyond first 1-2 songs; album size 31 and playlist size 20 play-all passed.
+- Next: Runtime-only gaps remain when ADB/emulator is available: multi-page >50-track album live playback and observed transitions beyond first 1-2 songs. Non-emulator queue index/cap/pagination guards now tested.
 - Acceptance:
   - Multi-page album queues more than first page
   - Playlist Play all starts at requested index
@@ -29,7 +29,7 @@ _Generated from `work-items.json`._
 - Labels: prefetch, seamless, media3
 - Spec: `docs/test-plan-thinkpad-emulator.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/4
-- Next: Needs natural end-of-track transition observation and forced manifest/network failure UI validation; start playback and prefetch evidence are present.
+- Next: Runtime-only gaps remain when ADB/emulator is available: natural end-of-track transition observation and forced manifest/network failure UI validation. Non-emulator early-end transition guard now tested.
 - Acceptance:
   - Starting a track does not pause/stall unexpectedly
   - Natural transition to next track is smooth enough for watch use

@@ -74,7 +74,10 @@
     "spec": "docs/test-plan-thinkpad-emulator.md",
     "evidence": [
       "Album pagination live API validated",
-      "Queue handoff payload fallback implemented"
+      "Queue handoff payload fallback implemented",
+      "Static queue start-index guard added so playlist taps remain aligned after blank-id filtering",
+      "100-track watch cap behavior covered by PlaybackQueueStoreTest",
+      "TIDAL album next-page cursor parsing covered, including encoded page[cursor] links"
     ],
     "acceptance": [
       "Multi-page album queues more than first page",
@@ -82,7 +85,7 @@
       "100-track watch cap behavior is acceptable/no silent app crash",
       "Track transitions continue beyond first 1-2 songs"
     ],
-    "next": "Needs multi-page >50-track album or 100-track cap validation plus observed transitions beyond first 1-2 songs; album size 31 and playlist size 20 play-all passed.",
+    "next": "Runtime-only gaps remain when ADB/emulator is available: multi-page >50-track album live playback and observed transitions beyond first 1-2 songs. Non-emulator queue index/cap/pagination guards now tested.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/3",
     "githubNumber": 3
   },
@@ -102,14 +105,16 @@
     "spec": "docs/test-plan-thinkpad-emulator.md",
     "evidence": [
       "Manifest prefetch implemented",
-      "loadTrack now suspendable"
+      "loadTrack now suspendable",
+      "Transition guard prevents automatic queue advance when backend reports media end far earlier than catalog duration",
+      "PlaybackTransitionPolicyTest covers early-end hold, near-end advance, short-track advance, and negative elapsed handling"
     ],
     "acceptance": [
       "Starting a track does not pause/stall unexpectedly",
       "Natural transition to next track is smooth enough for watch use",
       "Playback error UI appears for manifest/network failures"
     ],
-    "next": "Needs natural end-of-track transition observation and forced manifest/network failure UI validation; start playback and prefetch evidence are present.",
+    "next": "Runtime-only gaps remain when ADB/emulator is available: natural end-of-track transition observation and forced manifest/network failure UI validation. Non-emulator early-end transition guard now tested.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/4",
     "githubNumber": 4
   },
