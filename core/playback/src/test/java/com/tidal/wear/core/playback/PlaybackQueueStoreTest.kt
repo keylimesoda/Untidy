@@ -69,6 +69,43 @@ class PlaybackQueueStoreTest {
     }
 
     @Test
+    fun startIndexForPreservesPlaylistTrackTapAfterBlankIdFiltering() {
+        val tracks = listOf(
+            track("one"),
+            track(""),
+            track("two"),
+            track("three"),
+        )
+
+        assertEquals(0, PlaybackQueueStore.startIndexFor(tracks, 0))
+        assertEquals(1, PlaybackQueueStore.startIndexFor(tracks, 2))
+        assertEquals(2, PlaybackQueueStore.startIndexFor(tracks, 3))
+    }
+
+    @Test
+    fun startIndexForMovesBlankRequestedTrackToNextPlayableTrack() {
+        val tracks = listOf(
+            track("one"),
+            track(""),
+            track("two"),
+            track(""),
+        )
+
+        assertEquals(1, PlaybackQueueStore.startIndexFor(tracks, 1))
+        assertEquals(1, PlaybackQueueStore.startIndexFor(tracks, 3))
+    }
+
+    @Test
+    fun startIndexForClampsToOneHundredTrackWatchCap() {
+        val tracks = (1..150).map { track("track-$it") }
+
+        assertEquals(0, PlaybackQueueStore.startIndexFor(tracks, -5))
+        assertEquals(99, PlaybackQueueStore.startIndexFor(tracks, 99))
+        assertEquals(99, PlaybackQueueStore.startIndexFor(tracks, 100))
+        assertEquals(99, PlaybackQueueStore.startIndexFor(tracks, 149))
+    }
+
+    @Test
     fun getUnknownQueueReturnsEmptyList() {
         assertTrue(PlaybackQueueStore.get("missing").isEmpty())
     }

@@ -1142,7 +1142,7 @@ private fun JsonElement.includedObjects(): List<JsonObject> {
     return (root["included"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
 }
 
-private fun JsonElement.nextPageCursor(): String? {
+internal fun JsonElement.nextPageCursor(): String? {
     val root = this as? JsonObject ?: return null
     val links = root["links"] as? JsonObject ?: return null
     val next = links.string("next") ?: return null

@@ -607,7 +607,7 @@ private fun Context.startQueuePlayback(tracks: List<TidalTrack>, startIndex: Int
         .setAction(PlaybackActions.ACTION_PLAY_QUEUE)
         .putExtra(PlaybackActions.EXTRA_QUEUE_ID, queueId)
         .putExtra(PlaybackActions.EXTRA_QUEUE_PAYLOAD, PlaybackQueueStore.payloadFor(playableTracks))
-        .putExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, startIndex.coerceIn(0, playableTracks.lastIndex))
+        .putExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, PlaybackQueueStore.startIndexFor(tracks, startIndex))
         .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
 }

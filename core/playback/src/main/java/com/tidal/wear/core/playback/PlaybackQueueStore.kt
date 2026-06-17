@@ -16,6 +16,19 @@ object PlaybackQueueStore {
         .take(MAX_QUEUE_TRACKS)
         .toList()
 
+    fun startIndexFor(tracks: List<TidalTrack>, requestedStartIndex: Int): Int {
+        val playableTracks = tracks.withIndex()
+            .filter { it.value.id.isNotBlank() }
+            .take(MAX_QUEUE_TRACKS)
+            .toList()
+        if (playableTracks.isEmpty()) return 0
+        val requestedIndex = requestedStartIndex.coerceIn(0, tracks.lastIndex)
+        val exactPlayableIndex = playableTracks.indexOfFirst { it.index == requestedIndex }
+        if (exactPlayableIndex >= 0) return exactPlayableIndex
+        val nextPlayableIndex = playableTracks.indexOfFirst { it.index > requestedIndex }
+        return if (nextPlayableIndex >= 0) nextPlayableIndex else playableTracks.lastIndex
+    }
+
     fun put(tracks: List<TidalTrack>): String {
         val playableTracks = playableTracks(tracks)
         if (playableTracks.isEmpty()) return ""
