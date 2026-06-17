@@ -8,6 +8,78 @@ _None._
 
 ## review
 
+_None._
+
+## todo
+
+_None._
+
+## blocked
+
+### UNTIDY-003 — Validate album and playlist play-all behavior
+
+- Priority: P0
+- Type: test
+- Area: playback
+- Owner: Tommy
+- Labels: album, playlist, queue, playback
+- Spec: `docs/test-plan-thinkpad-emulator.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/3
+- Next: Blocked on runtime environment: ADB/emulator is unavailable from cron (adb devices lists no devices; selinuxuser_execheap is off and cron must not sudo/toggle SELinux). Unblock by starting/attaching the Wear emulator with ADB available, then run live multi-page >50-track album playback and observed >1-2 song transition validation.
+- Acceptance:
+  - Multi-page album queues more than first page
+  - Playlist Play all starts at requested index
+  - 100-track watch cap behavior is acceptable/no silent app crash
+  - Track transitions continue beyond first 1-2 songs
+
+### UNTIDY-004 — Validate playback transition smoothness and prefetch
+
+- Priority: P0
+- Type: test
+- Area: playback
+- Owner: Tommy
+- Labels: prefetch, seamless, media3
+- Spec: `docs/test-plan-thinkpad-emulator.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/4
+- Next: Blocked on runtime environment: ADB/emulator is unavailable from cron (adb devices lists no devices; selinuxuser_execheap is off and cron must not sudo/toggle SELinux). Unblock by starting/attaching the Wear emulator with ADB available, then observe natural end-of-track transition and force manifest/network failure UI validation.
+- Acceptance:
+  - Starting a track does not pause/stall unexpectedly
+  - Natural transition to next track is smooth enough for watch use
+  - Playback error UI appears for manifest/network failures
+
+### UNTIDY-010 — Implement Add to Playlist workflow
+
+- Priority: P2
+- Type: feature
+- Area: api
+- Owner: Tommy
+- Labels: playlist, feature, tidal-api, write
+- Spec: `docs/spec-add-to-playlist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/10
+- Next: Implementation for existing-playlist add is in PR #14, but final acceptance is blocked pending Ric approval for a live TIDAL write to a disposable playlist plus proof of the create-playlist endpoint/body before enabling New playlist.
+- Acceptance:
+  - Add current track to existing playlist
+  - Create new playlist and add track
+  - Success/error/loading states on watch UI
+  - Live API write validation passes
+
+### UNTIDY-011 — Downloads/offline playback capability spike
+
+- Priority: P2
+- Type: spike
+- Area: offline
+- Owner: Tommy
+- Labels: downloads, offline, drm, tidal
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/11
+- Next: Blocked pending sanctioned TIDAL offline/download path validation; fake download UI has been neutralized.
+- Acceptance:
+  - Determine whether TIDAL API/SDK permits offline storage for this app
+  - If viable, define single-track MVP implementation plan
+  - If not viable, remove/neutralize fake download affordances
+
+## done
+
 ### UNTIDY-001 — Stabilize Wear emulator workflow under Fedora SELinux
 
 - Priority: P0
@@ -147,75 +219,3 @@ _None._
   - No ScalingLazyColumn/rememberScalingLazyListState deprecation warnings in compile log
   - AutoMirrored icon warnings resolved where straightforward
   - Build/lint/tests pass
-
-## todo
-
-_None._
-
-## blocked
-
-### UNTIDY-003 — Validate album and playlist play-all behavior
-
-- Priority: P0
-- Type: test
-- Area: playback
-- Owner: Tommy
-- Labels: album, playlist, queue, playback
-- Spec: `docs/test-plan-thinkpad-emulator.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/3
-- Next: Blocked on runtime environment: ADB/emulator is unavailable from cron (adb devices lists no devices; selinuxuser_execheap is off and cron must not sudo/toggle SELinux). Unblock by starting/attaching the Wear emulator with ADB available, then run live multi-page >50-track album playback and observed >1-2 song transition validation.
-- Acceptance:
-  - Multi-page album queues more than first page
-  - Playlist Play all starts at requested index
-  - 100-track watch cap behavior is acceptable/no silent app crash
-  - Track transitions continue beyond first 1-2 songs
-
-### UNTIDY-004 — Validate playback transition smoothness and prefetch
-
-- Priority: P0
-- Type: test
-- Area: playback
-- Owner: Tommy
-- Labels: prefetch, seamless, media3
-- Spec: `docs/test-plan-thinkpad-emulator.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/4
-- Next: Blocked on runtime environment: ADB/emulator is unavailable from cron (adb devices lists no devices; selinuxuser_execheap is off and cron must not sudo/toggle SELinux). Unblock by starting/attaching the Wear emulator with ADB available, then observe natural end-of-track transition and force manifest/network failure UI validation.
-- Acceptance:
-  - Starting a track does not pause/stall unexpectedly
-  - Natural transition to next track is smooth enough for watch use
-  - Playback error UI appears for manifest/network failures
-
-### UNTIDY-010 — Implement Add to Playlist workflow
-
-- Priority: P2
-- Type: feature
-- Area: api
-- Owner: Tommy
-- Labels: playlist, feature, tidal-api, write
-- Spec: `docs/spec-add-to-playlist.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/10
-- Next: Implementation for existing-playlist add is in PR #14, but final acceptance is blocked pending Ric approval for a live TIDAL write to a disposable playlist plus proof of the create-playlist endpoint/body before enabling New playlist.
-- Acceptance:
-  - Add current track to existing playlist
-  - Create new playlist and add track
-  - Success/error/loading states on watch UI
-  - Live API write validation passes
-
-### UNTIDY-011 — Downloads/offline playback capability spike
-
-- Priority: P2
-- Type: spike
-- Area: offline
-- Owner: Tommy
-- Labels: downloads, offline, drm, tidal
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Blocked pending sanctioned TIDAL offline/download path validation; fake download UI has been neutralized.
-- Acceptance:
-  - Determine whether TIDAL API/SDK permits offline storage for this app
-  - If viable, define single-track MVP implementation plan
-  - If not viable, remove/neutralize fake download affordances
-
-## done
-
-_None._
