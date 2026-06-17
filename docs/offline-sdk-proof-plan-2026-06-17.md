@@ -935,3 +935,36 @@ Self-unblock attempted in this pass: the first replay attempt failed because Exo
 Concrete advancement: #11 now has the first network-disabled replay artifact. It proves the sanctioned DOWNLOAD cache fill is real but not yet aligned with replay cache keys/storage expectations. The next problem is narrower than provisioning in general: align `DashDownloader` cache keys with the offline replay media-source path and the SDK `OfflineCacheProvider`/`Storage.path` expectation, or find the official offline storage provider keying contract.
 
 Next concrete proof step: inspect cache-key alignment between `DashDownloader`, `DashMediaSource`/`DefaultDashChunkSource`, TIDAL `OfflineStorageProvider`, and `Storage.path`. Try a debug-only replay with matching media item/cache keys or a custom cache-key factory before returning to server-side `Downloads`/offline-license discovery.
+
+## Spike conclusion — 2026-06-17 13:48 PT
+
+#11 is complete as a capability spike. It should no longer linger as the catch-all offline/download work item.
+
+What the spike proved:
+
+- TIDAL's offline/download path is sanctioned in principle for this class of client, per Ric's correction; the work did not re-litigate permission.
+- `usage=DOWNLOAD` manifest fetch works for the authenticated session.
+- The DOWNLOAD DASH manifest is segment-addressable for the proof track.
+- App-private Media3 `DashDownloader` cache fill succeeds from the DOWNLOAD manifest.
+- `OfflinePlayProvider`, `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, and `Encryption` wiring is viable from app code.
+- App-private offline metadata store/provider reconstruction is viable.
+- Network-disabled replay has been attempted. The first meaningful replay result narrows the remaining failure to cache-key/storage alignment: Media3 parses duration but chunk replay misses the cache and attempts disabled upstream.
+
+What the spike did **not** claim:
+
+- No production offline playback is shipped.
+- No offline replay success has been claimed yet.
+- No `PLAYBACK` / `STREAM` manifest caching was used.
+- No URLs, bearer tokens, offline licenses, or keys were logged.
+
+Follow-up implementation work:
+
+- `UNTIDY-024` / GitHub #25 — align offline cache keys/storage paths for network-disabled replay and single-track MVP.
+
+Latest proof artifact:
+
+- `reports/offline-proof-2026-06-17-1345-network-disabled-replay-manifest-ok/latest.json`
+
+Release implication:
+
+- Offline/download is no longer a vague capability spike. The remaining work is a concrete implementation task: align cache-key/storage expectations between `DashDownloader`, `DashMediaSource` / `DefaultDashChunkSource`, TIDAL `OfflineStorageProvider`, TIDAL `OfflineCacheProvider`, and `PlaybackInfo.Offline.Track.Storage.path` until network-disabled replay reaches READY/playing from app-private cache.

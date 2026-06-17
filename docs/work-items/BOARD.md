@@ -4,21 +4,6 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
-### UNTIDY-011 — Downloads/offline playback capability spike
-
-- Priority: P2
-- Type: spike
-- Area: offline
-- Owner: Tommy
-- Labels: downloads, offline, drm, tidal
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Inspect and align cache keys/storage path between DashDownloader, DashMediaSource/DefaultDashChunkSource, TIDAL OfflineStorageProvider, and OfflineCacheProvider before attempting SDK offline replay again.
-- Acceptance:
-  - Prove the exact TIDAL offline provisioning path for this app
-  - If viable, define single-track MVP implementation plan
-  - If not viable, remove/neutralize fake download affordances
-
 ### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
 
 - Priority: P2
@@ -186,7 +171,21 @@ _Generated from `work-items.json`._
 
 ## todo
 
-_None._
+### UNTIDY-024 — Align offline cache keys for network-disabled replay
+
+- Priority: P1
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, cache, media3, tidal
+- Spec: `docs/offline-sdk-proof-plan-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/25
+- Next: Align DashDownloader/DashMediaSource/TIDAL OfflineCacheProvider cache keys and Storage.path, then rerun network-disabled replay proof.
+- Acceptance:
+  - Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.
+  - Artifact shows no STREAM/PLAYBACK manifest use and no URL/token/license leakage.
+  - Single-track MVP implementation plan is updated with exact storage/cache/provider contract.
+  - If production code is touched, narrow Gradle gate and runtime emulator proof pass.
 
 ## blocked
 
@@ -365,6 +364,21 @@ _None._
   - Create new playlist and add track
   - Success/error/loading states on watch UI
   - Live API write validation passes
+
+### UNTIDY-011 — Downloads/offline playback capability spike
+
+- Priority: P2
+- Type: spike
+- Area: offline
+- Owner: Tommy
+- Labels: downloads, offline, drm, tidal
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/11
+- Next: Spike complete. Follow-up implementation moved to UNTIDY-024 / GitHub #25: align offline cache keys/storage for network-disabled replay and single-track MVP.
+- Acceptance:
+  - Prove the exact TIDAL offline provisioning path for this app
+  - If viable, define single-track MVP implementation plan
+  - If not viable, remove/neutralize fake download affordances
 
 ### UNTIDY-012 — Migrate remaining Wear Compose lazy/icon deprecations
 
