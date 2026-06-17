@@ -538,7 +538,7 @@
     "id": "UNTIDY-019",
     "title": "Fix Wear search entry blank-screen UX",
     "type": "bug",
-    "status": "todo",
+    "status": "review",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -550,7 +550,10 @@
     ],
     "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
     "evidence": [
-      "Search entry appears as blank black screen in runtime artifact 03-search-entry.png; hidden 1dp EditText host needs visible Wear prompt."
+      "Search entry appears as blank black screen in runtime artifact 03-search-entry.png; hidden 1dp EditText host needs visible Wear prompt.",
+      "Search entry now renders visible prompt text Search TIDAL / Voice or keyboard / Speak or type instead of a blank black screen.",
+      "Runtime XML evidence: reports/search-entry-ux-2026-06-17/search-entry-prompt.xml and reports/round-safe-area-2026-06-17/02-search-entry-after.xml contain prompt text.",
+      "Code landed in commit 81610ff Tune round-screen list safe areas, which overlapped #20 and #21 changes."
     ],
     "acceptance": [
       "Search entry never appears as blank black screen.",
@@ -559,7 +562,7 @@
       "Runtime evidence captured.",
       "Compile/lint or relevant narrow gate passes."
     ],
-    "next": "Add visible Wear search prompt/voice-or-type affordance and validate search results still work.",
+    "next": "Review visible Wear search prompt implementation and emulator artifacts; code landed in commit 81610ff alongside #21 safe-area padding.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/20",
     "githubNumber": 20
   },

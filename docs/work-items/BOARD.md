@@ -37,6 +37,23 @@ _Generated from `work-items.json`._
   - Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.
   - No generic, non-Wear-specific advice without source/evidence.
 
+### UNTIDY-019 — Fix Wear search entry blank-screen UX
+
+- Priority: P1
+- Type: bug
+- Area: ui
+- Owner: Tommy
+- Labels: search, wear-os, ux, ime
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/20
+- Next: Review visible Wear search prompt implementation and emulator artifacts; code landed in commit 81610ff alongside #21 safe-area padding.
+- Acceptance:
+  - Search entry never appears as blank black screen.
+  - User has visible prompt/affordance before and during IME handoff.
+  - Existing search results flow still works.
+  - Runtime evidence captured.
+  - Compile/lint or relevant narrow gate passes.
+
 ### UNTIDY-020 — Tune round-screen list safe-area padding
 
 - Priority: P1
@@ -71,23 +88,6 @@ _Generated from `work-items.json`._
   - Any remaining release blockers have separate GitHub issues.
   - Debug-only code cannot leak into production release surfaces.
   - Known limitations are documented in README/specs.
-
-### UNTIDY-019 — Fix Wear search entry blank-screen UX
-
-- Priority: P1
-- Type: bug
-- Area: ui
-- Owner: Tommy
-- Labels: search, wear-os, ux, ime
-- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/20
-- Next: Add visible Wear search prompt/voice-or-type affordance and validate search results still work.
-- Acceptance:
-  - Search entry never appears as blank black screen.
-  - User has visible prompt/affordance before and during IME handoff.
-  - Existing search results flow still works.
-  - Runtime evidence captured.
-  - Compile/lint or relevant narrow gate passes.
 
 ### UNTIDY-021 — Gate or confirm New test playlist creation
 
