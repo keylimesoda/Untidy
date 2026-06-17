@@ -713,7 +713,7 @@
     "id": "UNTIDY-024",
     "title": "Align offline cache keys for network-disabled replay",
     "type": "feature",
-    "status": "todo",
+    "status": "in-progress",
     "priority": "P1",
     "area": "offline",
     "owner": "Tommy",
@@ -734,7 +734,7 @@
       "Single-track MVP implementation plan is updated with exact storage/cache/provider contract.",
       "If production code is touched, narrow Gradle gate and runtime emulator proof pass."
     ],
-    "next": "Align DashDownloader/DashMediaSource/TIDAL OfflineCacheProvider cache keys and Storage.path, then rerun network-disabled replay proof.",
+    "next": "Direct continuation from #11: align DashDownloader/DashMediaSource/TIDAL OfflineCacheProvider cache keys and Storage.path, then rerun network-disabled replay proof.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/25",
     "githubNumber": 25
   }
