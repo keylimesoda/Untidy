@@ -267,7 +267,7 @@
     "id": "UNTIDY-010",
     "title": "Implement Add to Playlist workflow",
     "type": "feature",
-    "status": "blocked",
+    "status": "review",
     "priority": "P2",
     "area": "api",
     "owner": "Tommy",
@@ -280,7 +280,13 @@
     "spec": "docs/spec-add-to-playlist.md",
     "evidence": [
       "Spec written",
-      "Collection write assumptions should be validated by favorite toggle first"
+      "Collection write assumptions should be validated by favorite toggle first",
+      "Ric approved creating faux/test playlists for #10 live validation; do not delete created playlists.",
+      "Live create playlist succeeded: POST /v2/playlists?countryCode=US with JSON:API data.attributes.name; faux playlist Untidy Test - 2026-06-17 0918 id 38051d1d-aec5-4709-b6f7-e7b1c2ad4274 preserved.",
+      "Live add track succeeded: POST /v2/playlists/{id}/relationships/items added Pearl Jam Why Go track id 5120026.",
+      "Duplicate add returned 200 and inserted duplicate item, so implementation now pre-checks playlist items and returns AlreadyPresent before duplicate writes.",
+      "User playlists list endpoint proven: GET /v2/userCollections/{userId}/relationships/playlists?include=playlists contains created playlist; /me variant returned 404.",
+      "Verification passed: core tidal-api unit/compile, app compile, full lintDebug assembleDebug testDebugUnitTest, git diff --check, live install/launch on emulator-5554."
     ],
     "acceptance": [
       "Add current track to existing playlist",
@@ -288,7 +294,7 @@
       "Success/error/loading states on watch UI",
       "Live API write validation passes"
     ],
-    "next": "Implementation for existing-playlist add is in PR #14, but final acceptance is blocked pending Ric approval for a live TIDAL write to a disposable playlist plus proof of the create-playlist endpoint/body before enabling New playlist.",
+    "next": "Review live-write implementation and decide whether to polish naming/text entry beyond default faux playlist name; live contract is proven and no-delete boundary preserved.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/10",
     "githubNumber": 10
   },

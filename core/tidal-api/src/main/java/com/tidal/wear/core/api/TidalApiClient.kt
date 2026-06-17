@@ -167,6 +167,21 @@ interface TidalApiService {
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
+    @GET("userCollections/{userId}/relationships/playlists")
+    suspend fun userCollectionPlaylistItems(
+        @Path("userId") userId: String,
+        @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "playlists",
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @POST("playlists")
+    suspend fun createPlaylist(
+        @Query("countryCode") countryCode: String,
+        @Body body: JsonObject,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
     @POST("playlists/{id}/relationships/items")
     suspend fun addPlaylistTrackItem(
         @Path("id") id: String,
@@ -450,9 +465,37 @@ class TidalApiClient(
         )
     suspend fun playlist(id: String): TidalPlaylist? = service.playlist(id, countryCode).dataObjects().firstOrNull()?.toPlaylist()
 
-    suspend fun editablePlaylists(): List<TidalPlaylist> = favorites().playlists
-        .filter { it.id.isNotBlank() && it.title.isNotBlank() }
-        .distinctBy { it.id }
+    suspend fun editablePlaylists(): List<TidalPlaylist> {
+        val userId = authRepository.accountInfo.first()?.userId?.takeIf { it.isNotBlank() }
+        val userPlaylists = if (userId != null) {
+            runCatching {
+                val root = service.userCollectionPlaylistItems(userId, countryCode, include = "playlists")
+                val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+                root.dataObjects().mapNotNull { item ->
+                    includedByKey[item.resourceKey()]?.toPlaylist()
+                        ?: item.toPlaylist()
+                        ?: item.id?.let { playlist(it) }
+                }
+            }.onFailure { Log.d(API_LOG_TAG, "editable playlists user collection failed reason=${it.safeReason()}") }
+                .getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+        return (userPlaylists + favorites().playlists)
+            .filter { it.id.isNotBlank() && it.title.isNotBlank() }
+            .distinctBy { it.id }
+    }
+
+    suspend fun createPlaylist(name: String, description: String = "Created by Untidy on Wear OS"): TidalPlaylist {
+        val normalizedName = name.trim().takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("Playlist name is required")
+        val root = service.createPlaylist(
+            countryCode,
+            createPlaylistBody(normalizedName, description),
+        )
+        return root.dataObjects().firstOrNull()?.toPlaylist()
+            ?: throw IllegalStateException("Create playlist response missing playlist")
+    }
 
     suspend fun addTrackToPlaylist(playlistId: String, trackId: String): AddTrackToPlaylistOutcome {
         val normalizedPlaylistId = playlistId.trim().takeIf { it.isNotBlank() }
@@ -460,6 +503,13 @@ class TidalApiClient(
         val normalizedTrackId = normalizeTrackId(trackId)
             ?: throw IllegalArgumentException("Track id is unavailable")
         return try {
+            val existingIds = runCatching { service.playlistItems(normalizedPlaylistId, countryCode).allRelationshipItemIds() }
+                .onFailure { Log.d(API_LOG_TAG, "playlist pre-add duplicate check failed reason=${it.safeReason()}") }
+                .getOrDefault(emptyList())
+            if (normalizedTrackId in existingIds) {
+                Log.d(API_LOG_TAG, "playlist add track skipped already present")
+                return AddTrackToPlaylistOutcome.AlreadyPresent
+            }
             val response = service.addPlaylistTrackItem(
                 normalizedPlaylistId,
                 countryCode,
@@ -1076,6 +1126,22 @@ internal fun addTrackToPlaylistOutcome(response: Response<Unit>): AddTrackToPlay
     response.isSuccessful -> AddTrackToPlaylistOutcome.Added
     response.code() == 409 -> AddTrackToPlaylistOutcome.AlreadyPresent
     else -> throw HttpException(response)
+}
+
+internal fun createPlaylistBody(name: String, description: String): JsonObject = buildJsonObject {
+    put(
+        "data",
+        buildJsonObject {
+            put("type", "playlists")
+            put(
+                "attributes",
+                buildJsonObject {
+                    put("name", name)
+                    if (description.isNotBlank()) put("description", description)
+                },
+            )
+        },
+    )
 }
 
 internal fun playlistTrackRelationshipBody(trackId: String): JsonObject = buildJsonObject {

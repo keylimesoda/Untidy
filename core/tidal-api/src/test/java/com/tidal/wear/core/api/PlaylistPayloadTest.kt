@@ -3,6 +3,8 @@ package com.tidal.wear.core.api
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
@@ -12,6 +14,30 @@ import retrofit2.HttpException
 import retrofit2.Response
 
 class PlaylistPayloadTest {
+    @Test
+    fun createPlaylistBodyUsesLiveJsonApiNameAttribute() {
+        val body = createPlaylistBody("Untidy Test", "Faux playlist")
+
+        assertEquals(
+            buildJsonObject {
+                put(
+                    "data",
+                    buildJsonObject {
+                        put("type", "playlists")
+                        put(
+                            "attributes",
+                            buildJsonObject {
+                                put("name", "Untidy Test")
+                                put("description", "Faux playlist")
+                            },
+                        )
+                    },
+                )
+            },
+            body,
+        )
+    }
+
     @Test
     fun playlistRelationshipBodyUsesJsonApiTrackResourceIdentifierArray() {
         val body = playlistTrackRelationshipBody("456")

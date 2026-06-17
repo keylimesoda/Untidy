@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import java.io.IOException
+import java.time.LocalDate
 
 @Composable
 fun AddToPlaylistSheet(
@@ -70,13 +71,15 @@ fun AddToPlaylistSheet(
     var loadError by remember(track.id) { mutableStateOf<String?>(null) }
     var addingTarget by remember(track.id) { mutableStateOf<TidalPlaylist?>(null) }
     var addError by remember(track.id) { mutableStateOf<String?>(null) }
+    var createError by remember(track.id) { mutableStateOf<String?>(null) }
     var successMessage by remember(track.id) { mutableStateOf<String?>(null) }
+    var creatingPlaylist by remember(track.id) { mutableStateOf(false) }
     var reloadToken by remember(track.id) { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
     val view = LocalView.current
 
     fun addToPlaylist(playlist: TidalPlaylist) {
-        if (addingTarget != null || successMessage != null) return
+        if (addingTarget != null || creatingPlaylist || successMessage != null) return
         addingTarget = playlist
         addError = null
         scope.launch {
@@ -94,6 +97,37 @@ fun AddToPlaylistSheet(
                 addError = playlistAddErrorMessage(throwable, playlist.title)
             }
             addingTarget = null
+        }
+    }
+
+    fun createPlaylistAndAddTrack() {
+        if (addingTarget != null || creatingPlaylist || successMessage != null) return
+        creatingPlaylist = true
+        addError = null
+        createError = null
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val playlist = apiClient.createPlaylist(
+                        name = defaultUntidyPlaylistName(),
+                        description = "Faux/test playlist created from Untidy Wear OS; do not delete automatically.",
+                    )
+                    val outcome = apiClient.addTrackToPlaylist(playlist.id, track.id)
+                    playlist to outcome
+                }
+            }.onSuccess { (playlist, outcome) ->
+                val prefix = when (outcome) {
+                    AddTrackToPlaylistOutcome.Added -> "Added to"
+                    AddTrackToPlaylistOutcome.AlreadyPresent -> "Already in"
+                }
+                playlists = listOf(playlist) + playlists.filterNot { it.id == playlist.id }
+                successMessage = "$prefix ${playlist.title}"
+                view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+            }.onFailure { throwable ->
+                if (throwable is CancellationException) throw throwable
+                createError = playlistCreateErrorMessage(throwable)
+            }
+            creatingPlaylist = false
         }
     }
 
@@ -154,10 +188,12 @@ fun AddToPlaylistSheet(
                 secondaryAction = "Cancel" to onBack,
             )
             addingTarget != null -> CenterStatus("Adding to ${addingTarget?.title.orEmpty()}…")
+            creatingPlaylist -> CenterStatus("Creating playlist…")
             else -> PlaylistChooser(
                 playlists = playlists,
-                addError = addError,
+                addError = addError ?: createError,
                 onSelect = ::addToPlaylist,
+                onCreatePlaylist = ::createPlaylistAndAddTrack,
                 onReload = { reloadToken += 1 },
             )
         }
@@ -169,6 +205,7 @@ private fun PlaylistChooser(
     playlists: List<TidalPlaylist>,
     addError: String?,
     onSelect: (TidalPlaylist) -> Unit,
+    onCreatePlaylist: () -> Unit,
     onReload: () -> Unit,
 ) {
     TransformingLazyColumn(
@@ -180,11 +217,7 @@ private fun PlaylistChooser(
             item { StatusLine(addError, Color(0xFFFF8A80)) }
         }
         item {
-            DisabledPlaylistRow(
-                icon = Icons.Filled.Add,
-                title = "New playlist",
-                subtitle = "Needs live endpoint validation",
-            )
+            CreatePlaylistRow(onClick = onCreatePlaylist)
         }
         if (playlists.isEmpty()) {
             item { StatusLine("No editable playlists found", TidalColors.OnSurfaceMuted) }
@@ -326,6 +359,28 @@ private fun SmallButton(label: String, onClick: () -> Unit) {
     }
 }
 
+@Composable
+private fun CreatePlaylistRow(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(0.94f)
+            .height(48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = null, tint = TidalColors.Cyan, modifier = Modifier.size(22.dp))
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text("New test playlist", color = TidalColors.White, fontSize = 13.sp, maxLines = 1)
+            Text("Creates faux Untidy playlist", color = TidalColors.OnSurfaceMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+private fun defaultUntidyPlaylistName(): String = "Untidy Test - ${LocalDate.now()}"
+
 private fun playlistLoadErrorMessage(throwable: Throwable): String = when (throwable) {
     is HttpException -> when (throwable.code()) {
         401 -> "Sign in again"
@@ -334,6 +389,18 @@ private fun playlistLoadErrorMessage(throwable: Throwable): String = when (throw
     }
     is IOException -> "No connection"
     else -> "Couldn't load playlists"
+}
+
+private fun playlistCreateErrorMessage(throwable: Throwable): String = when (throwable) {
+    is HttpException -> when (throwable.code()) {
+        401 -> "Sign in again"
+        403 -> "Playlist access denied"
+        429 -> "Too many requests"
+        in 500..599 -> "TIDAL unavailable"
+        else -> "Couldn't create playlist"
+    }
+    is IOException -> "No connection"
+    else -> "Couldn't create playlist"
 }
 
 private fun playlistAddErrorMessage(throwable: Throwable, playlistTitle: String): String = when (throwable) {
