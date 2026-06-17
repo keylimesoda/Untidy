@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: offline, downloads, ux, single-track-mvp
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/26
-- Next: Continue from first debug UX slice: persist download state outside proof polling, then route app UI playback through the proven cached/provider path and run full network-off validation.
+- Next: Continue from persisted debug Downloaded state: route app UI playback for downloaded tracks through the proven cached/provider path and run full network-off validation.
 - Acceptance:
   - A user-accessible or explicitly debug-gated UI path can download one track.
   - Downloaded state persists across app/service restart.

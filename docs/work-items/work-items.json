@@ -764,7 +764,10 @@
       "First debug UX slice: Now Playing Download row enables for eligible real tracks in debug builds and launches OfflineProofActivity for current track.",
       "If proof artifact reports playbackClaimed=true/reachedReady=true/no upstream attempt, UI state flips to Downloaded.",
       "Runtime smoke artifact: reports/offline-ux-2026-06-17-1409-download-row/.",
-      "Verification passed: :app:compileDebugKotlin, assembleDebug, git diff --check."
+      "Verification passed: :app:compileDebugKotlin, assembleDebug, git diff --check.",
+      "Downloaded state now persists in app-private offline-downloads SharedPreferences after proof success.",
+      "Eligible debug tracks initialize as Downloaded after restart when local marker exists.",
+      "Verification passed: :app:compileDebugKotlin and git diff --check."
     ],
     "acceptance": [
       "A user-accessible or explicitly debug-gated UI path can download one track.",
@@ -773,7 +776,7 @@
       "Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.",
       "Narrow Gradle gate passes."
     ],
-    "next": "Continue from first debug UX slice: persist download state outside proof polling, then route app UI playback through the proven cached/provider path and run full network-off validation.",
+    "next": "Continue from persisted debug Downloaded state: route app UI playback for downloaded tracks through the proven cached/provider path and run full network-off validation.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/26",
     "githubNumber": 26,
     "phase": "implement"

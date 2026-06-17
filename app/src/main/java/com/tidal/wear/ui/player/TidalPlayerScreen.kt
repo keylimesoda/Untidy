@@ -117,7 +117,7 @@ fun TidalPlayerScreen(
     val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
     val currentTrack = state.track
     var downloadState by remember(currentTrack?.id) {
-        mutableStateOf(if (BuildConfig.DEBUG && currentTrack?.isDownloadProofEligible() == true) DownloadState.NotDownloaded else DownloadState.Unavailable)
+        mutableStateOf(context.initialDownloadState(currentTrack))
     }
     var downloadProofRun by remember(currentTrack?.id) { mutableIntStateOf(0) }
 
@@ -129,6 +129,7 @@ fun TidalPlayerScreen(
             delay(1_000)
             val proof = withContext(Dispatchers.IO) { context.latestOfflineProofFor(track.id) }
             if (proof == true) {
+                withContext(Dispatchers.IO) { context.markOfflineProofDownloaded(track) }
                 downloadState = DownloadState.Downloaded
                 return@LaunchedEffect
             }
@@ -601,6 +602,27 @@ private fun TransportButton(
     }
 }
 
+
+private fun Context.initialDownloadState(track: TidalTrack?): DownloadState = when {
+    !BuildConfig.DEBUG -> DownloadState.Unavailable
+    track?.isDownloadProofEligible() != true -> DownloadState.Unavailable
+    isOfflineProofDownloaded(track.id) -> DownloadState.Downloaded
+    else -> DownloadState.NotDownloaded
+}
+
+private fun Context.markOfflineProofDownloaded(track: TidalTrack) {
+    getSharedPreferences("offline-downloads", Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean("downloaded:${track.id}", true)
+        .putString("title:${track.id}", track.title)
+        .putString("artist:${track.id}", track.artist)
+        .putLong("downloadedAt:${track.id}", System.currentTimeMillis())
+        .apply()
+}
+
+private fun Context.isOfflineProofDownloaded(trackId: String): Boolean =
+    getSharedPreferences("offline-downloads", Context.MODE_PRIVATE)
+        .getBoolean("downloaded:$trackId", false)
 
 private fun TidalTrack.isDownloadProofEligible(): Boolean = id.isNotBlank() &&
     id != "tidal-current" &&
