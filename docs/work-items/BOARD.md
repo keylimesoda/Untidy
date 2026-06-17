@@ -70,6 +70,23 @@ _Generated from `work-items.json`._
   - No major regression to scroll ergonomics.
   - Compile/lint or relevant narrow gate passes.
 
+### UNTIDY-021 — Gate or confirm New test playlist creation
+
+- Priority: P1
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: playlist, write, ux, safety
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/22
+- Next: Review debug-only New test playlist gate; create row is hidden in release builds while preserving dev/test flow.
+- Acceptance:
+  - Users cannot accidentally create a test playlist from first row with one tap in production UX.
+  - If debug-only, row is impossible in release builds.
+  - If confirmation-based, confirmation/cancel text is clear on a watch.
+  - No delete path is introduced.
+  - Relevant compile/test gate passes.
+
 ## todo
 
 ### UNTIDY-014 — Release readiness / ship checklist
@@ -88,23 +105,6 @@ _Generated from `work-items.json`._
   - Any remaining release blockers have separate GitHub issues.
   - Debug-only code cannot leak into production release surfaces.
   - Known limitations are documented in README/specs.
-
-### UNTIDY-021 — Gate or confirm New test playlist creation
-
-- Priority: P1
-- Type: cleanup
-- Area: ui
-- Owner: Tommy
-- Labels: playlist, write, ux, safety
-- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/22
-- Next: Hide New test playlist behind debug/developer mode or add explicit confirmation and clearer copy.
-- Acceptance:
-  - Users cannot accidentally create a test playlist from first row with one tap in production UX.
-  - If debug-only, row is impossible in release builds.
-  - If confirmation-based, confirmation/cancel text is clear on a watch.
-  - No delete path is introduced.
-  - Relevant compile/test gate passes.
 
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 

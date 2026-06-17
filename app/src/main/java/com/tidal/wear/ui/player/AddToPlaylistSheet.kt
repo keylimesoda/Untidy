@@ -45,6 +45,7 @@ import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.Text
+import com.tidal.wear.BuildConfig
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.AddTrackToPlaylistOutcome
 import com.tidal.wear.core.model.TidalPlaylist
@@ -192,6 +193,7 @@ fun AddToPlaylistSheet(
             else -> PlaylistChooser(
                 playlists = playlists,
                 addError = addError ?: createError,
+                showCreatePlaylist = BuildConfig.DEBUG,
                 onSelect = ::addToPlaylist,
                 onCreatePlaylist = ::createPlaylistAndAddTrack,
                 onReload = { reloadToken += 1 },
@@ -204,6 +206,7 @@ fun AddToPlaylistSheet(
 private fun PlaylistChooser(
     playlists: List<TidalPlaylist>,
     addError: String?,
+    showCreatePlaylist: Boolean,
     onSelect: (TidalPlaylist) -> Unit,
     onCreatePlaylist: () -> Unit,
     onReload: () -> Unit,
@@ -216,8 +219,10 @@ private fun PlaylistChooser(
         if (addError != null) {
             item { StatusLine(addError, Color(0xFFFF8A80)) }
         }
-        item {
-            CreatePlaylistRow(onClick = onCreatePlaylist)
+        if (showCreatePlaylist) {
+            item {
+                CreatePlaylistRow(onClick = onCreatePlaylist)
+            }
         }
         if (playlists.isEmpty()) {
             item { StatusLine("No editable playlists found", TidalColors.OnSurfaceMuted) }
