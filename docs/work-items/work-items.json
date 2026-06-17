@@ -748,7 +748,7 @@
     "id": "UNTIDY-025",
     "title": "Wire offline download/replay into end-user UX",
     "type": "feature",
-    "status": "todo",
+    "status": "in-progress",
     "priority": "P0",
     "area": "offline",
     "owner": "Tommy",
@@ -760,7 +760,11 @@
     ],
     "spec": "docs/spec-downloads-offline-playback.md",
     "evidence": [
-      "Created after #25 proved canonical cache-key network-disabled replay in debug harness; feature remains useless until exposed through user flow."
+      "Created after #25 proved canonical cache-key network-disabled replay in debug harness; feature remains useless until exposed through user flow.",
+      "First debug UX slice: Now Playing Download row enables for eligible real tracks in debug builds and launches OfflineProofActivity for current track.",
+      "If proof artifact reports playbackClaimed=true/reachedReady=true/no upstream attempt, UI state flips to Downloaded.",
+      "Runtime smoke artifact: reports/offline-ux-2026-06-17-1409-download-row/.",
+      "Verification passed: :app:compileDebugKotlin, assembleDebug, git diff --check."
     ],
     "acceptance": [
       "A user-accessible or explicitly debug-gated UI path can download one track.",
@@ -769,7 +773,7 @@
       "Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.",
       "Narrow Gradle gate passes."
     ],
-    "next": "Implement smallest single-track offline MVP: repository-backed DownloadState, action-sheet Download row, persistent downloaded-track record, cached playback resolver, and end-user network-off validation.",
+    "next": "Continue from first debug UX slice: persist download state outside proof polling, then route app UI playback through the proven cached/provider path and run full network-off validation.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/26",
     "githubNumber": 26,
     "phase": "implement"

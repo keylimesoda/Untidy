@@ -4,6 +4,23 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
+### UNTIDY-025 — Wire offline download/replay into end-user UX
+
+- Priority: P0
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, ux, single-track-mvp
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/26
+- Next: Continue from first debug UX slice: persist download state outside proof polling, then route app UI playback through the proven cached/provider path and run full network-off validation.
+- Acceptance:
+  - A user-accessible or explicitly debug-gated UI path can download one track.
+  - Downloaded state persists across app/service restart.
+  - Network-disabled playback of that downloaded track succeeds from app UI.
+  - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
+  - Narrow Gradle gate passes.
+
 ### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
 
 - Priority: P2
@@ -170,22 +187,7 @@ _Generated from `work-items.json`._
 
 ## todo
 
-### UNTIDY-025 — Wire offline download/replay into end-user UX
-
-- Priority: P0
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: offline, downloads, ux, single-track-mvp
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/26
-- Next: Implement smallest single-track offline MVP: repository-backed DownloadState, action-sheet Download row, persistent downloaded-track record, cached playback resolver, and end-user network-off validation.
-- Acceptance:
-  - A user-accessible or explicitly debug-gated UI path can download one track.
-  - Downloaded state persists across app/service restart.
-  - Network-disabled playback of that downloaded track succeeds from app UI.
-  - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
-  - Narrow Gradle gate passes.
+_None._
 
 ## blocked
 
