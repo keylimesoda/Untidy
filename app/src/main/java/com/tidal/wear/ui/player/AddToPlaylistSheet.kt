@@ -378,8 +378,8 @@ private fun CreatePlaylistRow(onClick: () -> Unit) {
         Icon(Icons.Filled.Add, contentDescription = null, tint = TidalColors.Cyan, modifier = Modifier.size(22.dp))
         Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text("New test playlist", color = TidalColors.White, fontSize = 13.sp, maxLines = 1)
-            Text("Creates faux Untidy playlist", color = TidalColors.OnSurfaceMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("New debug test playlist", color = TidalColors.White, fontSize = 13.sp, maxLines = 1)
+            Text("Creates Untidy Test + adds track", color = TidalColors.OnSurfaceMuted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
