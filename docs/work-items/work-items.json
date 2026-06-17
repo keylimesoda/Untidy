@@ -643,7 +643,7 @@
     "id": "UNTIDY-022",
     "title": "Validate Now Playing actions discoverability and rotary behavior",
     "type": "test",
-    "status": "todo",
+    "status": "in-progress",
     "priority": "P2",
     "area": "ui",
     "owner": "Tommy",
@@ -653,9 +653,10 @@
       "wear-os",
       "ux"
     ],
-    "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
+    "spec": "docs/test-plan-now-playing-actions-rotary.md",
     "evidence": [
-      "UX review found action sheet discoverability/rotary behavior needs Wear-specific validation, especially real watch."
+      "UX review found action sheet discoverability/rotary behavior needs Wear-specific validation, especially real watch.",
+      "docs/test-plan-now-playing-actions-rotary.md defines the discoverability and rotary/bezel validation matrix; no live TIDAL library mutation required."
     ],
     "acceptance": [
       "Users can discover player actions without prior knowledge.",
@@ -663,7 +664,7 @@
       "Any added affordance stays watch-glanceable and does not clutter Now Playing.",
       "Relevant compile/lint gate passes."
     ],
-    "next": "Validate vertical pager/actions discoverability and rotary/bezel behavior; add affordance or rotary focus if needed.",
+    "next": "Run the Now Playing actions/rotary validation matrix on the Wear emulator, then repeat rotary/bezel behavior on a real Wear device if available before review.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/23",
     "githubNumber": 23
   },

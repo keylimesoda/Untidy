@@ -19,6 +19,22 @@ _Generated from `work-items.json`._
   - If viable, define single-track MVP implementation plan
   - If not viable, remove/neutralize fake download affordances
 
+### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
+
+- Priority: P2
+- Type: test
+- Area: ui
+- Owner: Tommy
+- Labels: now-playing, rotary, wear-os, ux
+- Spec: `docs/test-plan-now-playing-actions-rotary.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/23
+- Next: Run the Now Playing actions/rotary validation matrix on the Wear emulator, then repeat rotary/bezel behavior on a real Wear device if available before review.
+- Acceptance:
+  - Users can discover player actions without prior knowledge.
+  - Action sheet scroll/rotary behavior is validated on emulator and real watch if possible.
+  - Any added affordance stays watch-glanceable and does not clutter Now Playing.
+  - Relevant compile/lint gate passes.
+
 ## review
 
 ### UNTIDY-014 — Release readiness / ship checklist
@@ -169,22 +185,6 @@ _Generated from `work-items.json`._
   - Controller access policy tests still pass.
   - Media controls/playback service still function in emulator and preferably real Wear OS validation.
   - Security posture is documented in code or docs.
-
-### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
-
-- Priority: P2
-- Type: test
-- Area: ui
-- Owner: Tommy
-- Labels: now-playing, rotary, wear-os, ux
-- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/23
-- Next: Validate vertical pager/actions discoverability and rotary/bezel behavior; add affordance or rotary focus if needed.
-- Acceptance:
-  - Users can discover player actions without prior knowledge.
-  - Action sheet scroll/rotary behavior is validated on emulator and real watch if possible.
-  - Any added affordance stays watch-glanceable and does not clutter Now Playing.
-  - Relevant compile/lint gate passes.
 
 ## blocked
 
