@@ -387,5 +387,146 @@
     "next": "Ready to close after PR #14 lands; parent emulator regression verified Back from album route returns to authenticated Home, not onboarding.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/13",
     "githubNumber": 13
+  },
+  {
+    "id": "UNTIDY-014",
+    "title": "Release readiness / ship checklist",
+    "type": "task",
+    "status": "todo",
+    "priority": "P1",
+    "area": "qa",
+    "owner": "Tommy",
+    "labels": [
+      "release",
+      "ship-readiness",
+      "qa",
+      "docs"
+    ],
+    "spec": "docs/release-readiness-checklist.md",
+    "evidence": [
+      "Created from chat-history audit: Ric wants the app polished/professional/ready to ship."
+    ],
+    "acceptance": [
+      "A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.",
+      "Final build/test/lint evidence is posted.",
+      "Any remaining release blockers have separate GitHub issues.",
+      "Debug-only code cannot leak into production release surfaces.",
+      "Known limitations are documented in README/specs."
+    ],
+    "next": "Draft release-readiness checklist after #11 proof stabilizes; include real-watch validation, debug-only audit, UX pass, lint warning disposition, and docs freshness.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/15",
+    "githubNumber": 15
+  },
+  {
+    "id": "UNTIDY-015",
+    "title": "Resolve WearRecents/task-affinity lint warnings",
+    "type": "cleanup",
+    "status": "todo",
+    "priority": "P2",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "wear-os",
+      "recents",
+      "lint",
+      "navigation"
+    ],
+    "spec": "docs/refactor-backlog.md",
+    "evidence": [
+      "Chat-history audit found remaining WearRecents lint warning in PlayerActivity FLAG_ACTIVITY_CLEAR_TOP and debug manifest task-affinity warning."
+    ],
+    "acceptance": [
+      "WearRecents warnings are fixed or intentionally suppressed with a comment/rationale.",
+      "Back from View Album/View Artist remains fixed.",
+      "Navigation from Now Playing remains stable.",
+      "Narrow build/lint verification passes."
+    ],
+    "next": "Inspect PlayerActivity launch/back-stack behavior and determine Wear-safe alternative or suppression rationale.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/16",
+    "githubNumber": 16
+  },
+  {
+    "id": "UNTIDY-016",
+    "title": "Dispose ExportedService lint warning with documented security posture",
+    "type": "cleanup",
+    "status": "todo",
+    "priority": "P2",
+    "area": "platform",
+    "owner": "Tommy",
+    "labels": [
+      "exported-service",
+      "security",
+      "lint",
+      "media-controls"
+    ],
+    "spec": "docs/flow-and-cleanup-audit.md",
+    "evidence": [
+      "Chat-history audit found ExportedService lint still present after #6 closure; may be intentional for Media3/Wear discovery but needs disposition."
+    ],
+    "acceptance": [
+      "ExportedService lint warning is fixed or suppressed with explicit rationale.",
+      "Controller access policy tests still pass.",
+      "Media controls/playback service still function in emulator and preferably real Wear OS validation.",
+      "Security posture is documented in code or docs."
+    ],
+    "next": "Reconfirm exported=true requirement for Media3/Wear controls; fix or suppress with rationale.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/17",
+    "githubNumber": 17
+  },
+  {
+    "id": "UNTIDY-017",
+    "title": "Normalize offline/download docs to corrected #11 framing",
+    "type": "cleanup",
+    "status": "todo",
+    "priority": "P2",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "docs",
+      "offline",
+      "downloads",
+      "tidal"
+    ],
+    "spec": "docs/spec-downloads-offline-playback.md",
+    "evidence": [
+      "Ric corrected framing: TIDAL already has/allows download/offline in first- and third-party clients; docs still contain stale permission-blocked language."
+    ],
+    "acceptance": [
+      "Docs no longer imply TIDAL offline/download is categorically permission-blocked for this class of client.",
+      "Docs consistently say #11 is an implementation-proof/orchestration task using sanctioned SDK/API surfaces.",
+      "Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.",
+      "git diff --check passes."
+    ],
+    "next": "Normalize spec/spike/workflow docs while preserving the no-STREAM-manifest-caching guardrail.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/18",
+    "githubNumber": 18
+  },
+  {
+    "id": "UNTIDY-018",
+    "title": "Senior Wear OS UX path walkthrough",
+    "type": "test",
+    "status": "in-progress",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "ux",
+      "wear-os",
+      "review",
+      "qa"
+    ],
+    "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
+    "evidence": [
+      "Ric explicitly requested a Senior UX specialist well-versed in Android Wear OS; prior generic experts were underinformed."
+    ],
+    "acceptance": [
+      "A UX walkthrough report exists under docs/ux/ or reports/ux/.",
+      "Report includes path-by-path observations, screenshots/artifact references where available, severity, and recommendations.",
+      "Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.",
+      "No generic, non-Wear-specific advice without source/evidence."
+    ],
+    "next": "Run senior Wear OS UX specialist walkthrough against emulator/source and produce evidence-backed report.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/19",
+    "githubNumber": 19
   }
 ]

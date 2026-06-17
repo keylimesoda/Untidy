@@ -4,6 +4,22 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
+### UNTIDY-018 — Senior Wear OS UX path walkthrough
+
+- Priority: P1
+- Type: test
+- Area: ui
+- Owner: Tommy
+- Labels: ux, wear-os, review, qa
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/19
+- Next: Run senior Wear OS UX specialist walkthrough against emulator/source and produce evidence-backed report.
+- Acceptance:
+  - A UX walkthrough report exists under docs/ux/ or reports/ux/.
+  - Report includes path-by-path observations, screenshots/artifact references where available, severity, and recommendations.
+  - Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.
+  - No generic, non-Wear-specific advice without source/evidence.
+
 ### UNTIDY-011 — Downloads/offline playback capability spike
 
 - Priority: P2
@@ -25,7 +41,70 @@ _None._
 
 ## todo
 
-_None._
+### UNTIDY-014 — Release readiness / ship checklist
+
+- Priority: P1
+- Type: task
+- Area: qa
+- Owner: Tommy
+- Labels: release, ship-readiness, qa, docs
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/15
+- Next: Draft release-readiness checklist after #11 proof stabilizes; include real-watch validation, debug-only audit, UX pass, lint warning disposition, and docs freshness.
+- Acceptance:
+  - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
+  - Final build/test/lint evidence is posted.
+  - Any remaining release blockers have separate GitHub issues.
+  - Debug-only code cannot leak into production release surfaces.
+  - Known limitations are documented in README/specs.
+
+### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
+
+- Priority: P2
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: wear-os, recents, lint, navigation
+- Spec: `docs/refactor-backlog.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/16
+- Next: Inspect PlayerActivity launch/back-stack behavior and determine Wear-safe alternative or suppression rationale.
+- Acceptance:
+  - WearRecents warnings are fixed or intentionally suppressed with a comment/rationale.
+  - Back from View Album/View Artist remains fixed.
+  - Navigation from Now Playing remains stable.
+  - Narrow build/lint verification passes.
+
+### UNTIDY-016 — Dispose ExportedService lint warning with documented security posture
+
+- Priority: P2
+- Type: cleanup
+- Area: platform
+- Owner: Tommy
+- Labels: exported-service, security, lint, media-controls
+- Spec: `docs/flow-and-cleanup-audit.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/17
+- Next: Reconfirm exported=true requirement for Media3/Wear controls; fix or suppress with rationale.
+- Acceptance:
+  - ExportedService lint warning is fixed or suppressed with explicit rationale.
+  - Controller access policy tests still pass.
+  - Media controls/playback service still function in emulator and preferably real Wear OS validation.
+  - Security posture is documented in code or docs.
+
+### UNTIDY-017 — Normalize offline/download docs to corrected #11 framing
+
+- Priority: P2
+- Type: cleanup
+- Area: offline
+- Owner: Tommy
+- Labels: docs, offline, downloads, tidal
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/18
+- Next: Normalize spec/spike/workflow docs while preserving the no-STREAM-manifest-caching guardrail.
+- Acceptance:
+  - Docs no longer imply TIDAL offline/download is categorically permission-blocked for this class of client.
+  - Docs consistently say #11 is an implementation-proof/orchestration task using sanctioned SDK/API surfaces.
+  - Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.
+  - git diff --check passes.
 
 ## blocked
 
