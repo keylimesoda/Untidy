@@ -8,36 +8,7 @@ _None._
 
 ## review
 
-### UNTIDY-003 — Validate album and playlist play-all behavior
-
-- Priority: P0
-- Type: test
-- Area: playback
-- Owner: Tommy
-- Labels: album, playlist, queue, playback
-- Spec: `docs/test-plan-thinkpad-emulator.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/3
-- Next: Review runtime evidence and merge the fallback pagination fix; real-watch/audio-specific validation can remain follow-up, but emulator acceptance is satisfied.
-- Acceptance:
-  - Multi-page album queues more than first page
-  - Playlist Play all starts at requested index
-  - 100-track watch cap behavior is acceptable/no silent app crash
-  - Track transitions continue beyond first 1-2 songs
-
-### UNTIDY-004 — Validate playback transition smoothness and prefetch
-
-- Priority: P0
-- Type: test
-- Area: playback
-- Owner: Tommy
-- Labels: prefetch, seamless, media3
-- Spec: `docs/test-plan-thinkpad-emulator.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/4
-- Next: Review emulator evidence. Natural full end-of-song waiting was not performed; Next/Media3 transition plus forced network-error UI evidence satisfy the practical emulator gate.
-- Acceptance:
-  - Starting a track does not pause/stall unexpectedly
-  - Natural transition to next track is smooth enough for watch use
-  - Playback error UI appears for manifest/network failures
+_None._
 
 ## todo
 
@@ -109,6 +80,37 @@ _None._
   - Single-track playback starts
   - Album Play all queues and plays multiple tracks
   - No AndroidRuntime crash in filtered logcat
+
+### UNTIDY-003 — Validate album and playlist play-all behavior
+
+- Priority: P0
+- Type: test
+- Area: playback
+- Owner: Tommy
+- Labels: album, playlist, queue, playback
+- Spec: `docs/test-plan-thinkpad-emulator.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/3
+- Next: Closed after emulator runtime validation on emulator-5554: multi-page album fallback loaded 65 tracks, album/playlist Play all queued correctly, requested playlist row index preserved, and queue transitions/prefetch were observed.
+- Acceptance:
+  - Multi-page album queues more than first page
+  - Playlist Play all starts at requested index
+  - 100-track watch cap behavior is acceptable/no silent app crash
+  - Track transitions continue beyond first 1-2 songs
+
+### UNTIDY-004 — Validate playback transition smoothness and prefetch
+
+- Priority: P0
+- Type: test
+- Area: playback
+- Owner: Tommy
+- Labels: prefetch, seamless, media3
+- Spec: `docs/test-plan-thinkpad-emulator.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/4
+- Next: Closed after emulator runtime validation on emulator-5554: single-track and queue playback started without unexpected stalls, Next transitions updated metadata promptly, prefetch logged, and forced network failure surfaced recoverable Now Playing error UI.
+- Acceptance:
+  - Starting a track does not pause/stall unexpectedly
+  - Natural transition to next track is smooth enough for watch use
+  - Playback error UI appears for manifest/network failures
 
 ### UNTIDY-005 — Fix/validate shared settings DataStore crash
 

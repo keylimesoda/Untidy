@@ -61,7 +61,7 @@
     "id": "UNTIDY-003",
     "title": "Validate album and playlist play-all behavior",
     "type": "test",
-    "status": "review",
+    "status": "done",
     "priority": "P0",
     "area": "playback",
     "owner": "Tommy",
@@ -86,7 +86,7 @@
       "100-track watch cap behavior is acceptable/no silent app crash",
       "Track transitions continue beyond first 1-2 songs"
     ],
-    "next": "Review runtime evidence and merge the fallback pagination fix; real-watch/audio-specific validation can remain follow-up, but emulator acceptance is satisfied.",
+    "next": "Closed after emulator runtime validation on emulator-5554: multi-page album fallback loaded 65 tracks, album/playlist Play all queued correctly, requested playlist row index preserved, and queue transitions/prefetch were observed.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/3",
     "githubNumber": 3
   },
@@ -94,7 +94,7 @@
     "id": "UNTIDY-004",
     "title": "Validate playback transition smoothness and prefetch",
     "type": "test",
-    "status": "review",
+    "status": "done",
     "priority": "P0",
     "area": "playback",
     "owner": "Tommy",
@@ -116,7 +116,7 @@
       "Natural transition to next track is smooth enough for watch use",
       "Playback error UI appears for manifest/network failures"
     ],
-    "next": "Review emulator evidence. Natural full end-of-song waiting was not performed; Next/Media3 transition plus forced network-error UI evidence satisfy the practical emulator gate.",
+    "next": "Closed after emulator runtime validation on emulator-5554: single-track and queue playback started without unexpected stalls, Next transitions updated metadata promptly, prefetch logged, and forced network failure surfaced recoverable Now Playing error UI.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/4",
     "githubNumber": 4
   },
