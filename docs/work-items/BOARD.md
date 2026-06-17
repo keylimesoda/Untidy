@@ -140,17 +140,6 @@ _None._
   - Single-track MVP implementation plan is updated with exact storage/cache/provider contract.
   - If production code is touched, narrow Gradle gate and runtime emulator proof pass.
 
-### UNTIDY-028 — Implement local remove-download UX
-
-- Priority: P1
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: downloads, remove, storage, ux
-- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/29
-- Next: Review local remove-download UX. Evidence: reports/remove-download-ux-2026-06-17-1551/; compileDebugKotlin and git diff --check passed.
-
 ### UNTIDY-029 — Implement offline fallback behavior
 
 - Priority: P1
@@ -456,6 +445,17 @@ _None._
   - Existing search results flow still works.
   - Runtime evidence captured.
   - Compile/lint or relevant narrow gate passes.
+
+### UNTIDY-028 — Implement local remove-download UX
+
+- Priority: P1
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: downloads, remove, storage, ux
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/29
+- Next: Done: local remove-download UX accepted with emulator tap-through proof and local-only cache/metadata cleanup evidence.
 
 ### UNTIDY-010 — Implement Add to Playlist workflow
 

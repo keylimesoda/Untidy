@@ -863,7 +863,7 @@
     "id": "UNTIDY-028",
     "title": "Implement local remove-download UX",
     "type": "feature",
-    "status": "review",
+    "status": "done",
     "priority": "P1",
     "area": "offline",
     "owner": "Tommy",
@@ -878,10 +878,12 @@
       "core/playback/src/main/java/com/tidal/wear/core/playback/offline/OfflineDownloads.kt centralizes local-only download metadata/cache cleanup.",
       "Now Playing Actions exposes Downloaded \u2192 Remove download / Cancel with Keeps it in TIDAL copy.",
       "Downloads shelf rows expose Remove download with Remove local copy? confirmation.",
-      "Verification: :app:compileDebugKotlin and git diff --check passed on 2026-06-17."
+      "Verification: :app:compileDebugKotlin and git diff --check passed on 2026-06-17.",
+      "Runtime tap-through evidence: reports/remove-download-ux-2026-06-17-1642/ shows Downloads row, local-only confirmation copy, empty state after removal, and app-private cache removal.",
+      "No TIDAL library, playlist, playlist membership, or remote deletion API is invoked by the removal path."
     ],
     "acceptance": [],
-    "next": "Review local remove-download UX. Evidence: reports/remove-download-ux-2026-06-17-1551/; compileDebugKotlin and git diff --check passed.",
+    "next": "Done: local remove-download UX accepted with emulator tap-through proof and local-only cache/metadata cleanup evidence.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/29",
     "githubNumber": 29
   },
