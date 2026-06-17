@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.util.Base64
 import android.util.Log
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.Cache
@@ -51,6 +52,7 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import java.util.regex.Pattern
 import java.util.concurrent.TimeUnit
 
 /**
@@ -128,6 +130,7 @@ class OfflineProofService : Service() {
             summarizeTrackManifest(root)
         }
         results += offlinePlaybackStoreAdapterProbe(trackId, countryCode, token, clientId)
+        results += downloadManifestShapeProbe(trackId, countryCode, token, clientId)
 
         val installationId = probeInstallationInventory(trackId, countryCode, token, clientId, results)
         probeOfflineDiscoverySurfaces(trackId, countryCode, token, clientId, account?.userId, results)
@@ -573,6 +576,121 @@ class OfflineProofService : Service() {
         }
     }
 
+    private fun downloadManifestShapeProbe(
+        trackId: String,
+        countryCode: String,
+        token: String,
+        clientId: String,
+    ): JsonObject = runCatching {
+        val url = "https://openapi.tidal.com/v2/trackManifests/$trackId".toHttpUrl().newBuilder()
+            .addQueryParameter("manifestType", "MPEG_DASH")
+            .addQueryParameter("formats", "HEAACV1")
+            .addQueryParameter("uriScheme", "DATA")
+            .addQueryParameter("usage", "DOWNLOAD")
+            .addQueryParameter("adaptive", "false")
+            .addQueryParameter("countryCode", countryCode)
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .header("accept", JSON_API_ACCEPT)
+            .header("X-Tidal-Token", clientId)
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            val bodyText = response.body?.string().orEmpty()
+            val root = bodyText.takeIf { it.isNotBlank() }?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
+            val attrs = root?.jsonObject("data")?.jsonObject("attributes")
+            val manifest = attrs?.string("uri").orEmpty()
+            val manifestHash = attrs?.string("hash").orEmpty()
+            val decoded = decodeDataDashManifest(manifest)
+            val absoluteUrlCount = HTTP_URL_PATTERN.matcher(decoded).countMatches()
+            val segmentTemplateCount = countOccurrences(decoded, "<SegmentTemplate")
+            val segmentListCount = countOccurrences(decoded, "<SegmentList")
+            val segmentBaseCount = countOccurrences(decoded, "<SegmentBase")
+            val baseUrlCount = countOccurrences(decoded, "<BaseURL")
+            val representationCount = countOccurrences(decoded, "<Representation")
+            val adaptationSetCount = countOccurrences(decoded, "<AdaptationSet")
+            val contentProtectionCount = countOccurrences(decoded, "<ContentProtection")
+            val hasInitializationTemplate = decoded.contains("initialization=", ignoreCase = true)
+            val hasMediaTemplate = decoded.contains("media=", ignoreCase = true)
+            val hasStartNumber = decoded.contains("startNumber=", ignoreCase = true)
+            val hasDuration = decoded.contains("duration=", ignoreCase = true)
+            val hasTimeline = decoded.contains("<SegmentTimeline", ignoreCase = true)
+            val hasTidalStorageSentinel = decoded.contains("https://fsu.fa.tidal.com/storage/.m3u8@")
+            val looksSegmentAddressable = baseUrlCount > 0 || absoluteUrlCount > 0 || hasMediaTemplate
+            val cacheFillCandidate = response.isSuccessful && decoded.isNotBlank() && contentProtectionCount == 0 && looksSegmentAddressable
+            event("downloadManifestShape", buildJsonObject {
+                put("sourceSurface", "trackManifests usage=DOWNLOAD uriScheme=DATA")
+                put("status", response.code)
+                put("successful", response.isSuccessful)
+                put("manifestPresent", manifest.isNotBlank())
+                put("manifestHashPresent", manifestHash.isNotBlank())
+                put("manifestContentHash", sha256Short(manifest))
+                put("uriIsData", manifest.startsWith("data:", ignoreCase = true))
+                put("decodedDashPresent", decoded.isNotBlank())
+                put("decodedLength", decoded.length)
+                put("decodedContentHash", sha256Short(decoded))
+                put("mpdPresent", decoded.contains("<MPD"))
+                put("representationCount", representationCount)
+                put("adaptationSetCount", adaptationSetCount)
+                put("baseUrlCount", baseUrlCount)
+                put("segmentTemplateCount", segmentTemplateCount)
+                put("segmentListCount", segmentListCount)
+                put("segmentBaseCount", segmentBaseCount)
+                put("absoluteUrlCount", absoluteUrlCount)
+                put("contentProtectionCount", contentProtectionCount)
+                put("hasInitializationTemplate", hasInitializationTemplate)
+                put("hasMediaTemplate", hasMediaTemplate)
+                put("hasStartNumber", hasStartNumber)
+                put("hasDuration", hasDuration)
+                put("hasSegmentTimeline", hasTimeline)
+                put("hasTidalStorageSentinel", hasTidalStorageSentinel)
+                put("looksSegmentAddressable", looksSegmentAddressable)
+                put("cacheFillCandidateWithoutLicense", cacheFillCandidate)
+                put("urlsLogged", false)
+                put("nextIfCandidate", "debug-only cache-fill using usage=DOWNLOAD DASH manifest and app-private SimpleCache")
+                put("nextIfNotCandidate", "continue searching Downloads/offline license source before playback")
+                put("errorSummary", summarizeErrors(root).toString())
+            })
+        }
+    }.getOrElse {
+        event("downloadManifestShape", buildJsonObject {
+            put("exception", it::class.java.simpleName)
+            put("message", it.message.orEmpty().take(180))
+        })
+    }
+
+    private fun decodeDataDashManifest(manifest: String): String {
+        if (!manifest.startsWith("data:", ignoreCase = true)) return ""
+        val comma = manifest.indexOf(',')
+        if (comma < 0) return ""
+        val meta = manifest.substring(0, comma)
+        val payload = manifest.substring(comma + 1)
+        return if (meta.contains(";base64", ignoreCase = true)) {
+            runCatching { String(Base64.decode(payload, Base64.DEFAULT), Charsets.UTF_8) }.getOrDefault("")
+        } else {
+            java.net.URLDecoder.decode(payload, Charsets.UTF_8.name())
+        }
+    }
+
+    private fun countOccurrences(value: String, needle: String): Int {
+        if (value.isBlank() || needle.isBlank()) return 0
+        var count = 0
+        var index = value.indexOf(needle)
+        while (index >= 0) {
+            count += 1
+            index = value.indexOf(needle, index + needle.length)
+        }
+        return count
+    }
+
+    private fun java.util.regex.Matcher.countMatches(): Int {
+        var count = 0
+        while (find()) count += 1
+        return count
+    }
+
     private fun offlineProviderWiringProbe(trackId: String): JsonObject {
         var cache: SimpleCache? = null
         return runCatching {
@@ -958,5 +1076,6 @@ class OfflineProofService : Service() {
         private const val DEFAULT_TRACK_ID = "5120026"
         private const val DEFAULT_COUNTRY = "US"
         private const val JSON_API_ACCEPT = "application/vnd.api+json"
+        private val HTTP_URL_PATTERN: Pattern = Pattern.compile("https?://[^\\s\"<>]+")
     }
 }

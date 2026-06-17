@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: downloads, offline, drm, tidal
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Inspect the sanctioned DOWNLOAD manifest shape and SDK cache-read expectations to determine whether it can drive a debug-only cache-fill experiment without STREAM/PLAYBACK manifests; if not, continue searching for the offline license/download-link source before attempting playback.
+- Next: Implement a debug-only cache-fill probe using only the sanctioned usage=DOWNLOAD DASH manifest and app-private Media3 cache; record cache bytes/keys without URLs, and do not claim offline playback until a network-disabled replay path succeeds.
 - Acceptance:
   - Determine whether TIDAL API/SDK permits offline storage for this app
   - If viable, define single-track MVP implementation plan
