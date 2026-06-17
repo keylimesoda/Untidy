@@ -316,14 +316,15 @@
     "evidence": [
       "Spec written",
       "DRM/API legality unknown",
-      "Ric corrected blocker: offline/download is not permission-blocked in principle; proceed to sanctioned SDK/API implementation proof while avoiding STREAM manifest caching."
+      "Ric corrected blocker: offline/download is not permission-blocked in principle; proceed to sanctioned SDK/API implementation proof while avoiding STREAM manifest caching.",
+      "2026-06-17 11:00 PT: debug-only OfflineProof runner proved authenticated usage=DOWNLOAD manifest (200) and SDK PlaybackMode.OFFLINE playback-info returns manifest-bearing PlaybackInfo.Track; downloads/{trackId}=500 and offlineTasks=400, so next seam is installation inventory/task/download id orchestration. Artifact: reports/offline-proof-2026-06-17-1100/latest.json."
     ],
     "acceptance": [
       "Determine whether TIDAL API/SDK permits offline storage for this app",
       "If viable, define single-track MVP implementation plan",
       "If not viable, remove/neutralize fake download affordances"
     ],
-    "next": "Ric confirmed TIDAL offline/download is allowed in 1st/3rd-party clients. Prove the official SDK/API call sequence for one-track offline using DOWNLOAD/OFFLINE surfaces; do not cache STREAM manifests.",
+    "next": "Probe installation registration/offline inventory and the missing offlineTasks/download resource-id seam after live DOWNLOAD/OFFLINE proof succeeded.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/11",
     "githubNumber": 11
   },

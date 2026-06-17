@@ -518,3 +518,23 @@ No production code should be changed for this proof. Recommended implementation 
 ## Recommendation
 
 Move #11 from permission-blocked to **sanctioned SDK proof needed**. The next actionable engineering step is a debug-only, one-track proof runner that exercises `usage=DOWNLOAD` / `PlaybackMode.OFFLINE`, installation inventory, and the SDK `OfflinePlayProvider` path. Stop immediately if the only available path is raw caching of current `PLAYBACK`/`STREAM` manifests.
+
+## Debug proof runner result — 2026-06-17 11:00 PT
+
+A debug-only proof runner was added under `app/src/debug/` and executed on the Wear emulator using the existing signed-in Untidy session. The runner is reachable through `com.tidal.wear.debug.OfflineProofActivity`, writes a redacted app-private JSON artifact, and probes only sanctioned offline/download surfaces. It intentionally omits bearer tokens, manifest URIs, download hrefs, licenses, and encryption material from logs/artifacts.
+
+Artifact copied from the emulator for this pass:
+
+- `reports/offline-proof-2026-06-17-1100/latest.json` (gitignored local runtime artifact)
+
+Redacted proof result for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| Auth state | token present, user id present, scopes `r_usr w_sub w_usr` | Existing user session can call authenticated TIDAL endpoints; artifact records only token length and client-id hash. |
+| OpenAPI `GET /v2/trackManifests/{id}` with `usage=DOWNLOAD`, `manifestType=MPEG_DASH`, `uriScheme=DATA`, `formats=HEAACV1` | `200`; `data.type=trackManifests`; manifest URI present; hash present; no DRM data in this response | This is the first live proof that a sanctioned DOWNLOAD manifest path returns real data for the current app/session. It is not a STREAM/PLAYBACK manifest and was not cached as product download data. |
+| SDK `player.streamingApi.getTrackPlaybackInfo(... PlaybackMode.OFFLINE ...)` | returned `PlaybackInfo.Track`; manifest present; streaming session id present; no license URL; `offlineRevalidateAt=-1`; `offlineValidUntil=-1` | The SDK OFFLINE playback-info call compiles and returns manifest-bearing playback info for the current app/session. The returned model is still `PlaybackInfo.Track`, not a complete `PlaybackInfo.Offline.Track`, so offline storage/license orchestration remains unsolved. |
+| OpenAPI `GET /v2/downloads/{trackId}` | `500 INTERNAL_SERVER_ERROR` | Track id is probably not a valid download resource id, or this endpoint requires a different orchestration-created id. Do not guess/crawl download URLs. |
+| OpenAPI `GET /v2/offlineTasks` with/without repeated state/action filters | `400 MISSING_REQUIRED_PARAMETER` | The generated method signature is incomplete for live use or requires another required query parameter not yet discovered from bytecode. Offline task creation/orchestration remains the next proof target. |
+
+Concrete advancement: the sanctioned `usage=DOWNLOAD` and `PlaybackMode.OFFLINE` probes now have live authenticated evidence. The next proof step is **not** product implementation yet; it is to identify the missing offline orchestration seam: installation registration/offline inventory POST/GET and the required `offlineTasks` parameter or download resource id source.

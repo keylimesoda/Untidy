@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: downloads, offline, drm, tidal
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Ric confirmed TIDAL offline/download is allowed in 1st/3rd-party clients. Prove the official SDK/API call sequence for one-track offline using DOWNLOAD/OFFLINE surfaces; do not cache STREAM manifests.
+- Next: Probe installation registration/offline inventory and the missing offlineTasks/download resource-id seam after live DOWNLOAD/OFFLINE proof succeeded.
 - Acceptance:
   - Determine whether TIDAL API/SDK permits offline storage for this app
   - If viable, define single-track MVP implementation plan
