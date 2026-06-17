@@ -461,7 +461,7 @@
     "id": "UNTIDY-016",
     "title": "Dispose ExportedService lint warning with documented security posture",
     "type": "cleanup",
-    "status": "todo",
+    "status": "review",
     "priority": "P2",
     "area": "platform",
     "owner": "Tommy",
@@ -473,7 +473,11 @@
     ],
     "spec": "docs/flow-and-cleanup-audit.md",
     "evidence": [
-      "Chat-history audit found ExportedService lint still present after #6 closure; may be intentional for Media3/Wear discovery but needs disposition."
+      "Chat-history audit found ExportedService lint still present after #6 closure; may be intentional for Media3/Wear discovery but needs disposition.",
+      "TidalMediaService remains exported intentionally for MediaLibraryService/MediaBrowserService discovery.",
+      "Manifest now has narrow tools:ignore=\"ExportedService\" with inline rationale.",
+      "Security posture documented: MediaSession onConnect controller filtering plus app-command-token checks for explicit playback/control start commands.",
+      "Verification passed: :core:playback:testDebugUnitTest :app:processDebugMainManifest :app:compileDebugKotlin and git diff --check."
     ],
     "acceptance": [
       "ExportedService lint warning is fixed or suppressed with explicit rationale.",
@@ -481,7 +485,7 @@
       "Media controls/playback service still function in emulator and preferably real Wear OS validation.",
       "Security posture is documented in code or docs."
     ],
-    "next": "Reconfirm exported=true requirement for Media3/Wear controls; fix or suppress with rationale.",
+    "next": "Review exported media service disposition: service remains exported for Media3/Wear controller discovery with manifest suppression/rationale plus controller filtering and app-command-token safeguards.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/17",
     "githubNumber": 17
   },

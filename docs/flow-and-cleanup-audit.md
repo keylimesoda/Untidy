@@ -172,7 +172,7 @@ Completed without emulator/device validation:
 
 Recommendation / follow-up:
 
-- Keep `TidalMediaService` exported for now because it is a MediaLibraryService/MediaBrowserService endpoint likely needed by system media controllers. Do not blindly set `exported=false` until emulator/device testing confirms notification, Bluetooth/headset, recents, and media controls still work. If exported must remain true, add controller/package validation in `onGetSession(controllerInfo)` and keep the lint suppression/decision documented.
+- `TidalMediaService` remains exported intentionally because it is the MediaLibraryService/MediaBrowserService endpoint used for Media3/Wear media controller discovery. The manifest now carries a narrow `tools:ignore="ExportedService"` rationale, while the service enforces controller filtering in `onConnect()` and app-command-token checks for explicit playback/control start commands.
 - KVM is now enabled and usable. The current emulator unblock is host SELinux policy: a temporary `selinuxuser_execheap` diagnostic allowed `UntidyWearOS51` to boot and the app to install/launch to onboarding/device-auth polling. Do not leave that boolean broadly enabled as a persistent daily-workstation fix. See `docs/emulator-selinux-notes.md`.
 - Next device-test priority: no-login install/launch capture, authenticated TIDAL sign-in, single-track playback/error display, album/playlist play-all, process-kill queue recovery, View Album/View Artist, favorite/like toggles, and exported service/media controls behavior.
 
@@ -184,7 +184,7 @@ bash ./gradlew lintDebug assembleDebug testDebugUnitTest --no-daemon
 git diff --check
 ```
 
-Result: `BUILD SUCCESSFUL`; diff check clean. Data extraction/backup config is now privacy-safe and lint-clean. Remaining app lint is dependency-update warnings plus `ExportedService`, intentionally pending device validation/recommendation.
+Result: `BUILD SUCCESSFUL`; diff check clean. Data extraction/backup config is privacy-safe. Later #17 disposition keeps `TidalMediaService` exported for Media3/Wear discovery with a narrow manifest lint suppression and documented controller/token safeguards; remaining release lint posture is tracked in the release-readiness checklist.
 
 
 ## Feature/spec progress — 2026-06-16

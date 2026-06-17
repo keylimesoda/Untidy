@@ -136,6 +136,22 @@ _Generated from `work-items.json`._
   - Navigation from Now Playing remains stable.
   - Narrow build/lint verification passes.
 
+### UNTIDY-016 — Dispose ExportedService lint warning with documented security posture
+
+- Priority: P2
+- Type: cleanup
+- Area: platform
+- Owner: Tommy
+- Labels: exported-service, security, lint, media-controls
+- Spec: `docs/flow-and-cleanup-audit.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/17
+- Next: Review exported media service disposition: service remains exported for Media3/Wear controller discovery with manifest suppression/rationale plus controller filtering and app-command-token safeguards.
+- Acceptance:
+  - ExportedService lint warning is fixed or suppressed with explicit rationale.
+  - Controller access policy tests still pass.
+  - Media controls/playback service still function in emulator and preferably real Wear OS validation.
+  - Security posture is documented in code or docs.
+
 ### UNTIDY-017 — Normalize offline/download docs to corrected #11 framing
 
 - Priority: P2
@@ -170,21 +186,7 @@ _Generated from `work-items.json`._
 
 ## todo
 
-### UNTIDY-016 — Dispose ExportedService lint warning with documented security posture
-
-- Priority: P2
-- Type: cleanup
-- Area: platform
-- Owner: Tommy
-- Labels: exported-service, security, lint, media-controls
-- Spec: `docs/flow-and-cleanup-audit.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/17
-- Next: Reconfirm exported=true requirement for Media3/Wear controls; fix or suppress with rationale.
-- Acceptance:
-  - ExportedService lint warning is fixed or suppressed with explicit rationale.
-  - Controller access policy tests still pass.
-  - Media controls/playback service still function in emulator and preferably real Wear OS validation.
-  - Security posture is documented in code or docs.
+_None._
 
 ## blocked
 
