@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: offline, downloads, ux, single-track-mvp
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/26
-- Next: Run full end-user validation: UI download, persistent Downloaded state, disable network, and app UI playback through cached route.
+- Next: Run literal tap-through UI validation from Now Playing: tap Download, wait for Downloaded, disable network, and play from app UI. App-authored playback route already uses DOWNLOAD manifest + offline cache for marked downloaded tracks.
 - Acceptance:
   - A user-accessible or explicitly debug-gated UI path can download one track.
   - Downloaded state persists across app/service restart.

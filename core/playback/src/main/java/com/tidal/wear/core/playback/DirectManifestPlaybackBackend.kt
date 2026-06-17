@@ -183,19 +183,32 @@ internal class DirectManifestPlaybackBackend(
         dataSpec.key ?: "untidy-download-proof-$trackId-${sha256Short(dataSpec.uri.toString())}"
     }
 
+    private fun isMarkedDownloaded(trackId: String): Boolean =
+        appContext.getSharedPreferences("offline-downloads", Context.MODE_PRIVATE).getBoolean("downloaded:$trackId", false)
+
     private fun fetchPlaybackManifest(trackId: String): ResolvedManifest {
         val token = kotlinx.coroutines.runBlocking { authRepository.getAccessToken() }
             ?: throw IOException("No TIDAL access token")
         val clientId = kotlinx.coroutines.runBlocking { authRepository.getClientIdForApi() }
+        if (isMarkedDownloaded(trackId)) {
+            runCatching { fetchTrackManifest(trackId, token, clientId, usage = "DOWNLOAD") }
+                .onFailure { Log.w(DIRECT_LOG_TAG, "download manifest failed id=$trackId reason=${it::class.java.simpleName}: ${it.message}") }
+                .getOrNull()
+                ?.let { return it }
+        }
         runCatching { fetchDesktopPlaybackInfo(trackId, token, clientId) }
             .onFailure { Log.w(DIRECT_LOG_TAG, "desktop playbackinfo failed id=$trackId reason=${it::class.java.simpleName}: ${it.message}") }
             .getOrNull()
             ?.let { return it }
 
+        return fetchTrackManifest(trackId, token, clientId, usage = "PLAYBACK")
+    }
+
+    private fun fetchTrackManifest(trackId: String, token: String, clientId: String, usage: String): ResolvedManifest {
         val urlBuilder = "https://openapi.tidal.com/v2/trackManifests/$trackId".toHttpUrl().newBuilder()
             .addQueryParameter("manifestType", "MPEG_DASH")
             .addQueryParameter("uriScheme", "DATA")
-            .addQueryParameter("usage", "PLAYBACK")
+            .addQueryParameter("usage", usage)
             .addQueryParameter("adaptive", "false")
         requestedFormats().forEach { urlBuilder.addQueryParameter("formats", it) }
         val url = urlBuilder.build()
@@ -210,7 +223,7 @@ internal class DirectManifestPlaybackBackend(
             if (!response.isSuccessful) {
                 throw IOException("track manifest ${response.code}: ${body.take(240)}")
             }
-            return body.toTrackManifest(trackId)
+            return body.toTrackManifest(trackId, usage)
         }
     }
 
@@ -274,7 +287,7 @@ private fun ResolvedManifest.mediaItem(trackId: String): MediaItem = MediaItem.B
     .setMimeType(if (kind == ManifestKind.Dash) MimeTypes.APPLICATION_MPD else mimeType.takeIf { it.isNotBlank() })
     .build()
 
-private fun String.toTrackManifest(trackId: String): ResolvedManifest {
+private fun String.toTrackManifest(trackId: String, usage: String = "PLAYBACK"): ResolvedManifest {
     val attributes = JSONObject(this)
         .getJSONObject("data")
         .optJSONObject("attributes")
@@ -286,7 +299,7 @@ private fun String.toTrackManifest(trackId: String): ResolvedManifest {
         trackId = trackId,
         uri = uri,
         kind = ManifestKind.Dash,
-        source = "openapi-trackManifests",
+        source = "openapi-trackManifests-$usage",
         presentation = attributes.optString("trackPresentation", "UNKNOWN"),
         previewReason = attributes.optString("previewReason").takeIf { it.isNotBlank() },
         mimeType = MimeTypes.APPLICATION_MPD,

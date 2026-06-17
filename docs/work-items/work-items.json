@@ -770,7 +770,11 @@
       "Verification passed: :app:compileDebugKotlin and git diff --check.",
       "DirectManifestPlaybackBackend now checks app-private offline-downloads marker and routes downloaded DASH tracks through app-private SimpleCache.",
       "Playback backend uses the same canonical cache-key derivation as the passing #25 proof.",
-      "Verification passed: :core:playback:compileDebugKotlin :app:compileDebugKotlin and git diff --check."
+      "Verification passed: :core:playback:compileDebugKotlin :app:compileDebugKotlin and git diff --check.",
+      "DirectManifestPlaybackBackend now requests usage=DOWNLOAD manifest first for marked downloaded tracks.",
+      "Downloaded DASH playback uses app-private SimpleCache plus canonical cache-key factory.",
+      "Runtime artifact reports app-authored playback route uses openapi-trackManifests-DOWNLOAD and offline cache: reports/offline-ux-2026-06-17-1422-download-manifest-route/.",
+      "Verification passed: :core:playback:compileDebugKotlin :app:compileDebugKotlin, assembleDebug, git diff --check."
     ],
     "acceptance": [
       "A user-accessible or explicitly debug-gated UI path can download one track.",
@@ -779,7 +783,7 @@
       "Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.",
       "Narrow Gradle gate passes."
     ],
-    "next": "Run full end-user validation: UI download, persistent Downloaded state, disable network, and app UI playback through cached route.",
+    "next": "Run literal tap-through UI validation from Now Playing: tap Download, wait for Downloaded, disable network, and play from app UI. App-authored playback route already uses DOWNLOAD manifest + offline cache for marked downloaded tracks.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/26",
     "githubNumber": 26,
     "phase": "implement"

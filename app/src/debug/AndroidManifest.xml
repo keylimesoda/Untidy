@@ -8,5 +8,10 @@
             android:name=".debug.OfflineProofActivity"
             android:exported="true"
             android:theme="@style/Theme.TidalWear" />
+
+        <activity
+            android:name=".debug.OfflinePlaybackValidationActivity"
+            android:exported="true"
+            android:theme="@style/Theme.TidalWear" />
     </application>
 </manifest>
