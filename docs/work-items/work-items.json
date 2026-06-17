@@ -948,7 +948,7 @@
     "id": "UNTIDY-031",
     "title": "Add album/playlist collection download UX",
     "type": "feature",
-    "status": "todo",
+    "status": "review",
     "priority": "P2",
     "area": "offline",
     "owner": "Tommy",
@@ -959,9 +959,16 @@
       "collections"
     ],
     "spec": "docs/ux/offline-download-lifecycle-ux-2026-06-17.md",
-    "evidence": [],
+    "evidence": [
+      "Album detail now shows a compact collection download chip below Play Album with Download/Downloaded/Partial count states.",
+      "Playlist detail now shows the same Wear-friendly collection download chip below Play all without cluttering track rows.",
+      "Collection state is derived from local downloaded-track markers and distinguishes full, partial, empty, and unavailable states.",
+      "Tapping collection download chip does not mutate TIDAL or silently delete anything; it advertises next-phase collection download while preserving single-track MVP scope.",
+      ":app:compileDebugKotlin --no-daemon passed; git diff --check passed.",
+      "Runtime evidence captured under reports/collection-download-ux-2026-06-17-1621/: playlist route shows collection chip with Downloaded 1/1 and All playable tracks on watch after scrolling."
+    ],
     "acceptance": [],
-    "next": "Add collection-level album/playlist download states after single-track lifecycle stabilizes.",
+    "next": "Review collection-level album/playlist download affordances. Runtime evidence: reports/collection-download-ux-2026-06-17-1621/.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/32",
     "githubNumber": 32
   }

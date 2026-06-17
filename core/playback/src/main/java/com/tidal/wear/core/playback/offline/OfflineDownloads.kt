@@ -13,6 +13,18 @@ data class DownloadedTrackSummary(
     fun toTrack(): TidalTrack = TidalTrack(id = id, title = title, artist = artist, album = "Downloaded")
 }
 
+data class CollectionDownloadSummary(
+    val playableCount: Int,
+    val downloadedCount: Int,
+)
+
+fun Context.collectionDownloadSummary(tracks: List<TidalTrack>): CollectionDownloadSummary {
+    val playableIds = tracks.mapNotNull { it.id.takeIf(String::isNotBlank) }.distinct()
+    if (playableIds.isEmpty()) return CollectionDownloadSummary(playableCount = 0, downloadedCount = 0)
+    val downloadedCount = playableIds.count { isOfflineTrackDownloaded(it) }
+    return CollectionDownloadSummary(playableCount = playableIds.size, downloadedCount = downloadedCount)
+}
+
 fun Context.readOfflineDownloadedTracks(): List<DownloadedTrackSummary> {
     val prefs = getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
     return prefs.all.keys

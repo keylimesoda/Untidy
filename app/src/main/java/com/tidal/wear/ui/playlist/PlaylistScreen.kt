@@ -1,6 +1,7 @@
 package com.tidal.wear.ui.playlist
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.playback.offline.collectionDownloadSummary
 import com.tidal.wear.ui.art.rememberArtworkPalette
 import com.tidal.wear.ui.components.PlaylistArtwork
 import com.tidal.wear.ui.components.RetryStatusChip
@@ -103,6 +105,8 @@ fun PlaylistScreen(
     val trackArtworkUrls = remember(tracks) {
         tracks.mapNotNull { it.artworkUrl?.takeIf(String::isNotBlank) }
     }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val collectionDownloadSummary = remember(tracks) { context.collectionDownloadSummary(tracks) }
     val art = rememberArtworkPalette(playlistArtworkUrl ?: trackArtworkUrls.firstOrNull(), Size(160, 160))
     val accent = art.palette.accentColor()
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -133,6 +137,20 @@ fun PlaylistScreen(
                     PlayAllChip(
                         accent = accent,
                         onClick = { onPlayQueue(tracks, 0) },
+                    )
+                }
+                item {
+                    CollectionDownloadChip(
+                        label = collectionDownloadSummary.actionLabel("Download playlist"),
+                        secondary = collectionDownloadSummary.detailLabel("Playlist"),
+                        accent = accent,
+                        onClick = {
+                            Toast.makeText(
+                                context,
+                                collectionDownloadSummary.toastLabel("Playlist download"),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        },
                     )
                 }
             }
@@ -218,6 +236,75 @@ private fun PlayAllChip(
     ) {
         Text("Play all", color = TidalColors.White, fontWeight = FontWeight.Black, fontSize = 14.sp, maxLines = 1)
     }
+}
+
+@Composable
+private fun CollectionDownloadChip(
+    label: String,
+    secondary: String,
+    accent: Color,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 20.dp, vertical = 3.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(TidalColors.SurfaceHigh)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .semantics { contentDescription = "$label. $secondary" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "↓",
+            color = accent,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+            fontSize = 18.sp,
+            modifier = Modifier.width(24.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                color = TidalColors.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = secondary,
+                color = TidalColors.OnSurfaceMuted,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.actionLabel(defaultLabel: String): String = when {
+    playableCount <= 0 -> "Offline unavailable"
+    downloadedCount <= 0 -> defaultLabel
+    downloadedCount >= playableCount -> "Downloaded $downloadedCount/$playableCount"
+    else -> "Partial $downloadedCount/$playableCount"
+}
+
+private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.detailLabel(kind: String): String = when {
+    playableCount <= 0 -> "$kind has no playable tracks"
+    downloadedCount <= 0 -> "Tracks save one at a time for now"
+    downloadedCount >= playableCount -> "All playable tracks on watch"
+    else -> "Local-valid subset plays offline"
+}
+
+private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.toastLabel(defaultPrefix: String): String = when {
+    playableCount <= 0 -> "Offline unavailable"
+    downloadedCount <= 0 -> "$defaultPrefix is coming after track MVP"
+    downloadedCount >= playableCount -> "Downloaded tracks play offline"
+    else -> "Partial download plays offline subset"
 }
 
 @Composable
