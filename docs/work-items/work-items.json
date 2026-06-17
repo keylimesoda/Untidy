@@ -713,7 +713,7 @@
     "id": "UNTIDY-024",
     "title": "Align offline cache keys for network-disabled replay",
     "type": "feature",
-    "status": "in-progress",
+    "status": "review",
     "priority": "P1",
     "area": "offline",
     "owner": "Tommy",
@@ -726,7 +726,11 @@
     ],
     "spec": "docs/offline-sdk-proof-plan-2026-06-17.md",
     "evidence": [
-      "Created from #11 spike conclusion after network-disabled replay narrowed remaining work to cache-key/storage alignment."
+      "Created from #11 spike conclusion after network-disabled replay narrowed remaining work to cache-key/storage alignment.",
+      "2026-06-17 13:58 PT: canonical cache-key factory wired into both DashDownloader cache fill and DashMediaSource replay in debug proof harness.",
+      "Runtime artifact reports network-disabled replay success: offlineUpstreamAttempted=false, reachedReady=true, reachedPlaying=true, playbackState=READY, playbackClaimed=true.",
+      "Artifact: reports/offline-proof-2026-06-17-1358-cache-miss-key-probe/latest.json.",
+      "No PLAYBACK/STREAM manifest use and no URL/token/license/key logging in artifact."
     ],
     "acceptance": [
       "Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.",
@@ -734,7 +738,7 @@
       "Single-track MVP implementation plan is updated with exact storage/cache/provider contract.",
       "If production code is touched, narrow Gradle gate and runtime emulator proof pass."
     ],
-    "next": "Direct continuation from #11: align DashDownloader/DashMediaSource/TIDAL OfflineCacheProvider cache keys and Storage.path, then rerun network-disabled replay proof.",
+    "next": "Review canonical cache-key replay proof; next implementation step is controlled UI/debug flow that persists downloaded-track record and routes playback through proven cache/provider path.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/25",
     "githubNumber": 25
   }

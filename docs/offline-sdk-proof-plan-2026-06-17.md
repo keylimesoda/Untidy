@@ -968,3 +968,29 @@ Latest proof artifact:
 Release implication:
 
 - Offline/download is no longer a vague capability spike. The remaining work is a concrete implementation task: align cache-key/storage expectations between `DashDownloader`, `DashMediaSource` / `DefaultDashChunkSource`, TIDAL `OfflineStorageProvider`, TIDAL `OfflineCacheProvider`, and `PlaybackInfo.Offline.Track.Storage.path` until network-disabled replay reaches READY/playing from app-private cache.
+
+## Canonical cache-key network-disabled replay proof — 2026-06-17 13:58 PT
+
+The next #25 implementation proof step aligned Media3 download and replay cache-key derivation with a shared canonical `CacheKeyFactory` in the debug proof harness.
+
+Code change:
+
+- `app/src/debug/java/com/tidal/wear/debug/OfflineProofService.kt`
+  - Added `canonicalProofCacheKeyFactory(trackId)`.
+  - Wired the same cache key factory into both `DashDownloader` cache fill and `DashMediaSource` / `DefaultDashChunkSource` replay.
+  - Replaced the disabled replay upstream with an instrumented redacted data source that records hashed replay miss keys before throwing. This preserves the no-URL/no-token/no-license artifact discipline.
+
+Runtime artifact:
+
+- `reports/offline-proof-2026-06-17-1358-cache-miss-key-probe/latest.json` (gitignored local runtime artifact)
+
+Redacted live result for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| `downloadManifestCacheFill` | cache fill succeeded from `usage=DOWNLOAD`; canonical cache-key factory enabled | The sanctioned DOWNLOAD bytes continue to populate app-private Media3 cache. |
+| `downloadManifestNetworkDisabledReplay` | `canonicalCacheKeyFactory=true`; `offlineUpstreamAttempted=false`; `reachedReady=true`; `reachedPlaying=true`; `playbackState=READY`; `durationMs=200100`; `errorClass=""`; `playbackClaimed=true` | Network-disabled replay succeeded from app-private cache without chunk network fallback. |
+
+Concrete advancement: the #25 cache-key/storage seam is proven in the debug harness. The app can now download/cache a proof track from the sanctioned `usage=DOWNLOAD` DASH manifest and play it back with network chunk upstream disabled, without using `PLAYBACK` / `STREAM` manifests and without logging URLs/tokens/licenses/keys.
+
+Remaining work before ordinary end-user validation: wire this proven cache/provider path behind a controlled UI/debug feature flow for a selected track, persist the downloaded-track record outside the proof service, and expose a safe playback resolver path. The core offline replay proof is now green.

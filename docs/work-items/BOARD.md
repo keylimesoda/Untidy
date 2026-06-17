@@ -4,22 +4,6 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
-### UNTIDY-024 — Align offline cache keys for network-disabled replay
-
-- Priority: P1
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: offline, downloads, cache, media3, tidal
-- Spec: `docs/offline-sdk-proof-plan-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/25
-- Next: Direct continuation from #11: align DashDownloader/DashMediaSource/TIDAL OfflineCacheProvider cache keys and Storage.path, then rerun network-disabled replay proof.
-- Acceptance:
-  - Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.
-  - Artifact shows no STREAM/PLAYBACK manifest use and no URL/token/license leakage.
-  - Single-track MVP implementation plan is updated with exact storage/cache/provider contract.
-  - If production code is touched, narrow Gradle gate and runtime emulator proof pass.
-
 ### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
 
 - Priority: P2
@@ -120,6 +104,22 @@ _Generated from `work-items.json`._
   - If confirmation-based, confirmation/cancel text is clear on a watch.
   - No delete path is introduced.
   - Relevant compile/test gate passes.
+
+### UNTIDY-024 — Align offline cache keys for network-disabled replay
+
+- Priority: P1
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, cache, media3, tidal
+- Spec: `docs/offline-sdk-proof-plan-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/25
+- Next: Review canonical cache-key replay proof; next implementation step is controlled UI/debug flow that persists downloaded-track record and routes playback through proven cache/provider path.
+- Acceptance:
+  - Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.
+  - Artifact shows no STREAM/PLAYBACK manifest use and no URL/token/license leakage.
+  - Single-track MVP implementation plan is updated with exact storage/cache/provider contract.
+  - If production code is touched, narrow Gradle gate and runtime emulator proof pass.
 
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 

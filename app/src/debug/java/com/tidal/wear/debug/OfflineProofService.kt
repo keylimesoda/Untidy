@@ -12,9 +12,14 @@ import android.util.Base64
 import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import android.net.Uri
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.CacheKeyFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.dash.DefaultDashChunkSource
 import androidx.media3.exoplayer.dash.DashMediaSource
@@ -740,9 +745,11 @@ class OfflineProofService : Service() {
                         .setUserAgent("UntidyOfflineProof/${BuildConfig.VERSION_NAME}")
                         .setDefaultRequestProperties(requestHeaders),
                 )
+                val canonicalCacheKeyFactory = canonicalProofCacheKeyFactory(trackId)
                 val onlineCacheDataSourceFactory = CacheDataSource.Factory()
                     .setCache(requireNotNull(cache))
                     .setUpstreamDataSourceFactory(onlineUpstreamFactory)
+                    .setCacheKeyFactory(canonicalCacheKeyFactory)
                 val cacheKey = "untidy-download-proof-$trackId-${sha256Short(manifest)}"
                 val mediaItem = MediaItem.Builder()
                     .setMediaId("untidy-download-proof-$trackId")
@@ -771,11 +778,22 @@ class OfflineProofService : Service() {
                 }
 
                 var offlineUpstreamAttempted = false
+                val replayMisses = mutableListOf<String>()
                 val offlineChunkCacheDataSourceFactory = CacheDataSource.Factory()
                     .setCache(requireNotNull(cache))
+                    .setCacheKeyFactory(canonicalCacheKeyFactory)
                     .setUpstreamDataSourceFactory {
-                        offlineUpstreamAttempted = true
-                        throw java.io.IOException("offline proof network upstream disabled for chunks")
+                        object : DataSource {
+                            override fun addTransferListener(transferListener: TransferListener) = Unit
+                            override fun open(dataSpec: DataSpec): Long {
+                                offlineUpstreamAttempted = true
+                                replayMisses += sha256Short(canonicalCacheKeyFactory.buildCacheKey(dataSpec))
+                                throw java.io.IOException("offline proof network upstream disabled for chunks")
+                            }
+                            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = -1
+                            override fun getUri(): Uri? = null
+                            override fun close() = Unit
+                        }
                     }
                     .setFlags(CacheDataSource.FLAG_BLOCK_ON_CACHE or CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
                 val offlineManifestDataSourceFactory = DefaultDataSource.Factory(applicationContext)
@@ -853,6 +871,10 @@ class OfflineProofService : Service() {
                     put("cacheBytesAdded", (bytesAfterFill - bytesBeforeFill).coerceAtLeast(0L))
                     put("cacheKeysBeforeFill", keysBeforeFill)
                     put("cacheKeysAfterFill", keysAfterFill)
+                    put("cacheKeyHashSample", cache?.keys?.take(8)?.joinToString(",") { sha256Short(it) }.orEmpty())
+                    put("canonicalCacheKeyFactory", true)
+                    put("replayMissKeyHashes", replayMisses.distinct().take(12).joinToString(","))
+                    put("replayMissKeysInCache", replayMisses.distinct().count { miss -> cache?.keys?.any { sha256Short(it) == miss } == true })
                     put("downloadProgressBytes", progressBytesDownloaded)
                     put("downloadProgressPercent", progressPercent.toDouble())
                     put("attemptedReplay", true)
@@ -888,6 +910,11 @@ class OfflineProofService : Service() {
             runCatching { Handler(Looper.getMainLooper()).post { player?.release() } }
             runCatching { cache?.release() }
         }
+    }
+
+    private fun canonicalProofCacheKeyFactory(trackId: String): CacheKeyFactory = CacheKeyFactory { dataSpec: DataSpec ->
+        dataSpec.key
+            ?: "untidy-download-proof-$trackId-${sha256Short(dataSpec.uri.toString())}"
     }
 
     private fun playbackStateName(state: Int): String = when (state) {
@@ -959,6 +986,7 @@ class OfflineProofService : Service() {
                 val cacheDataSourceFactory = CacheDataSource.Factory()
                     .setCache(requireNotNull(cache))
                     .setUpstreamDataSourceFactory(upstreamFactory)
+                    .setCacheKeyFactory(canonicalProofCacheKeyFactory(trackId))
                 val mediaItem = MediaItem.Builder()
                     .setMediaId("untidy-download-proof-$trackId")
                     .setUri(manifest)
@@ -995,6 +1023,7 @@ class OfflineProofService : Service() {
                     put("cacheKeysBefore", beforeKeys)
                     put("cacheKeysAfter", keys.size)
                     put("cacheKeyHashes", keys.joinToString(",") { sha256Short(it) })
+                    put("canonicalCacheKeyFactory", true)
                     put("progressContentLength", progressContentLength)
                     put("progressBytesDownloaded", progressBytesDownloaded)
                     put("progressPercent", progressPercent.toDouble())
