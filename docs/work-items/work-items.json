@@ -824,5 +824,120 @@
     "next": "Ric to review offline/download lifecycle UX report; after approval split implementation issues for Downloads screen, removal, collection downloads, offline fallback, and settings/storage.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/27",
     "githubNumber": 27
+  },
+  {
+    "id": "UNTIDY-027",
+    "title": "Implement Home \u2192 Downloads shelf",
+    "type": "feature",
+    "status": "review",
+    "priority": "P0",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "downloads",
+      "offline",
+      "ux",
+      "shelf"
+    ],
+    "spec": "docs/ux/offline-download-lifecycle-ux-2026-06-17.md",
+    "evidence": [
+      "Downloads route/screen added and Home Downloads chip enabled.",
+      "Runtime route evidence: reports/downloads-shelf-2026-06-17-1533/downloads-route.xml contains Downloads, Tracks, 1 downloaded, Why, Pearl Jam.",
+      "Verification passed: :app:compileDebugKotlin, assembleDebug, git diff --check."
+    ],
+    "acceptance": [
+      "Home Downloads row opens Downloads screen.",
+      "Downloads screen shows empty state or downloaded tracks.",
+      "A downloaded track row can start playback.",
+      "UI uses Wear list/safe-area patterns.",
+      "Compile and emulator smoke pass."
+    ],
+    "next": "Review Downloads shelf implementation. Home Downloads route opens Downloads screen; downloaded tracks list and can start playback. Runtime evidence: reports/downloads-shelf-2026-06-17-1533/.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/28",
+    "githubNumber": 28
+  },
+  {
+    "id": "UNTIDY-028",
+    "title": "Implement local remove-download UX",
+    "type": "feature",
+    "status": "todo",
+    "priority": "P1",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "downloads",
+      "remove",
+      "storage",
+      "ux"
+    ],
+    "spec": "docs/ux/offline-download-lifecycle-ux-2026-06-17.md",
+    "evidence": [],
+    "acceptance": [],
+    "next": "Implement single-track Remove download with local-only confirmation and cache/metadata cleanup.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/29",
+    "githubNumber": 29
+  },
+  {
+    "id": "UNTIDY-029",
+    "title": "Implement offline fallback behavior",
+    "type": "feature",
+    "status": "todo",
+    "priority": "P1",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "offline",
+      "fallback",
+      "network",
+      "ux"
+    ],
+    "spec": "docs/ux/offline-download-lifecycle-ux-2026-06-17.md",
+    "evidence": [],
+    "acceptance": [],
+    "next": "Implement network-unavailable fallback: Downloads reachable, live screens explain connection need, non-downloaded playback says Not downloaded.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/30",
+    "githubNumber": 30
+  },
+  {
+    "id": "UNTIDY-030",
+    "title": "Enable minimal Settings Downloads controls",
+    "type": "cleanup",
+    "status": "todo",
+    "priority": "P2",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "settings",
+      "downloads",
+      "storage",
+      "ux"
+    ],
+    "spec": "docs/ux/offline-download-lifecycle-ux-2026-06-17.md",
+    "evidence": [],
+    "acceptance": [],
+    "next": "Enable coherent Downloads settings/storage summary and update sign-out copy for local downloads.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/31",
+    "githubNumber": 31
+  },
+  {
+    "id": "UNTIDY-031",
+    "title": "Add album/playlist collection download UX",
+    "type": "feature",
+    "status": "todo",
+    "priority": "P2",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "album",
+      "playlist",
+      "downloads",
+      "collections"
+    ],
+    "spec": "docs/ux/offline-download-lifecycle-ux-2026-06-17.md",
+    "evidence": [],
+    "acceptance": [],
+    "next": "Add collection-level album/playlist download states after single-track lifecycle stabilizes.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/32",
+    "githubNumber": 32
   }
 ]

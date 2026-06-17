@@ -55,6 +55,23 @@ _Generated from `work-items.json`._
   - Report explicitly recommends removal/management units.
   - Follow-up implementation issues are created only after review.
 
+### UNTIDY-027 — Implement Home → Downloads shelf
+
+- Priority: P0
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: downloads, offline, ux, shelf
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/28
+- Next: Review Downloads shelf implementation. Home Downloads route opens Downloads screen; downloaded tracks list and can start playback. Runtime evidence: reports/downloads-shelf-2026-06-17-1533/.
+- Acceptance:
+  - Home Downloads row opens Downloads screen.
+  - Downloads screen shows empty state or downloaded tracks.
+  - A downloaded track row can start playback.
+  - UI uses Wear list/safe-area patterns.
+  - Compile and emulator smoke pass.
+
 ### UNTIDY-014 — Release readiness / ship checklist
 
 - Priority: P1
@@ -203,7 +220,49 @@ _Generated from `work-items.json`._
 
 ## todo
 
-_None._
+### UNTIDY-028 — Implement local remove-download UX
+
+- Priority: P1
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: downloads, remove, storage, ux
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/29
+- Next: Implement single-track Remove download with local-only confirmation and cache/metadata cleanup.
+
+### UNTIDY-029 — Implement offline fallback behavior
+
+- Priority: P1
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, fallback, network, ux
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/30
+- Next: Implement network-unavailable fallback: Downloads reachable, live screens explain connection need, non-downloaded playback says Not downloaded.
+
+### UNTIDY-030 — Enable minimal Settings Downloads controls
+
+- Priority: P2
+- Type: cleanup
+- Area: offline
+- Owner: Tommy
+- Labels: settings, downloads, storage, ux
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/31
+- Next: Enable coherent Downloads settings/storage summary and update sign-out copy for local downloads.
+
+### UNTIDY-031 — Add album/playlist collection download UX
+
+- Priority: P2
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: album, playlist, downloads, collections
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/32
+- Next: Add collection-level album/playlist download states after single-track lifecycle stabilizes.
 
 ## blocked
 

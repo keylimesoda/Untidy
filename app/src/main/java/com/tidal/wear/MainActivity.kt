@@ -82,6 +82,7 @@ import com.tidal.wear.ui.artist.ArtistScreen
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.discover.DiscoverScreen
+import com.tidal.wear.ui.downloads.DownloadsScreen
 import com.tidal.wear.ui.library.LibraryScreen
 import com.tidal.wear.ui.onboarding.OnboardingScreen
 import com.tidal.wear.ui.playlist.PlaylistScreen
@@ -135,6 +136,7 @@ private object Routes {
     const val Home = "home"
     const val Discover = "discover"
     const val Search = "search"
+    const val Downloads = "downloads"
     const val Album = "album/{albumId}"
     const val Playlist = "playlist/{playlistId}"
     const val Artist = "artist/{artistId}"
@@ -256,7 +258,13 @@ private fun TidalWearApp(
                                 openPlayer()
                             } ?: navController.navigate(Routes.Search)
                         },
-                        onOffline = { Toast.makeText(context, "Downloads coming soon", Toast.LENGTH_SHORT).show() },
+                        onOffline = { navController.navigate(Routes.Downloads) },
+                    )
+                }
+                composable(Routes.Downloads) {
+                    DownloadsScreen(
+                        context = appContext,
+                        onPlayTrack = ::playTrack,
                     )
                 }
                 composable(Routes.Discover) {
@@ -396,9 +404,8 @@ private fun HomeScreen(
                 )
                 HomeListChip(
                     label = "Downloads",
-                    secondaryLabel = "Proof in progress",
+                    secondaryLabel = "Saved on watch",
                     icon = Icons.Filled.Download,
-                    enabled = false,
                     onClick = onOffline,
                 )
                 HomeListChip(
