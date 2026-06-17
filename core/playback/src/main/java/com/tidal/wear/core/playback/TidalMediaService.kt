@@ -306,8 +306,7 @@ class TidalMediaService : MediaLibraryService() {
         val track = currentTrack
         val elapsedMs = (SystemClock.elapsedRealtime() - currentTrackStartedAtMs).coerceAtLeast(0L)
         val durationMs = track?.durationMs ?: 0L
-        val endedEarly = durationMs > 60_000L && elapsedMs < durationMs - 45_000L
-        if (endedEarly) {
+        if (shouldHoldQueueAdvanceOnEarlyMediaEnd(elapsedMs = elapsedMs, durationMs = durationMs)) {
             Log.w(
                 PLAYER_LOG_TAG,
                 "backend ended before catalog duration id=${track?.id.orEmpty()} elapsedMs=$elapsedMs durationMs=$durationMs; not advancing queue automatically",

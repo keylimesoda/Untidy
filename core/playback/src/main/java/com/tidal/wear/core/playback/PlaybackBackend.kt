@@ -43,6 +43,17 @@ internal sealed interface PlaybackBackendEvent {
     data class Other(val name: String) : PlaybackBackendEvent
 }
 
+internal fun shouldHoldQueueAdvanceOnEarlyMediaEnd(
+    elapsedMs: Long,
+    durationMs: Long,
+    minimumCatalogDurationMs: Long = 60_000L,
+    earlyEndToleranceMs: Long = 45_000L,
+): Boolean {
+    if (durationMs <= minimumCatalogDurationMs) return false
+    val safeElapsedMs = elapsedMs.coerceAtLeast(0L)
+    return safeElapsedMs < durationMs - earlyEndToleranceMs
+}
+
 internal interface PlaybackBackend {
     val events: Flow<PlaybackBackendEvent>
     val positionMs: Long

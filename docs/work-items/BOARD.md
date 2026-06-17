@@ -35,22 +35,6 @@ _Generated from `work-items.json`._
   - Natural transition to next track is smooth enough for watch use
   - Playback error UI appears for manifest/network failures
 
-### UNTIDY-010 — Implement Add to Playlist workflow
-
-- Priority: P2
-- Type: feature
-- Area: api
-- Owner: Tommy
-- Labels: playlist, feature, tidal-api, write
-- Spec: `docs/spec-add-to-playlist.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/10
-- Next: Start after UNTIDY-008 proves TIDAL write endpoint pattern.
-- Acceptance:
-  - Add current track to existing playlist
-  - Create new playlist and add track
-  - Success/error/loading states on watch UI
-  - Live API write validation passes
-
 ## review
 
 ### UNTIDY-001 — Stabilize Wear emulator workflow under Fedora SELinux
@@ -198,6 +182,22 @@ _Generated from `work-items.json`._
 _None._
 
 ## blocked
+
+### UNTIDY-010 — Implement Add to Playlist workflow
+
+- Priority: P2
+- Type: feature
+- Area: api
+- Owner: Tommy
+- Labels: playlist, feature, tidal-api, write
+- Spec: `docs/spec-add-to-playlist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/10
+- Next: Implementation for existing-playlist add is in PR #14, but final acceptance is blocked pending Ric approval for a live TIDAL write to a disposable playlist plus proof of the create-playlist endpoint/body before enabling New playlist.
+- Acceptance:
+  - Add current track to existing playlist
+  - Create new playlist and add track
+  - Success/error/loading states on watch UI
+  - Live API write validation passes
 
 ### UNTIDY-011 — Downloads/offline playback capability spike
 

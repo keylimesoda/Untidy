@@ -260,7 +260,7 @@
     "id": "UNTIDY-010",
     "title": "Implement Add to Playlist workflow",
     "type": "feature",
-    "status": "in-progress",
+    "status": "blocked",
     "priority": "P2",
     "area": "api",
     "owner": "Tommy",
@@ -281,7 +281,7 @@
       "Success/error/loading states on watch UI",
       "Live API write validation passes"
     ],
-    "next": "Start after UNTIDY-008 proves TIDAL write endpoint pattern.",
+    "next": "Implementation for existing-playlist add is in PR #14, but final acceptance is blocked pending Ric approval for a live TIDAL write to a disposable playlist plus proof of the create-playlist endpoint/body before enabling New playlist.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/10",
     "githubNumber": 10
   },
