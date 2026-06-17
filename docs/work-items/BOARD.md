@@ -8,21 +8,7 @@ _None._
 
 ## review
 
-### UNTIDY-010 — Implement Add to Playlist workflow
-
-- Priority: P2
-- Type: feature
-- Area: api
-- Owner: Tommy
-- Labels: playlist, feature, tidal-api, write
-- Spec: `docs/spec-add-to-playlist.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/10
-- Next: Review live-write implementation and decide whether to polish naming/text entry beyond default faux playlist name; live contract is proven and no-delete boundary preserved.
-- Acceptance:
-  - Add current track to existing playlist
-  - Create new playlist and add track
-  - Success/error/loading states on watch UI
-  - Live API write validation passes
+_None._
 
 ## todo
 
@@ -202,6 +188,22 @@ _None._
   - Queue screen shows current track and upcoming tracks
   - Empty queue state is safe
   - Compile/lint passes
+
+### UNTIDY-010 — Implement Add to Playlist workflow
+
+- Priority: P2
+- Type: feature
+- Area: api
+- Owner: Tommy
+- Labels: playlist, feature, tidal-api, write
+- Spec: `docs/spec-add-to-playlist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/10
+- Next: Closed after live TIDAL API validation and implementation: faux playlist creation/add worked within Ric's no-delete boundary, duplicate writes are prechecked, UI exposes New test playlist, and full Gradle gate passed.
+- Acceptance:
+  - Add current track to existing playlist
+  - Create new playlist and add track
+  - Success/error/loading states on watch UI
+  - Live API write validation passes
 
 ### UNTIDY-012 — Migrate remaining Wear Compose lazy/icon deprecations
 
