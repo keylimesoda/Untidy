@@ -250,6 +250,7 @@ interface TidalLegacyApiService {
         @Query("countryCode") countryCode: String,
         @Query("token") token: String,
         @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
 
@@ -341,6 +342,7 @@ interface TidalDesktopApiService {
         @Url url: String,
         @Query("countryCode") countryCode: String,
         @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
         @Header("accept") accept: String = "application/json",
     ): JsonElement
 
@@ -882,11 +884,27 @@ class TidalApiClient(
     private suspend fun legacyAlbumTracks(id: String): List<TidalTrack> {
         Log.d(API_LOG_TAG, "album tracks v1 fallback")
         val clientId = authRepository.getClientIdForApi()
-        return runCatching { parseLegacyTracks(legacyService.albumTracks(id, countryCode, token = clientId)) }
-            .recoverCatching {
-                Log.d(API_LOG_TAG, "album tracks v1 failed reason=${it.safeReason()}, trying desktop")
-                parseLegacyTracks(desktopService.albumTracks("https://listen.tidal.com/v1/albums/$id/tracks", countryCode))
+        return runCatching {
+            pagedLegacyAlbumTracks { offset, pageSize ->
+                legacyService.albumTracks(
+                    id = id,
+                    countryCode = countryCode,
+                    token = clientId,
+                    limit = pageSize,
+                    offset = offset,
+                )
             }
+        }.recoverCatching {
+            Log.d(API_LOG_TAG, "album tracks v1 failed reason=${it.safeReason()}, trying desktop")
+            pagedLegacyAlbumTracks { offset, pageSize ->
+                desktopService.albumTracks(
+                    url = "https://listen.tidal.com/v1/albums/$id/tracks",
+                    countryCode = countryCode,
+                    limit = pageSize,
+                    offset = offset,
+                )
+            }
+        }
             .onFailure { Log.d(API_LOG_TAG, "album tracks desktop failed reason=${it.safeReason()}") }
             .getOrThrow()
             .also { Log.d(API_LOG_TAG, "album tracks ok count=${it.size}") }
@@ -977,15 +995,38 @@ class TidalApiClient(
         return albums.distinctBy { it.id }.take(limit)
     }
 
+    private suspend fun pagedLegacyAlbumTracks(
+        load: suspend (offset: Int, pageSize: Int) -> JsonElement,
+    ): List<TidalTrack> = pagedLegacyObjects(
+        limit = LEGACY_ALBUM_TRACK_MAX_TRACKS,
+        pageSize = LEGACY_ALBUM_TRACK_PAGE_SIZE,
+        maxPages = LEGACY_ALBUM_TRACK_MAX_PAGES,
+        load = load,
+    ).mapNotNull { it.legacyTrackObject().toLegacyTrack() }
+        .distinctBy { it.id }
+
     private suspend fun pagedLegacyArtistAlbums(
         limit: Int,
         load: suspend (offset: Int, pageSize: Int) -> JsonElement,
     ): List<JsonObject> {
+        return pagedLegacyObjects(
+            limit = limit,
+            pageSize = minOf(ARTIST_ALBUM_PAGE_SIZE, limit.coerceAtLeast(1)),
+            maxPages = ARTIST_ALBUM_MAX_PAGES,
+            load = load,
+        )
+    }
+
+    private suspend fun pagedLegacyObjects(
+        limit: Int,
+        pageSize: Int,
+        maxPages: Int,
+        load: suspend (offset: Int, pageSize: Int) -> JsonElement,
+    ): List<JsonObject> {
         val items = mutableListOf<JsonObject>()
-        val pageSize = minOf(ARTIST_ALBUM_PAGE_SIZE, limit.coerceAtLeast(1))
         var offset = 0
         var pageCount = 0
-        while (items.size < limit && pageCount < ARTIST_ALBUM_MAX_PAGES) {
+        while (items.size < limit && pageCount < maxPages) {
             val page = parseLegacyObjects(load(offset, pageSize))
             if (page.isEmpty()) break
             items += page
@@ -1011,16 +1052,18 @@ class TidalApiClient(
 
     private fun parseLegacyFavoriteObjects(element: JsonElement): List<JsonObject> = parseLegacyObjects(element)
 
-    private fun parseLegacyObjects(element: JsonElement): List<JsonObject> {
-        val root = element as? JsonObject
-        return when {
-            root == null -> (element as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
-            root["items"] is JsonArray -> (root["items"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
-            else -> emptyList()
-        }
-    }
+    private fun parseLegacyObjects(element: JsonElement): List<JsonObject> = legacyObjects(element)
 }
 
+
+internal fun legacyObjects(element: JsonElement): List<JsonObject> {
+    val root = element as? JsonObject
+    return when {
+        root == null -> (element as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+        root["items"] is JsonArray -> (root["items"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+        else -> emptyList()
+    }
+}
 
 internal fun normalizeTrackId(trackId: String): String? = trackId
     .substringAfterLast(':')
@@ -1489,6 +1532,9 @@ private fun Throwable.safeReason(): String = when (this) {
 private const val JSON_API_ACCEPT = "application/vnd.api+json"
 private const val API_LOG_TAG = "Untidy/API"
 private const val ALBUM_TRACK_PAGE_SIZE = 50
+private const val LEGACY_ALBUM_TRACK_PAGE_SIZE = 50
+private const val LEGACY_ALBUM_TRACK_MAX_PAGES = 4
+private const val LEGACY_ALBUM_TRACK_MAX_TRACKS = 100
 private const val ARTIST_ALBUM_PREVIEW_LIMIT = 12
 private const val ARTIST_ALBUM_PAGE_SIZE = 25
 private const val ARTIST_ALBUM_MAX_PAGES = 8
