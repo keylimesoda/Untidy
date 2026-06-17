@@ -54,6 +54,12 @@ internal fun shouldHoldQueueAdvanceOnEarlyMediaEnd(
     return safeElapsedMs < durationMs - earlyEndToleranceMs
 }
 
+internal fun playbackErrorUiMessage(code: String, message: String?): String = buildString {
+    append("Playback failed")
+    message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it.take(120)) }
+        ?: code.takeIf { it.isNotBlank() }?.let { append(" (").append(it).append(")") }
+}
+
 internal interface PlaybackBackend {
     val events: Flow<PlaybackBackendEvent>
     val positionMs: Long

@@ -29,7 +29,7 @@ _Generated from `work-items.json`._
 - Labels: prefetch, seamless, media3
 - Spec: `docs/test-plan-thinkpad-emulator.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/4
-- Next: Runtime-only gaps remain when ADB/emulator is available: natural end-of-track transition observation and forced manifest/network failure UI validation. Non-emulator early-end transition guard now tested.
+- Next: Runtime-only gaps remain when ADB/emulator is available: natural end-of-track transition observation and forced manifest/network failure UI validation. Non-emulator early-end transition guard and playback-error message formatting are now tested.
 - Acceptance:
   - Starting a track does not pause/stall unexpectedly
   - Natural transition to next track is smooth enough for watch use

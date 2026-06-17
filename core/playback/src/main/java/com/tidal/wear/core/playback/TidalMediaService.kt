@@ -89,7 +89,12 @@ class TidalMediaService : MediaLibraryService() {
                         is PlaybackBackendEvent.QualityChanged -> logPlaybackContext("quality", event.context)
                         is PlaybackBackendEvent.Error -> {
                             Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.code}", event.throwable)
-                            player.setPlaybackError(event.uiMessage())
+                            player.setPlaybackError(
+                                playbackErrorUiMessage(
+                                    code = event.code,
+                                    message = event.throwable?.message,
+                                ),
+                            )
                         }
                         is PlaybackBackendEvent.Other -> if (event.name.contains("Error", ignoreCase = true)) {
                             Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.name}")
@@ -328,12 +333,6 @@ class TidalMediaService : MediaLibraryService() {
             PLAYER_LOG_TAG,
             "backend context $label productId=${context.productId} presentation=${context.assetPresentation} previewReason=${context.previewReason.orEmpty()} durationSec=${context.durationSeconds} quality=${context.audioQuality.orEmpty()} codec=${context.audioCodec.orEmpty()}",
         )
-    }
-
-    private fun PlaybackBackendEvent.Error.uiMessage(): String = buildString {
-        append("Playback failed")
-        throwable?.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it.take(120)) }
-            ?: code.takeIf { it.isNotBlank() }?.let { append(" (").append(it).append(")") }
     }
 
     private suspend fun configureQuality() {

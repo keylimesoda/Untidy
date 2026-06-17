@@ -107,14 +107,15 @@
       "Manifest prefetch implemented",
       "loadTrack now suspendable",
       "Transition guard prevents automatic queue advance when backend reports media end far earlier than catalog duration",
-      "PlaybackTransitionPolicyTest covers early-end hold, near-end advance, short-track advance, and negative elapsed handling"
+      "PlaybackTransitionPolicyTest covers early-end hold, near-end advance, short-track advance, and negative elapsed handling",
+      "Playback error UI message formatter covered for backend message, blank-message code fallback, and 120-char round-display cap"
     ],
     "acceptance": [
       "Starting a track does not pause/stall unexpectedly",
       "Natural transition to next track is smooth enough for watch use",
       "Playback error UI appears for manifest/network failures"
     ],
-    "next": "Runtime-only gaps remain when ADB/emulator is available: natural end-of-track transition observation and forced manifest/network failure UI validation. Non-emulator early-end transition guard now tested.",
+    "next": "Runtime-only gaps remain when ADB/emulator is available: natural end-of-track transition observation and forced manifest/network failure UI validation. Non-emulator early-end transition guard and playback-error message formatting are now tested.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/4",
     "githubNumber": 4
   },
