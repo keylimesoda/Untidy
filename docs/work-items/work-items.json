@@ -662,7 +662,7 @@
     "id": "UNTIDY-023",
     "title": "Add watch-friendly retry/error recovery",
     "type": "cleanup",
-    "status": "todo",
+    "status": "review",
     "priority": "P2",
     "area": "ui",
     "owner": "Tommy",
@@ -674,7 +674,10 @@
     ],
     "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
     "evidence": [
-      "UX review found album/playlist/artist errors are passive text and missing metadata actions use toast-only feedback."
+      "UX review found album/playlist/artist errors are passive text and missing metadata actions use toast-only feedback.",
+      "Album, playlist, artist, and artist-albums detail errors now render RetryStatusChip with one-tap retry.",
+      "Now Playing action sheet now shows inline error feedback for missing track/album/artist metadata instead of toast-only feedback.",
+      "Verification passed: :app:compileDebugKotlin and git diff --check."
     ],
     "acceptance": [
       "Detail screen network/API errors have one-tap retry.",
@@ -682,7 +685,7 @@
       "Empty states remain clear and non-alarming.",
       "Relevant compile/lint gate passes."
     ],
-    "next": "Add retry chips to detail errors and inline action-sheet feedback for missing metadata IDs.",
+    "next": "Review retry/error recovery implementation: detail screens now use tap-to-retry chips and action sheet shows inline metadata errors instead of toast-only feedback.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/24",
     "githubNumber": 24
   }

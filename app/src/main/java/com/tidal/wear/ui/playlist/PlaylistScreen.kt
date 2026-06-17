@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,6 +41,7 @@ import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.art.rememberArtworkPalette
 import com.tidal.wear.ui.components.PlaylistArtwork
+import com.tidal.wear.ui.components.RetryStatusChip
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
@@ -58,8 +60,9 @@ fun PlaylistScreen(
     var tracks by remember(playlistId) { mutableStateOf(emptyList<TidalTrack>()) }
     var loading by remember(playlistId) { mutableStateOf(true) }
     var error by remember(playlistId) { mutableStateOf<String?>(null) }
+    var retryTick by remember(playlistId) { mutableIntStateOf(0) }
 
-    LaunchedEffect(playlistId) {
+    LaunchedEffect(playlistId, retryTick) {
         loading = true
         error = null
         try {
@@ -135,7 +138,7 @@ fun PlaylistScreen(
             }
             when {
                 loading -> item { StatusText("Loading playlist…") }
-                error != null -> item { StatusText(error.orEmpty()) }
+                error != null -> item { RetryStatusChip(title = error.orEmpty(), onClick = { retryTick += 1 }) }
                 tracks.isEmpty() -> item { StatusText("No tracks found") }
                 else -> tracks.forEachIndexed { index, track ->
                     item {

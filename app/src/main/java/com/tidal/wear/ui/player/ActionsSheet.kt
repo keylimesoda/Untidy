@@ -57,13 +57,17 @@ fun ActionsSheet(
     onDownload: () -> Unit,
     onQueue: () -> Unit,
     onOutputSettings: () -> Unit,
-    onAddToPlaylist: () -> Unit,
-    onViewAlbum: () -> Unit,
-    onViewArtist: () -> Unit,
+    onAddToPlaylist: () -> String?,
+    onViewAlbum: () -> String?,
+    onViewArtist: () -> String?,
     modifier: Modifier = Modifier,
 ) {
     var outputExpanded by remember { mutableStateOf(false) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
     val preferredOutput = outputOptions.firstOrNull { it.preferred } ?: outputOptions.firstOrNull()
+    fun runAction(action: () -> String?) {
+        actionMessage = action()
+    }
     Column(
         modifier = modifier.fillMaxSize().background(TidalColors.Black),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -126,9 +130,12 @@ fun ActionsSheet(
                     }
                 }
             }
-            item { ActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist", null, TidalColors.White, onClick = onAddToPlaylist) }
-            item { ActionRow(Icons.Filled.Album, "View album", null, TidalColors.White, onClick = onViewAlbum) }
-            item { ActionRow(Icons.Filled.Person, "View artist", null, TidalColors.White, onClick = onViewArtist) }
+            item { ActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist", null, TidalColors.White, onClick = { runAction(onAddToPlaylist) }) }
+            item { ActionRow(Icons.Filled.Album, "View album", null, TidalColors.White, onClick = { runAction(onViewAlbum) }) }
+            item { ActionRow(Icons.Filled.Person, "View artist", null, TidalColors.White, onClick = { runAction(onViewArtist) }) }
+            if (actionMessage != null) {
+                item { ActionStatusLine(actionMessage.orEmpty()) }
+            }
         }
     }
 }
@@ -137,6 +144,19 @@ data class AudioOutputOption(
     val label: String,
     val preferred: Boolean,
 )
+
+@Composable
+private fun ActionStatusLine(text: String) {
+    Text(
+        text = text,
+        color = Color(0xFFFF8A80),
+        fontSize = 11.sp,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth(0.86f).padding(vertical = 6.dp),
+    )
+}
 
 private fun downloadLabel(state: DownloadState): String = when (state) {
     DownloadState.Unavailable -> "Offline unavailable"

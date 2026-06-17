@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,6 +41,7 @@ import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.art.rememberArtworkPalette
+import com.tidal.wear.ui.components.RetryStatusChip
 import com.tidal.wear.ui.components.TidalResultChip
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
@@ -66,8 +68,9 @@ fun ArtistScreen(
     var albumGroups by remember(artistId) { mutableStateOf<TidalArtistAlbums?>(null) }
     var loading by remember(artistId) { mutableStateOf(true) }
     var error by remember(artistId) { mutableStateOf<String?>(null) }
+    var retryTick by remember(artistId) { mutableIntStateOf(0) }
 
-    LaunchedEffect(artistId, releaseVersionPreference) {
+    LaunchedEffect(artistId, releaseVersionPreference, retryTick) {
         loading = true
         error = null
         try {
@@ -125,7 +128,7 @@ fun ArtistScreen(
             }
             when {
                 loading -> item { StatusText("Loading artist…") }
-                error != null -> item { StatusText(error.orEmpty()) }
+                error != null -> item { RetryStatusChip(title = error.orEmpty(), onClick = { retryTick += 1 }) }
                 safeTracks.isEmpty() && safeAlbumGroups.all.isEmpty() -> item { StatusText("No artist content found") }
                 else -> {
                     section("Top Tracks", safeTracks.take(12)) { track ->
@@ -172,8 +175,9 @@ fun ArtistAlbumsScreen(
     var albumGroups by remember(artistId) { mutableStateOf<TidalArtistAlbums?>(null) }
     var loading by remember(artistId) { mutableStateOf(true) }
     var error by remember(artistId) { mutableStateOf<String?>(null) }
+    var retryTick by remember(artistId) { mutableIntStateOf(0) }
 
-    LaunchedEffect(artistId, releaseVersionPreference) {
+    LaunchedEffect(artistId, releaseVersionPreference, retryTick) {
         loading = true
         error = null
         try {
@@ -228,7 +232,7 @@ fun ArtistAlbumsScreen(
             item { SectionHeader("Albums") }
             when {
                 loading -> item { StatusText("Loading albums…") }
-                error != null -> item { StatusText(error.orEmpty()) }
+                error != null -> item { RetryStatusChip(title = error.orEmpty(), onClick = { retryTick += 1 }) }
                 safeAlbumGroups.all.isEmpty() -> item { StatusText("No albums found") }
                 else -> {
                     albumSection("Albums", safeAlbumGroups.albums, title, onOpenAlbum)

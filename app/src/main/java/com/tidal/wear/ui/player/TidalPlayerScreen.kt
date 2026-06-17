@@ -422,27 +422,30 @@ private fun TidalPlayerNonAmbient(
                     onAddToPlaylist = {
                         val track = state.track
                         when {
-                            track == null -> Toast.makeText(context, "Nothing playing", Toast.LENGTH_SHORT).show()
-                            track.id.isBlank() || track.id == "tidal-current" || track.id.startsWith("fixture", ignoreCase = true) -> {
-                                Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
+                            track == null -> "Nothing playing"
+                            track.id.isBlank() || track.id == "tidal-current" || track.id.startsWith("fixture", ignoreCase = true) -> "Track unavailable"
+                            else -> {
+                                addToPlaylistTrack = track
+                                null
                             }
-                            else -> addToPlaylistTrack = track
                         }
                     },
                     onViewAlbum = {
                         val albumId = state.track?.albumId.orEmpty()
                         if (albumId.isBlank()) {
-                            Toast.makeText(context, "Album unavailable", Toast.LENGTH_SHORT).show()
+                            "Album unavailable"
                         } else {
                             onOpenAlbum(albumId)
+                            null
                         }
                     },
                     onViewArtist = {
                         val artistId = state.track?.artistId.orEmpty()
                         if (artistId.isBlank()) {
-                            Toast.makeText(context, "Artist unavailable", Toast.LENGTH_SHORT).show()
+                            "Artist unavailable"
                         } else {
                             onOpenArtist(artistId)
+                            null
                         }
                     },
                 )
