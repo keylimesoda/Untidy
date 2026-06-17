@@ -209,3 +209,132 @@ sudo setsebool selinuxuser_execheap off
 ```
 
 Never use persistent `setsebool -P selinuxuser_execheap on` without an explicit security decision.
+
+## Delivery phases
+
+Statuses answer **where is the issue on the board?** Phases answer **what kind of work is currently being done?**
+
+Use phase labels when useful:
+
+- `phase:spec`
+- `phase:review`
+- `phase:test-plan`
+- `phase:implement`
+- `phase:test`
+- `phase:validate`
+- `phase:blocked`
+
+Recommended lifecycle:
+
+```text
+spec → review → test-plan → implement → test → validate → done
+```
+
+### 1. `phase:spec`
+
+Define the work before coding.
+
+Required output:
+
+- problem statement
+- user flow / technical scope
+- non-goals
+- acceptance criteria
+- risks / open questions
+- linked artifact if substantial, e.g. `docs/spec-*.md`
+
+Use for:
+
+- new features
+- non-trivial platform decisions
+- ambiguous bugs
+
+Skip only for tiny obvious fixes.
+
+### 2. `phase:review`
+
+Review the spec or proposed approach before implementation.
+
+Required output:
+
+- feasibility check against current code
+- API/UX/security concerns
+- implementation recommendation
+- whether emulator/live-account validation is required
+
+For risky external writes, this phase must explicitly call out what is reversible and what needs Ric approval.
+
+### 3. `phase:test-plan`
+
+Define how success will be proven.
+
+Required output:
+
+- compile/lint/unit gates
+- emulator/manual test steps
+- logcat/artifact capture commands if needed
+- pass/fail criteria
+- known blockers
+
+Use especially for playback, auth, media service, and API-write work.
+
+### 4. `phase:implement`
+
+Make the code/doc change.
+
+Rules:
+
+- keep scope tied to one issue or an explicitly batched PR
+- add pure tests where possible
+- do not perform live external writes unless approved
+- update issue with files changed and assumptions
+
+### 5. `phase:test`
+
+Run the planned checks.
+
+Minimum evidence:
+
+```bash
+source scripts/env-android.sh
+bash ./gradlew <relevant tasks> --no-daemon
+git diff --check
+```
+
+For user-facing/runtime work, include emulator artifacts under `reports/` and summarize them in the issue. Do not commit raw `reports/` artifacts.
+
+### 6. `phase:validate`
+
+Confirm the work actually satisfies acceptance criteria.
+
+Validation is stricter than testing:
+
+- compare results to acceptance criteria
+- verify GitHub issue status/labels are right
+- verify PR includes the change
+- verify docs/specs are updated if behavior changed
+- identify remaining risk explicitly
+
+Move to `status:review` only after validation evidence is posted.
+
+### 7. `done`
+
+Close only when:
+
+- PR is merged, or no-code closure is explicitly accepted
+- final evidence is linked in the issue
+- local mirror is updated
+
+## Status/phase mapping
+
+Suggested combinations:
+
+| Status | Typical phase |
+|---|---|
+| `status:todo` | `phase:spec` or none |
+| `status:in-progress` | `phase:spec`, `phase:test-plan`, `phase:implement`, or `phase:test` |
+| `status:review` | `phase:validate` |
+| `status:blocked` | `phase:blocked` |
+| `status:done` | no active phase |
+
+Every issue does **not** need every phase label forever. Use phase labels to make active work legible, then remove/advance them as the work moves.
