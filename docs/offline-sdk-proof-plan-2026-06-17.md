@@ -629,3 +629,34 @@ Redacted runtime results for track `5120026` / country `US`:
 Concrete advancement: #11 now has a compile/runtime proof that Untidy can wire the official SDK `OfflinePlayProvider`/`OfflineCacheProvider`/`Encryption` path with app-private Media3 cache. The remaining unknown is not "can the app supply the offline provider?"; it is where TIDAL exposes the sanctioned download resource id/offline license/offline task sequence for this app session.
 
 Next concrete proof step: inspect generated model relationships for offline task/download/user-offline-mix ids and/or decompile SDK network metadata for hidden required query/header fields; only if a real server-side id or license source is found should the runner attempt a one-track cache fill and offline playback replay.
+
+
+## Offline mix cursor/id self-unblock probe — 2026-06-17 12:02 PT
+
+After the provider/cache wiring proof, the next self-unblock target was the remaining server-side id source. I inspected generated model relationships and API metadata for `UserOfflineMixes`, `Downloads`, `OfflineTasks`, and `Installations`, then added a debug-only probe for the most plausible cursor/locale alternates.
+
+Additional SDK metadata from this pass:
+
+- `UserOfflineMixesResourceObject` has only an `items` relationship; its `attributes` type is generated as `Object`, so the local artifact does not expose a hidden offline-mix id field.
+- `UserOfflineMixes.userOfflineMixesIdGet(id, countryCode, locale, include)` defaults locale to `en-US`; the earlier runtime probe used `en_US`, so the runner now probes the hyphen-locale shape too.
+- `userOfflineMixes/{id}/relationships/items` uses `page[cursor]`, `locale`, and `include`; it does not accept `countryCode`.
+- `DownloadsResourceObject` has `id`, `attributes.downloadLinks`, and `owners` relationship only. `DownloadLinkMeta` exposes required header names, but no alternate id source.
+- `OfflineTasksRelationships` exposes `collection`, `item`, and `owners`; task listing can filter by `filter[id]` and `filter[installation.id]`, but there is still no create endpoint in the generated artifact.
+- `InstallationsOfflineInventoryResourceIdentifierMeta` only exposes `addedAt`; it does not expose a task/download id.
+
+Artifact copied from the emulator for this pass:
+
+- `reports/offline-proof-2026-06-17-1202-offline-mix-cursors/latest.json` (gitignored local runtime artifact)
+
+Redacted live results for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| `GET /v2/userOfflineMixes/{userId}?locale=en-US&include=items` | `404 NOT_FOUND` | The locale correction did not make user id a valid offline-mix id. |
+| `GET /v2/userOfflineMixes/{userId}/relationships/items?page[cursor]=0&locale=en_US&include=items` | `400 INVALID_CURSOR` | Cursor `0` remains invalid for this endpoint/id pair. |
+| `GET /v2/userOfflineMixes/{userId}/relationships/items?locale=en-US&include=items` | `500 INTERNAL_SERVER_ERROR` | Omitting cursor does not produce a first page for user id as mix id. |
+| `GET /v2/userOfflineMixes/{userId}/relationships/items?locale=en-US` | `500 INTERNAL_SERVER_ERROR` | Omitting both cursor and include still does not reveal item ids. |
+| `GET /v2/downloads?filter[id]={trackId}&include=owners` | `500 INTERNAL_SERVER_ERROR` | Track id is still not accepted as a download id/filter id for this app/session. |
+| `GET /v2/offlineTasks?include=item,collection,owners` and `page[cursor]=0` | `400 MISSING_REQUIRED_PARAMETER` | Task listing still needs a real installation/task/download seam not present in generated metadata. |
+
+Self-unblock outcome: generated metadata plus live cursor/locale alternates did not reveal a valid offline mix, download, task, or installation id. This is a useful negative proof: the next run should stop guessing `UserOfflineMixes` by user id and instead inspect non-`tidalapi` SDK artifacts for first-party orchestration around `Downloads`, `OfflineTasks`, or `OfflineDrmHelper`, or search network constants in player/offline modules for the missing server-side source.

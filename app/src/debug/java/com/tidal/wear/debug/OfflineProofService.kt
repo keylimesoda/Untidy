@@ -389,12 +389,36 @@ class OfflineProofService : Service() {
                 summarizeUserOfflineMix(root)
             }
 
+            val offlineMixUrlHyphenLocale = "https://openapi.tidal.com/v2/userOfflineMixes/$userId".toHttpUrl().newBuilder()
+                .addQueryParameter("countryCode", countryCode)
+                .addQueryParameter("locale", "en-US")
+                .addQueryParameter("include", "items")
+                .build()
+            results += getJsonProbe("userOfflineMixByUserIdHyphenLocale", offlineMixUrlHyphenLocale.toString(), token, clientId) { root ->
+                summarizeUserOfflineMix(root)
+            }
+
             val offlineMixItemsUrl = "https://openapi.tidal.com/v2/userOfflineMixes/$userId/relationships/items".toHttpUrl().newBuilder()
                 .addQueryParameter("page[cursor]", "0")
                 .addQueryParameter("locale", "en_US")
                 .addQueryParameter("include", "items")
                 .build()
             results += getJsonProbe("userOfflineMixItemsByUserId", offlineMixItemsUrl.toString(), token, clientId) { root ->
+                summarizeRelationshipItems(root)
+            }
+
+            val offlineMixItemsNoCursorUrl = "https://openapi.tidal.com/v2/userOfflineMixes/$userId/relationships/items".toHttpUrl().newBuilder()
+                .addQueryParameter("locale", "en-US")
+                .addQueryParameter("include", "items")
+                .build()
+            results += getJsonProbe("userOfflineMixItemsByUserIdNoCursor", offlineMixItemsNoCursorUrl.toString(), token, clientId) { root ->
+                summarizeRelationshipItems(root)
+            }
+
+            val offlineMixItemsNoIncludeUrl = "https://openapi.tidal.com/v2/userOfflineMixes/$userId/relationships/items".toHttpUrl().newBuilder()
+                .addQueryParameter("locale", "en-US")
+                .build()
+            results += getJsonProbe("userOfflineMixItemsByUserIdNoCursorNoInclude", offlineMixItemsNoIncludeUrl.toString(), token, clientId) { root ->
                 summarizeRelationshipItems(root)
             }
         }
