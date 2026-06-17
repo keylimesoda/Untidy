@@ -3,6 +3,7 @@ package com.tidal.wear.core.api
 import android.util.Log
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.tidal.wear.core.auth.TidalAuthRepository
+import com.tidal.wear.core.model.AddTrackToPlaylistOutcome
 import com.tidal.wear.core.model.ReleaseVersionPreference
 import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalAlbumReleaseType
@@ -165,6 +166,14 @@ interface TidalApiService {
         @Query("include") include: String = "items",
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
+
+    @POST("playlists/{id}/relationships/items")
+    suspend fun addPlaylistTrackItem(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Body body: JsonObject,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): Response<Unit>
 
     @GET("albums/{id}")
     suspend fun album(
@@ -438,6 +447,37 @@ class TidalApiClient(
             },
         )
     suspend fun playlist(id: String): TidalPlaylist? = service.playlist(id, countryCode).dataObjects().firstOrNull()?.toPlaylist()
+
+    suspend fun editablePlaylists(): List<TidalPlaylist> = favorites().playlists
+        .filter { it.id.isNotBlank() && it.title.isNotBlank() }
+        .distinctBy { it.id }
+
+    suspend fun addTrackToPlaylist(playlistId: String, trackId: String): AddTrackToPlaylistOutcome {
+        val normalizedPlaylistId = playlistId.trim().takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("Playlist id is required")
+        val normalizedTrackId = normalizeTrackId(trackId)
+            ?: throw IllegalArgumentException("Track id is unavailable")
+        return try {
+            val response = service.addPlaylistTrackItem(
+                normalizedPlaylistId,
+                countryCode,
+                playlistTrackRelationshipBody(normalizedTrackId),
+            )
+            when {
+                response.isSuccessful -> AddTrackToPlaylistOutcome.Added
+                response.code() == 409 -> AddTrackToPlaylistOutcome.AlreadyPresent
+                else -> throw HttpException(response)
+            }.also { outcome ->
+                Log.d(API_LOG_TAG, "playlist add track write ok outcome=$outcome")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.d(API_LOG_TAG, "playlist add track write failed reason=${t.safeReason()}")
+            throw t
+        }
+    }
+
     suspend fun playlistTracks(id: String): List<TidalTrack> {
         val root = try {
             service.playlistItems(id, countryCode, include = "items,items.albums,items.artists")
@@ -991,7 +1031,9 @@ internal fun normalizeTrackId(trackId: String): String? = trackId
     .trim()
     .takeIf { it.isNotBlank() && it != "tidal-current" && !it.startsWith("fixture", ignoreCase = true) }
 
-internal fun userCollectionTrackRelationshipBody(trackId: String): JsonObject = buildJsonObject {
+internal fun userCollectionTrackRelationshipBody(trackId: String): JsonObject = playlistTrackRelationshipBody(trackId)
+
+internal fun playlistTrackRelationshipBody(trackId: String): JsonObject = buildJsonObject {
     put(
         "data",
         buildJsonArray {

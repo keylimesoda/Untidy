@@ -1,10 +1,20 @@
 # Feature Spec: Downloads / Offline Playback
 
-**Status:** Draft spec only — do not implement from this file without resolving the TIDAL/DRM unknowns.  
-**Feature:** #2, Downloads / offline playback  
-**Target app:** Untidy Wear OS standalone TIDAL client  
-**Audience:** PM, UX, Android playback/storage implementers, reviewers  
-**Last updated:** 2026-06-16
+**Status:** Draft spec + Phase 0 spike completed; do not implement product downloads until the sanctioned TIDAL offline path is proven.
+**Feature:** #2, Downloads / offline playback
+**Target app:** Untidy Wear OS standalone TIDAL client
+**Audience:** PM, UX, Android playback/storage implementers, reviewers
+**Last updated:** 2026-06-17
+
+## 0. Phase 0 spike result — 2026-06-17
+
+Detailed spike artifact: [`docs/spike-downloads-offline-playback-2026-06-17.md`](spike-downloads-offline-playback-2026-06-17.md).
+
+Recommendation: **do not implement user-visible downloads by caching the current streaming manifest URLs.** The app's current direct-manifest path requests TIDAL streaming playback (`usage=PLAYBACK` / `playbackmode=STREAM`) and has no sanctioned offline entitlement/license/storage semantics.
+
+Promising but unproven lead: local TIDAL SDK artifacts expose offline/download surfaces including `PlaybackMode.OFFLINE`, `TrackManifests$UsageTrackManifestsIdGet.DOWNLOAD`, `OfflinePlayProvider`, `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, `OfflineDrmHelper`, `PlaybackInfo.Offline.Track`, `Downloads`, and `OfflineTasks`. Treat these as a follow-up SDK proof target, not as permission to cache streaming URLs.
+
+UI truthfulness update from the spike: the Now Playing action sheet no longer cycles fake download states. Until the SDK/legal path is proven, it renders a disabled **Offline unavailable** row and Settings explains that offline playback needs sanctioned TIDAL support.
 
 ## 1. PM problem statement
 

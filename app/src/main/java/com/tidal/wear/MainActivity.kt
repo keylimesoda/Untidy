@@ -26,7 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -444,7 +444,7 @@ private fun HomePrimaryAction(
 
     when {
         !signedIn -> {
-            icon = Icons.Filled.Login
+            icon = Icons.AutoMirrored.Filled.Login
             label = "Sign in to TIDAL"
             secondaryLabel = "Connect your account"
             onClick = onSignedOutClick

@@ -24,7 +24,7 @@
       "Keep selinuxuser_execheap off by default when emulator is not running",
       "Record repeatable emulator boot command"
     ],
-    "next": "Use scripts/run-wear-emulator.sh for future emulator sessions; investigate safer VM/scoped-policy option later.",
+    "next": "Keep open until current emulator session exits and selinuxuser_execheap is verified off; wrapper/docs/boot command exist, but default-off posture still needs final recorded check.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/1",
     "githubNumber": 1
   },
@@ -53,7 +53,7 @@
       "Album Play all queues and plays multiple tracks",
       "No AndroidRuntime crash in filtered logcat"
     ],
-    "next": "Complete TIDAL device-code auth, then run search/playback checks.",
+    "next": "Needs explicit Search returns results evidence before closure; auth, Home/Library, single-track/album/playlist playback, and no-crash evidence are present in issue comments/PR #14.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/2",
     "githubNumber": 2
   },
@@ -82,7 +82,7 @@
       "100-track watch cap behavior is acceptable/no silent app crash",
       "Track transitions continue beyond first 1-2 songs"
     ],
-    "next": "Run after authenticated playback works.",
+    "next": "Needs multi-page >50-track album or 100-track cap validation plus observed transitions beyond first 1-2 songs; album size 31 and playlist size 20 play-all passed.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/3",
     "githubNumber": 3
   },
@@ -109,7 +109,7 @@
       "Natural transition to next track is smooth enough for watch use",
       "Playback error UI appears for manifest/network failures"
     ],
-    "next": "Run after single-track playback works.",
+    "next": "Needs natural end-of-track transition observation and forced manifest/network failure UI validation; start playback and prefetch evidence are present.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/4",
     "githubNumber": 4
   },
@@ -139,7 +139,7 @@
       "No AndroidRuntime DataStore exception in logcat during launch/service probes",
       "Full Gradle gate passes"
     ],
-    "next": "Run full lint/build/test after current emulator validation batch.",
+    "next": "Ready to close after PR #14 lands; runtime service/UI coexistence, no DataStore AndroidRuntime crash, full Gradle gate, and diff check all passed.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/5",
     "githubNumber": 5
   },
@@ -167,7 +167,7 @@
       "Test whether exported=false breaks Wear/system media controls",
       "If exported remains true, add controller/package validation or document accepted risk"
     ],
-    "next": "Run after authenticated media controls are available.",
+    "next": "Needs exported=false media-control experiment or explicit exported=true risk decision with controller/package validation/documented risk; defensive probes passed but decision is still open.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/6",
     "githubNumber": 6
   },
@@ -195,7 +195,7 @@
       "View Artist opens correct artist screen",
       "Missing IDs show fallback toast, not crash"
     ],
-    "next": "Run during authenticated playback test.",
+    "next": "Ready to close after PR #14 lands if static fallback-toast verification is accepted; View Album and View Artist passed live runtime validation.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/7",
     "githubNumber": 7
   },
@@ -224,7 +224,7 @@
       "Unfavorite write persists to TIDAL",
       "Failure rolls back optimistic UI with toast/error"
     ],
-    "next": "Run after single-track playback produces a real TIDAL track ID.",
+    "next": "Ready to close after PR #14 lands; live favorite and unfavorite writes passed and were restored, with full Gradle gate passed.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/8",
     "githubNumber": 8
   },
@@ -235,7 +235,7 @@
     "status": "review",
     "priority": "P1",
     "area": "ui",
-    "owner": "unassigned",
+    "owner": "Tommy",
     "labels": [
       "queue",
       "feature",
@@ -252,7 +252,7 @@
       "Empty queue state is safe",
       "Compile/lint passes"
     ],
-    "next": "Implement after core authenticated playback smoke is green.",
+    "next": "Ready to close after PR #14 lands if static empty/single-track queue-state verification is accepted; Queue action/sheet/jump-to-index passed runtime validation and Gradle gate passed.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/9",
     "githubNumber": 9
   },
@@ -260,10 +260,10 @@
     "id": "UNTIDY-010",
     "title": "Implement Add to Playlist workflow",
     "type": "feature",
-    "status": "todo",
+    "status": "review",
     "priority": "P2",
     "area": "api",
-    "owner": "unassigned",
+    "owner": "Tommy",
     "labels": [
       "playlist",
       "feature",
@@ -289,10 +289,10 @@
     "id": "UNTIDY-011",
     "title": "Downloads/offline playback capability spike",
     "type": "spike",
-    "status": "todo",
+    "status": "blocked",
     "priority": "P2",
     "area": "offline",
-    "owner": "unassigned",
+    "owner": "Tommy",
     "labels": [
       "downloads",
       "offline",
@@ -309,7 +309,7 @@
       "If viable, define single-track MVP implementation plan",
       "If not viable, remove/neutralize fake download affordances"
     ],
-    "next": "Run after playback baseline is stable.",
+    "next": "Blocked pending sanctioned TIDAL offline/download path validation; fake download UI has been neutralized.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/11",
     "githubNumber": 11
   },
@@ -317,10 +317,10 @@
     "id": "UNTIDY-012",
     "title": "Migrate remaining Wear Compose lazy/icon deprecations",
     "type": "cleanup",
-    "status": "todo",
+    "status": "review",
     "priority": "P3",
     "area": "cleanup",
-    "owner": "unassigned",
+    "owner": "Tommy",
     "labels": [
       "wear-compose",
       "warnings",
@@ -365,7 +365,7 @@
       "Authenticated state persists",
       "Emulator regression passes"
     ],
-    "next": "Diagnose MainActivity route/back-stack/auth-state interaction.",
+    "next": "Ready to close after PR #14 lands; parent emulator regression verified Back from album route returns to authenticated Home, not onboarding.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/13",
     "githubNumber": 13
   }

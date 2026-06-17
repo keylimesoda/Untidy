@@ -52,6 +52,11 @@ data class TidalPlaylist(
     val artworkUrl: String? = null,
 )
 
+enum class AddTrackToPlaylistOutcome {
+    Added,
+    AlreadyPresent,
+}
+
 data class TidalSearchResult(
     val tracks: List<TidalTrack> = emptyList(),
     val albums: List<TidalAlbum> = emptyList(),

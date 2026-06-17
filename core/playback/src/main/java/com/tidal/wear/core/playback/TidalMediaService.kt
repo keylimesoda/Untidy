@@ -101,13 +101,37 @@ class TidalMediaService : MediaLibraryService() {
         session = MediaLibrarySession.Builder(
             this,
             sessionPlayer!!,
-            object : MediaLibrarySession.Callback {},
+            object : MediaLibrarySession.Callback {
+                override fun onConnect(
+                    session: MediaSession,
+                    controllerInfo: MediaSession.ControllerInfo,
+                ): MediaSession.ConnectionResult {
+                    if (!isAllowedController(session, controllerInfo)) {
+                        Log.w(
+                            PLAYER_LOG_TAG,
+                            "rejecting media controller package=${controllerInfo.packageName} uid=${controllerInfo.uid} trusted=${controllerInfo.isTrusted}",
+                        )
+                        return MediaSession.ConnectionResult.reject()
+                    }
+                    return super.onConnect(session, controllerInfo)
+                }
+            },
         )
             .setSessionActivity(playerActivityPendingIntent())
             .build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
+
+    private fun isAllowedController(
+        session: MediaSession,
+        controllerInfo: MediaSession.ControllerInfo,
+    ): Boolean = MediaControllerAccessPolicy.isAllowedController(
+        ownPackageName = packageName,
+        controllerPackageName = controllerInfo.packageName,
+        isTrusted = controllerInfo.isTrusted,
+        isMediaNotificationController = session.isMediaNotificationController(controllerInfo),
+    )
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)

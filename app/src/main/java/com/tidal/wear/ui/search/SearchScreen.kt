@@ -53,9 +53,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
-import androidx.wear.compose.material.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.rememberScalingLazyListState
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalAlbum
@@ -241,7 +241,7 @@ fun SearchScreen(
 private fun TidalSearchResult?.isNullOrEmpty(): Boolean = this == null ||
     (tracks.isEmpty() && albums.isEmpty() && artists.isEmpty() && playlists.isEmpty())
 
-private fun <T> androidx.wear.compose.material.ScalingLazyListScope.section(
+private fun <T> androidx.wear.compose.foundation.lazy.ScalingLazyListScope.section(
     title: String,
     items: List<T>,
     itemContent: @Composable (T) -> Unit,

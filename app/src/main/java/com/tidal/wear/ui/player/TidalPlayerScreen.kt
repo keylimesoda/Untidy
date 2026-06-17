@@ -38,7 +38,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.runtime.Composable
@@ -110,14 +110,10 @@ fun TidalPlayerScreen(
     val context = LocalContext.current
     val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
     val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
-    var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.NotDownloaded) }
+    val downloadState = DownloadState.Unavailable
 
-    fun cycleDownloadState() {
-        downloadState = when (downloadState) {
-            DownloadState.NotDownloaded -> DownloadState.Downloading(0.47f)
-            is DownloadState.Downloading -> DownloadState.Downloaded
-            DownloadState.Downloaded -> DownloadState.NotDownloaded
-        }
+    fun showDownloadUnavailable() {
+        Toast.makeText(context, "Offline playback needs a sanctioned TIDAL download path", Toast.LENGTH_LONG).show()
     }
 
     BackHandler { (context as? Activity)?.moveTaskToBack(true) }
@@ -138,7 +134,7 @@ fun TidalPlayerScreen(
             viewModel = viewModel,
             apiClient = apiClient,
             downloadState = downloadState,
-            onDownload = ::cycleDownloadState,
+            onDownload = ::showDownloadUnavailable,
             onOpenAlbum = onOpenAlbum,
             onOpenArtist = onOpenArtist,
         )
@@ -169,6 +165,7 @@ private fun TidalPlayerNonAmbient(
     var likeLoading by remember(state.track?.id) { mutableStateOf(false) }
     var likeError by remember(state.track?.id) { mutableStateOf<String?>(null) }
     var showQueue by remember { mutableStateOf(false) }
+    var addToPlaylistTrack by remember { mutableStateOf<TidalTrack?>(null) }
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
@@ -194,6 +191,15 @@ private fun TidalPlayerNonAmbient(
             .onFailure { likeError = "Like unavailable" }
         likeLoading = false
     }
+    addToPlaylistTrack?.let { trackSnapshot ->
+        AddToPlaylistSheet(
+            track = trackSnapshot,
+            apiClient = apiClient,
+            onBack = { addToPlaylistTrack = null },
+        )
+        return
+    }
+
     if (showQueue) {
         QueueSheet(
             queue = state.queue,
@@ -292,7 +298,7 @@ private fun TidalPlayerNonAmbient(
             },
         )
         SecondaryIconAt(
-            icon = Icons.Filled.QueueMusic,
+            icon = Icons.AutoMirrored.Filled.QueueMusic,
             description = "Queue",
             x = 134,
             y = 36,
@@ -413,7 +419,16 @@ private fun TidalPlayerNonAmbient(
                             Toast.makeText(context, "Open Wear OS Bluetooth settings to change output", Toast.LENGTH_SHORT).show()
                         }
                     },
-                    onAddToPlaylist = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
+                    onAddToPlaylist = {
+                        val track = state.track
+                        when {
+                            track == null -> Toast.makeText(context, "Nothing playing", Toast.LENGTH_SHORT).show()
+                            track.id.isBlank() || track.id == "tidal-current" || track.id.startsWith("fixture", ignoreCase = true) -> {
+                                Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
+                            }
+                            else -> addToPlaylistTrack = track
+                        }
+                    },
                     onViewAlbum = {
                         val albumId = state.track?.albumId.orEmpty()
                         if (albumId.isBlank()) {

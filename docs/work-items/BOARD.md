@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: emulator, selinux, kvm, qa
 - Spec: `docs/emulator-selinux-notes.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/1
-- Next: Use scripts/run-wear-emulator.sh for future emulator sessions; investigate safer VM/scoped-policy option later.
+- Next: Keep open until current emulator session exits and selinuxuser_execheap is verified off; wrapper/docs/boot command exist, but default-off posture still needs final recorded check.
 - Acceptance:
   - Document safe wrapper/toggle workflow
   - Keep selinuxuser_execheap off by default when emulator is not running
@@ -30,7 +30,7 @@ _Generated from `work-items.json`._
 - Labels: emulator, auth, playback
 - Spec: `docs/test-plan-thinkpad-emulator.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/2
-- Next: Complete TIDAL device-code auth, then run search/playback checks.
+- Next: Needs explicit Search returns results evidence before closure; auth, Home/Library, single-track/album/playlist playback, and no-crash evidence are present in issue comments/PR #14.
 - Acceptance:
   - Authenticated app reaches Home
   - Search returns results
@@ -47,7 +47,7 @@ _Generated from `work-items.json`._
 - Labels: album, playlist, queue, playback
 - Spec: `docs/test-plan-thinkpad-emulator.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/3
-- Next: Run after authenticated playback works.
+- Next: Needs multi-page >50-track album or 100-track cap validation plus observed transitions beyond first 1-2 songs; album size 31 and playlist size 20 play-all passed.
 - Acceptance:
   - Multi-page album queues more than first page
   - Playlist Play all starts at requested index
@@ -63,7 +63,7 @@ _Generated from `work-items.json`._
 - Labels: prefetch, seamless, media3
 - Spec: `docs/test-plan-thinkpad-emulator.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/4
-- Next: Run after single-track playback works.
+- Next: Needs natural end-of-track transition observation and forced manifest/network failure UI validation; start playback and prefetch evidence are present.
 - Acceptance:
   - Starting a track does not pause/stall unexpectedly
   - Natural transition to next track is smooth enough for watch use
@@ -78,7 +78,7 @@ _Generated from `work-items.json`._
 - Labels: datastore, crash, service, settings
 - Spec: `reports/emulator-smoke/no-login-smoke-report-2026-06-16.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/5
-- Next: Run full lint/build/test after current emulator validation batch.
+- Next: Ready to close after PR #14 lands; runtime service/UI coexistence, no DataStore AndroidRuntime crash, full Gradle gate, and diff check all passed.
 - Acceptance:
   - UI and playback service can coexist without duplicate DataStore crash
   - No AndroidRuntime DataStore exception in logcat during launch/service probes
@@ -93,7 +93,7 @@ _Generated from `work-items.json`._
 - Labels: auth, navigation, emulator, runtime
 - Spec: `reports/emulator-smoke/unexpected-onboarding-after-back-logcat.txt`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/13
-- Next: Diagnose MainActivity route/back-stack/auth-state interaction.
+- Next: Ready to close after PR #14 lands; parent emulator regression verified Back from album route returns to authenticated Home, not onboarding.
 - Acceptance:
   - Back from View Album/View Artist does not start onboarding
   - Authenticated state persists
@@ -108,7 +108,7 @@ _Generated from `work-items.json`._
 - Labels: exported-service, security, media-controls
 - Spec: `docs/flow-and-cleanup-audit.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/6
-- Next: Run after authenticated media controls are available.
+- Next: Needs exported=false media-control experiment or explicit exported=true risk decision with controller/package validation/documented risk; defensive probes passed but decision is still open.
 - Acceptance:
   - Test notification/media controls with exported=true
   - Test whether exported=false breaks Wear/system media controls
@@ -123,7 +123,7 @@ _Generated from `work-items.json`._
 - Labels: now-playing, album, artist
 - Spec: `docs/spec-view-album-artist-from-now-playing.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/7
-- Next: Run during authenticated playback test.
+- Next: Ready to close after PR #14 lands if static fallback-toast verification is accepted; View Album and View Artist passed live runtime validation.
 - Acceptance:
   - Action sheet buttons appear during real playback
   - View Album opens correct album screen
@@ -139,7 +139,7 @@ _Generated from `work-items.json`._
 - Labels: favorites, tidal-api, write
 - Spec: `docs/flow-and-cleanup-audit.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/8
-- Next: Run after single-track playback produces a real TIDAL track ID.
+- Next: Ready to close after PR #14 lands; live favorite and unfavorite writes passed and were restored, with full Gradle gate passed.
 - Acceptance:
   - Heart loads persisted favorite state
   - Favorite write persists to TIDAL
@@ -151,25 +151,23 @@ _Generated from `work-items.json`._
 - Priority: P1
 - Type: feature
 - Area: ui
-- Owner: unassigned
+- Owner: Tommy
 - Labels: queue, feature, player-action-sheet
 - Spec: `docs/spec-current-queue-ui.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/9
-- Next: Implement after core authenticated playback smoke is green.
+- Next: Ready to close after PR #14 lands if static empty/single-track queue-state verification is accepted; Queue action/sheet/jump-to-index passed runtime validation and Gradle gate passed.
 - Acceptance:
   - Player pull-under/action sheet has Current Queue button
   - Queue screen shows current track and upcoming tracks
   - Empty queue state is safe
   - Compile/lint passes
 
-## todo
-
 ### UNTIDY-010 — Implement Add to Playlist workflow
 
 - Priority: P2
 - Type: feature
 - Area: api
-- Owner: unassigned
+- Owner: Tommy
 - Labels: playlist, feature, tidal-api, write
 - Spec: `docs/spec-add-to-playlist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/10
@@ -180,27 +178,12 @@ _Generated from `work-items.json`._
   - Success/error/loading states on watch UI
   - Live API write validation passes
 
-### UNTIDY-011 — Downloads/offline playback capability spike
-
-- Priority: P2
-- Type: spike
-- Area: offline
-- Owner: unassigned
-- Labels: downloads, offline, drm, tidal
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Run after playback baseline is stable.
-- Acceptance:
-  - Determine whether TIDAL API/SDK permits offline storage for this app
-  - If viable, define single-track MVP implementation plan
-  - If not viable, remove/neutralize fake download affordances
-
 ### UNTIDY-012 — Migrate remaining Wear Compose lazy/icon deprecations
 
 - Priority: P3
 - Type: cleanup
 - Area: cleanup
-- Owner: unassigned
+- Owner: Tommy
 - Labels: wear-compose, warnings, cleanup
 - Spec: `docs/refactor-backlog.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/12
@@ -210,9 +193,26 @@ _Generated from `work-items.json`._
   - AutoMirrored icon warnings resolved where straightforward
   - Build/lint/tests pass
 
-## blocked
+## todo
 
 _None._
+
+## blocked
+
+### UNTIDY-011 — Downloads/offline playback capability spike
+
+- Priority: P2
+- Type: spike
+- Area: offline
+- Owner: Tommy
+- Labels: downloads, offline, drm, tidal
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/11
+- Next: Blocked pending sanctioned TIDAL offline/download path validation; fake download UI has been neutralized.
+- Acceptance:
+  - Determine whether TIDAL API/SDK permits offline storage for this app
+  - If viable, define single-track MVP implementation plan
+  - If not viable, remove/neutralize fake download affordances
 
 ## done
 
