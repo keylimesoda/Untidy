@@ -886,7 +886,7 @@
     "id": "UNTIDY-029",
     "title": "Implement offline fallback behavior",
     "type": "feature",
-    "status": "todo",
+    "status": "review",
     "priority": "P1",
     "area": "offline",
     "owner": "Tommy",
@@ -897,9 +897,18 @@
       "ux"
     ],
     "spec": "docs/ux/offline-download-lifecycle-ux-2026-06-17.md",
-    "evidence": [],
-    "acceptance": [],
-    "next": "Implement network-unavailable fallback: Downloads reachable, live screens explain connection need, non-downloaded playback says Not downloaded.",
+    "evidence": [
+      "Offline fallback code routes Search/Discover live-only failures to connection-required copy plus Downloads shortcut.",
+      "Playback start guards now allow offline playback only for downloaded tracks and show Not downloaded / connect-to-stream copy for non-downloaded tracks.",
+      "Runtime artifact: reports/offline-fallback-2026-06-17-1601/ with discover-offline.xml/png and downloads-offline.xml/png.",
+      "Verification: :app:compileDebugKotlin --no-daemon passed; git diff --check passed."
+    ],
+    "acceptance": [
+      "Offline mode does not strand the user on live-only screens.",
+      "Downloaded tracks remain discoverable/playable through Home -> Downloads.",
+      "Non-downloaded tracks fail with clear user-facing copy."
+    ],
+    "next": "Review offline fallback runtime evidence, then close if accepted; next implementation lane is #31 minimal Settings Downloads controls.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/30",
     "githubNumber": 30
   },

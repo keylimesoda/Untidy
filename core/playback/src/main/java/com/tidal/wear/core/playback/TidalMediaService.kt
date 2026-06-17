@@ -31,6 +31,7 @@ import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.core.playback.settings.sharedSettingsDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -176,6 +177,14 @@ class TidalMediaService : MediaLibraryService() {
                     stopSelfResult(startId)
                     return result
                 }
+                if (!canStartLiveOrDownloadedPlayback(trackId)) {
+                    Log.w(PLAYER_LOG_TAG, "playTrack offline fallback: not downloaded id=$trackId; stopping foreground-service startId=$startId")
+                    val knownTrack = intent.toTrackOrNull()
+                    sessionPlayer?.setPlaybackError("Not downloaded · connect to stream this track")
+                    knownTrack?.let { publishOngoingActivity(it, isPlaying = false) }
+                    stopSelfResult(startId)
+                    return result
+                }
                 val knownTrack = intent.toTrackOrNull()
                 currentQueue = emptyList()
                 currentQueueIndex = 0
@@ -222,6 +231,12 @@ class TidalMediaService : MediaLibraryService() {
 
     private fun playTrack(trackId: String, knownTrack: TidalTrack? = null) {
         val id = trackId.ifBlank { return }
+        if (!canStartLiveOrDownloadedPlayback(id)) {
+            Log.w(PLAYER_LOG_TAG, "playTrack offline fallback: not downloaded id=$id")
+            sessionPlayer?.setPlaybackError("Not downloaded · connect to stream this track")
+            knownTrack?.let { publishOngoingActivity(it, isPlaying = false) }
+            return
+        }
         Log.d(PLAYER_LOG_TAG, "playTrack entry id=$id knownTrack.title=${knownTrack?.title.orEmpty()}")
         serviceScope.launch {
             configureQuality()
@@ -256,12 +271,38 @@ class TidalMediaService : MediaLibraryService() {
             Log.w(PLAYER_LOG_TAG, "playQueue ignored empty queue id=$queueId payload=${queuePayload.isNotBlank()}")
             return false
         }
-        currentQueue = queue
-        currentQueueIndex = startIndex.coerceIn(0, queue.lastIndex)
+        val playableQueue = if (isNetworkAvailable()) {
+            queue
+        } else {
+            queue.filter { isOfflineTrackDownloaded(it.id) }
+        }
+        if (playableQueue.isEmpty()) {
+            Log.w(PLAYER_LOG_TAG, "playQueue offline fallback: no downloaded tracks queueId=$queueId")
+            sessionPlayer?.setPlaybackError("Not downloaded · connect to stream this track")
+            return false
+        }
+        val requestedTrackId = queue.getOrNull(startIndex.coerceIn(0, queue.lastIndex))?.id
+        currentQueue = playableQueue
+        currentQueueIndex = requestedTrackId
+            ?.let { id -> playableQueue.indexOfFirst { it.id == id } }
+            ?.takeIf { it >= 0 }
+            ?: 0
         val track = queue[currentQueueIndex]
         Log.d(PLAYER_LOG_TAG, "playQueue id=$queueId size=${queue.size} start=$currentQueueIndex track=${track.id}")
         playTrack(track.id, track)
         return true
+    }
+
+
+    private fun canStartLiveOrDownloadedPlayback(trackId: String): Boolean =
+        isNetworkAvailable() || isOfflineTrackDownloaded(trackId)
+
+    private fun isNetworkAvailable(): Boolean {
+        val manager = getSystemService(android.net.ConnectivityManager::class.java) ?: return false
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     private fun skipToNextInQueue() {

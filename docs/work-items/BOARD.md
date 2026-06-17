@@ -165,6 +165,21 @@ _Generated from `work-items.json`._
 - GitHub: https://github.com/keylimesoda/Untidy/issues/29
 - Next: Review local remove-download UX. Evidence: reports/remove-download-ux-2026-06-17-1551/; compileDebugKotlin and git diff --check passed.
 
+### UNTIDY-029 — Implement offline fallback behavior
+
+- Priority: P1
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, fallback, network, ux
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/30
+- Next: Review offline fallback runtime evidence, then close if accepted; next implementation lane is #31 minimal Settings Downloads controls.
+- Acceptance:
+  - Offline mode does not strand the user on live-only screens.
+  - Downloaded tracks remain discoverable/playable through Home -> Downloads.
+  - Non-downloaded tracks fail with clear user-facing copy.
+
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 
 - Priority: P2
@@ -230,17 +245,6 @@ _Generated from `work-items.json`._
   - Relevant compile/lint gate passes.
 
 ## todo
-
-### UNTIDY-029 — Implement offline fallback behavior
-
-- Priority: P1
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: offline, fallback, network, ux
-- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/30
-- Next: Implement network-unavailable fallback: Downloads reachable, live screens explain connection need, non-downloaded playback says Not downloaded.
 
 ### UNTIDY-030 — Enable minimal Settings Downloads controls
 

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
@@ -50,6 +51,7 @@ import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.components.TidalResultChip
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
+import com.tidal.wear.ui.offline.rememberNetworkAvailable
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +66,7 @@ fun DiscoverScreen(
     onOpenArtist: (TidalArtist) -> Unit,
     onPlayTrack: (TidalTrack) -> Unit,
     onPlayQueue: (List<TidalTrack>, Int) -> Unit,
+    onOpenDownloads: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var sections by remember { mutableStateOf<List<TidalDiscoverSection>>(emptyList()) }
@@ -71,10 +74,18 @@ fun DiscoverScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf(false) }
     var loadTick by remember { mutableIntStateOf(0) }
+    val networkAvailable = rememberNetworkAvailable()
     val selectedSection = selectedTitle?.let { title -> sections.firstOrNull { it.title == title } }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
 
     fun loadDiscover() {
+        if (!networkAvailable) {
+            sections = emptyList()
+            selectedTitle = null
+            loading = false
+            error = true
+            return
+        }
         loading = true
         error = false
         scope.launch {
@@ -92,7 +103,7 @@ fun DiscoverScreen(
         }
     }
 
-    LaunchedEffect(loadTick) { loadDiscover() }
+    LaunchedEffect(loadTick, networkAvailable) { loadDiscover() }
     LaunchedEffect(selectedTitle, loading) {
         if (!loading) listState.scrollToItem(0)
     }
@@ -108,7 +119,12 @@ fun DiscoverScreen(
             item { DiscoverTitle(selectedSection?.title ?: "Discover") }
             when {
                 loading -> item { LoadingDiscover() }
-                error -> item { ErrorRow(onClick = { loadTick++ }) }
+                error -> {
+                    item { ErrorRow(networkAvailable = networkAvailable, onClick = { loadTick++ }) }
+                    if (!networkAvailable) {
+                        item { DownloadsShortcutChip(onClick = onOpenDownloads) }
+                    }
+                }
                 sections.isEmpty() -> item { EmptyDiscover() }
                 selectedSection == null -> sections.forEach { section ->
                     item {
@@ -176,6 +192,23 @@ private fun TidalSearchResult.toItems(): List<DiscoverItem> =
         albums.take(8).map { DiscoverItem.AlbumItem(it) } +
         playlists.take(8).map { DiscoverItem.PlaylistItem(it) } +
         artists.take(6).map { DiscoverItem.ArtistItem(it) }
+
+@Composable
+private fun DownloadsShortcutChip(onClick: () -> Unit) {
+    Chip(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        onClick = onClick,
+        colors = ChipDefaults.secondaryChipColors(
+            backgroundColor = TidalColors.SurfaceHigh,
+            contentColor = TidalColors.White,
+            secondaryContentColor = TidalColors.OnSurfaceMuted,
+            iconColor = TidalColors.Cyan,
+        ),
+        icon = { Icon(Icons.Filled.Download, contentDescription = null) },
+        label = { RowText("Open Downloads") },
+        secondaryLabel = { RowText("Play saved music") },
+    )
+}
 
 private fun TidalDiscoverSection.summaryLabel(): String = subtitle.ifBlank {
     when {
@@ -268,7 +301,7 @@ private fun EmptyDiscover() {
 }
 
 @Composable
-private fun ErrorRow(onClick: () -> Unit) {
+private fun ErrorRow(networkAvailable: Boolean, onClick: () -> Unit) {
     Chip(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         onClick = onClick,
@@ -278,8 +311,8 @@ private fun ErrorRow(onClick: () -> Unit) {
             secondaryContentColor = TidalColors.OnSurfaceMuted,
             iconColor = TidalColors.Cyan,
         ),
-        label = { RowText("Discover unavailable") },
-        secondaryLabel = { RowText("Check recommendations access · tap to retry") },
+        label = { RowText(if (networkAvailable) "Discover unavailable" else "Connect to discover") },
+        secondaryLabel = { RowText(if (networkAvailable) "Check recommendations access · tap to retry" else "Downloads still work offline") },
     )
 }
 

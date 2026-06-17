@@ -75,6 +75,7 @@ import com.tidal.wear.core.playback.PlaybackActions
 import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
 import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
+import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.playback.NowPlayingStateHolder
 import com.tidal.wear.ui.album.AlbumScreen
 import com.tidal.wear.ui.artist.ArtistAlbumsScreen
@@ -84,6 +85,7 @@ import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.discover.DiscoverScreen
 import com.tidal.wear.ui.downloads.DownloadsScreen
 import com.tidal.wear.ui.library.LibraryScreen
+import com.tidal.wear.ui.offline.isNetworkAvailable
 import com.tidal.wear.ui.onboarding.OnboardingScreen
 import com.tidal.wear.ui.playlist.PlaylistScreen
 import com.tidal.wear.ui.search.SearchScreen
@@ -214,12 +216,18 @@ private fun TidalWearApp(
 
             fun openPlayer() = context.startActivity(Intent(context, PlayerActivity::class.java))
             fun playTrack(track: TidalTrack) {
-                context.startTrackPlayback(track)
+                val started = context.startTrackPlayback(track)
                 openPlayer()
+                if (!started) {
+                    Toast.makeText(context, "Not downloaded · connect to stream this track", Toast.LENGTH_LONG).show()
+                }
             }
             fun playQueue(tracks: List<TidalTrack>, startIndex: Int) {
-                context.startQueuePlayback(tracks, startIndex)
+                val started = context.startQueuePlayback(tracks, startIndex)
                 openPlayer()
+                if (!started) {
+                    Toast.makeText(context, "Not downloaded · connect to stream this track", Toast.LENGTH_LONG).show()
+                }
             }
             fun openAlbum(album: TidalAlbum) {
                 navController.navigate(Routes.album(album.id))
@@ -275,6 +283,7 @@ private fun TidalWearApp(
                         onOpenArtist = ::openArtist,
                         onPlayTrack = ::playTrack,
                         onPlayQueue = ::playQueue,
+                        onOpenDownloads = { navController.navigate(Routes.Downloads) },
                     )
                 }
                 composable(Routes.Search) {
@@ -284,6 +293,7 @@ private fun TidalWearApp(
                         onOpenAlbum = ::openAlbum,
                         onOpenPlaylist = ::openPlaylist,
                         onOpenArtist = ::openArtist,
+                        onOpenDownloads = { navController.navigate(Routes.Downloads) },
                         onCancel = {
                             if (!navController.popBackStack()) {
                                 navController.navigateAndClear(Routes.Home)
@@ -585,7 +595,8 @@ private fun TidalTrack?.metadataLine(): String = listOf(
     this?.artist.orEmpty(),
 ).filter { it.isNotBlank() }.joinToString(" \u00B7 ").ifBlank { "TIDAL" }
 
-private fun Context.startTrackPlayback(track: TidalTrack) {
+private fun Context.startTrackPlayback(track: TidalTrack): Boolean {
+    if (!canStartLiveOrDownloadedPlayback(track.id)) return false
     val intent = Intent(this, TidalMediaService::class.java)
         .setAction(PlaybackActions.ACTION_PLAY_TRACK)
         .putExtra(PlaybackActions.EXTRA_TRACK_ID, track.id)
@@ -598,6 +609,7 @@ private fun Context.startTrackPlayback(track: TidalTrack) {
         .putExtra(PlaybackActions.EXTRA_ARTIST_ID, track.artistId)
         .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
+    return true
 }
 
 private fun Context.resumeTrackPlayback() {
@@ -607,18 +619,28 @@ private fun Context.resumeTrackPlayback() {
     ContextCompat.startForegroundService(this, intent)
 }
 
-private fun Context.startQueuePlayback(tracks: List<TidalTrack>, startIndex: Int) {
+private fun Context.startQueuePlayback(tracks: List<TidalTrack>, startIndex: Int): Boolean {
     val playableTracks = PlaybackQueueStore.playableTracks(tracks)
-    if (playableTracks.isEmpty()) return
+        .filter { canStartLiveOrDownloadedPlayback(it.id) }
+    if (playableTracks.isEmpty()) return false
+    val requestedTrackId = tracks.getOrNull(startIndex)?.id
+    val playbackStartIndex = requestedTrackId
+        ?.let { id -> playableTracks.indexOfFirst { it.id == id } }
+        ?.takeIf { it >= 0 }
+        ?: 0
     val queueId = PlaybackQueueStore.put(playableTracks)
     val intent = Intent(this, TidalMediaService::class.java)
         .setAction(PlaybackActions.ACTION_PLAY_QUEUE)
         .putExtra(PlaybackActions.EXTRA_QUEUE_ID, queueId)
         .putExtra(PlaybackActions.EXTRA_QUEUE_PAYLOAD, PlaybackQueueStore.payloadFor(playableTracks))
-        .putExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, PlaybackQueueStore.startIndexFor(tracks, startIndex))
+        .putExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, playbackStartIndex)
         .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
+    return true
 }
+
+private fun Context.canStartLiveOrDownloadedPlayback(trackId: String): Boolean =
+    isNetworkAvailable() || isOfflineTrackDownloaded(trackId)
 
 private fun NavHostController.navigateAndClear(route: String) {
     navigate(route) {

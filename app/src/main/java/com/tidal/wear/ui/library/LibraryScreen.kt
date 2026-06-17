@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Person
@@ -30,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,6 +45,8 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.tidal.wear.core.api.TidalApiClient
+import com.tidal.wear.core.playback.offline.DownloadedTrackSummary
+import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
 import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalPlaylist
@@ -51,6 +55,7 @@ import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.components.TidalResultChip
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
+import com.tidal.wear.ui.offline.rememberNetworkAvailable
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +71,10 @@ fun LibraryScreen(
     onPlayTrack: (TidalTrack) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current.applicationContext
+    val networkAvailable = rememberNetworkAvailable()
     var favorites by remember { mutableStateOf<TidalSearchResult?>(null) }
+    var downloadedTracks by remember { mutableStateOf(emptyList<DownloadedTrackSummary>()) }
     var selectedCategory by remember { mutableStateOf<LibraryCategory?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf(false) }
@@ -74,6 +82,13 @@ fun LibraryScreen(
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 2)
 
     fun loadLibrary() {
+        if (!networkAvailable) {
+            scope.launch { downloadedTracks = withContext(Dispatchers.IO) { context.readOfflineDownloadedTracks() } }
+            favorites = null
+            loading = false
+            error = true
+            return
+        }
         loading = true
         error = false
         scope.launch {
@@ -90,7 +105,7 @@ fun LibraryScreen(
         }
     }
 
-    LaunchedEffect(loadTick) { loadLibrary() }
+    LaunchedEffect(loadTick, networkAvailable) { loadLibrary() }
     LaunchedEffect(selectedCategory, loading) {
         if (!loading) listState.scrollToItem(if (selectedCategory == null) 2 else 0)
     }
@@ -108,7 +123,12 @@ fun LibraryScreen(
             }
             when {
                 loading -> item { LoadingCollection() }
-                error -> item { ErrorRow(onClick = { loadTick++ }) }
+                error -> {
+                    item { ErrorRow(networkAvailable = networkAvailable, onClick = { loadTick++ }) }
+                    if (!networkAvailable) {
+                        item { OfflineDownloadsHint(count = downloadedTracks.size) }
+                    }
+                }
                 favorites.isEmpty() -> item {
                     EmptyCollection()
                 }
@@ -213,6 +233,25 @@ private fun TidalSearchResult?.isEmpty(): Boolean = this == null ||
     (tracks.isEmpty() && albums.isEmpty() && artists.isEmpty() && playlists.isEmpty())
 
 @Composable
+private fun OfflineDownloadsHint(count: Int) {
+    Chip(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+        onClick = { },
+        enabled = false,
+        colors = ChipDefaults.secondaryChipColors(
+            backgroundColor = TidalColors.SurfaceHigh,
+            contentColor = TidalColors.White,
+            secondaryContentColor = TidalColors.OnSurfaceMuted,
+            iconColor = TidalColors.Cyan,
+        ),
+        icon = { Icon(Icons.Filled.Download, contentDescription = null) },
+        label = { RowText("Downloads available") },
+        secondaryLabel = { RowText(if (count == 1) "1 saved track" else "$count saved tracks") },
+        contentPadding = PaddingValues(horizontal = 12.dp),
+    )
+}
+
+@Composable
 private fun LibraryTitle(title: String) {
     Text(
         text = title,
@@ -305,7 +344,7 @@ private fun EmptyCollection() {
 }
 
 @Composable
-private fun ErrorRow(onClick: () -> Unit) {
+private fun ErrorRow(networkAvailable: Boolean, onClick: () -> Unit) {
     Chip(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         onClick = onClick,
@@ -315,8 +354,8 @@ private fun ErrorRow(onClick: () -> Unit) {
             secondaryContentColor = TidalColors.OnSurfaceMuted,
             iconColor = TidalColors.Cyan,
         ),
-        label = { RowText("Library unavailable") },
-        secondaryLabel = { RowText("Tap to retry") },
+        label = { RowText(if (networkAvailable) "Library unavailable" else "Connect for full library") },
+        secondaryLabel = { RowText(if (networkAvailable) "Tap to retry" else "Downloaded music still plays") },
     )
 }
 

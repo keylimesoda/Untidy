@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
@@ -67,6 +68,7 @@ import com.tidal.wear.ui.art.rememberDeferredRowArtwork
 import com.tidal.wear.ui.components.RowArtworkThumb
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
+import com.tidal.wear.ui.offline.rememberNetworkAvailable
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -83,6 +85,7 @@ fun SearchScreen(
     onOpenAlbum: (TidalAlbum) -> Unit,
     onOpenPlaylist: (TidalPlaylist) -> Unit,
     onOpenArtist: (TidalArtist) -> Unit,
+    onOpenDownloads: () -> Unit,
     onCancel: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -94,6 +97,7 @@ fun SearchScreen(
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var requestKeyboardTick by remember { mutableIntStateOf(1) }
+    val networkAvailable = rememberNetworkAvailable()
 
     LaunchedEffect(requestKeyboardTick, inputView) {
         if (requestKeyboardTick > 0) {
@@ -105,13 +109,23 @@ fun SearchScreen(
         }
     }
 
-    LaunchedEffect(submittedQuery, loading) {
+    LaunchedEffect(submittedQuery, loading, networkAvailable) {
         if (submittedQuery.isNotBlank() && !loading) listState.scrollToItem(0)
     }
 
     fun searchNow() {
         val q = query.trim()
         if (q.isBlank() || loading) return
+        if (!networkAvailable) {
+            submittedQuery = q
+            result = null
+            error = "Connect to search TIDAL"
+            inputView?.let { editText ->
+                editText.clearFocus()
+                editText.hideKeyboard()
+            }
+            return
+        }
         submittedQuery = q
         result = null
         error = null
@@ -184,7 +198,12 @@ fun SearchScreen(
                 }
                 when {
                     loading -> item { SearchingIndicator() }
-                    error != null -> item { StatusText(error.orEmpty()) }
+                    error != null -> {
+                        item { StatusText(error.orEmpty()) }
+                        if (!networkAvailable) {
+                            item { DownloadsShortcutChip(onClick = onOpenDownloads) }
+                        }
+                    }
                     result.isNullOrEmpty() -> item { StatusText("No results found") }
                     else -> {
                         val safeResult = result ?: TidalSearchResult()
@@ -507,6 +526,23 @@ private fun EditText.showKeyboard() {
 private fun EditText.hideKeyboard() {
     context.getSystemService(InputMethodManager::class.java)
         ?.hideSoftInputFromWindow(windowToken, 0)
+}
+
+@Composable
+private fun DownloadsShortcutChip(onClick: () -> Unit) {
+    Chip(
+        onClick = onClick,
+        colors = ChipDefaults.secondaryChipColors(
+            backgroundColor = TidalColors.SurfaceHigh,
+            contentColor = TidalColors.White,
+            secondaryContentColor = TidalColors.OnSurfaceMuted,
+            iconColor = TidalColors.Cyan,
+        ),
+        icon = { Icon(Icons.Filled.Download, contentDescription = null) },
+        label = { Text("Open Downloads", fontWeight = FontWeight.Bold) },
+        secondaryLabel = { Text("Play saved music") },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 2.dp),
+    )
 }
 
 @Composable
