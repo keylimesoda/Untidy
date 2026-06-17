@@ -784,3 +784,34 @@ Redacted runtime results for track `5120026` / country `US`:
 Concrete advancement: the public `Player`/`OfflinePlayProvider` seam is now proven at compile and runtime. The remaining blocker is no longer local player construction or internal media-source access; it is the sanctioned provisioning source for a **real** `PlaybackInfo.Offline.Track`: `offlineLicense`, `Storage.path`, and cached bytes/download resource ids.
 
 Next concrete proof step: search/decompile any available first-party/sample artifacts or SDK call sites for an `OfflinePlaybackInfoProvider` implementation or provisioning path. Avoid repeating lower-value guesses already ruled out (`downloads/{trackId}`, user id as offline-mix id, and cursor `0` as first page).
+
+## Upstream source/provider implementation search — 2026-06-17 12:46 PT
+
+After the public `Player(..., OfflinePlayProvider, ...)` injection proof, this pass searched for a real provider/provisioning implementation rather than guessing more endpoint ids.
+
+Durable local artifacts:
+
+- `reports/offline-proof-2026-06-17-1246-offline-provider-impl-search/search-summary.txt`
+- `reports/offline-proof-2026-06-17-1246-offline-provider-impl-search/class-index.txt`
+- `reports/offline-proof-2026-06-17-1246-offline-provider-impl-search/candidate-classes.txt`
+- `reports/offline-proof-2026-06-17-1246-offline-provider-impl-search/javap-reference-hits.txt`
+- `reports/offline-proof-2026-06-17-1246-offline-provider-impl-search/javap-implementers.txt`
+- `reports/offline-proof-2026-06-17-1246-offline-provider-impl-search/upstream-source-search.txt`
+- `reports/offline-proof-2026-06-17-1246-offline-provider-impl-search/source-snippets.md`
+
+Search/proof steps completed:
+
+1. Indexed local TIDAL/Media3 Gradle artifacts: 23 artifacts, 6,271 classes, 626 offline/download/cache/player candidate classes.
+2. Decompiled candidate classes with `javap` looking for references and implementers of `OfflinePlaybackInfoProvider`, `OfflinePlayProvider`, `OfflineCacheProvider`, `offlineLicense`, `Downloads`, `OfflineTasks`, and `Installations`.
+3. Found 137 reference hits but **zero concrete `OfflinePlaybackInfoProvider` implementers** in the packaged local artifacts (`javap-implementers.txt` is empty).
+4. Searched the public upstream `tidal-music/tidal-sdk-android` source at HEAD `86c48c3` for the same provider/provisioning seams.
+5. Found the SDK source confirms the app boundary:
+   - `PlaybackInfoRepositoryDefault.getOfflineTrackPlaybackInfo(...)` only delegates to the supplied `offlinePlaybackInfoProvider` and throws `NullPointerException("No OfflinePlaybackInfoProvider provided")` if absent.
+   - `OfflinePlaybackInfoProvider` is documented as "getting track or video playback info from local storage."
+   - The only upstream implementation found is `OfflinePlaybackInfoProviderStub` under tests, returning synthetic `TrackPlaybackInfoFactory.OFFLINE_PLAY` / `VideoPlaybackInfoFactory.OFFLINE_PLAY`.
+   - `OfflinePlayProvider` is only a holder for app-supplied `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, and `Encryption`.
+6. Public Dokka pages corroborate the same contract: `OfflinePlaybackInfoProvider` is an interface for local-storage playback info, and `OfflinePlayProvider` is a collection of classes needed for offline playback; neither page documents a download-task creation helper.
+
+Interpretation: within the public SDK and packaged artifacts available to Untidy, offline playback provisioning is intentionally app-supplied. The TIDAL player SDK can request `usage=DOWNLOAD` manifests and can consume `PlaybackInfo.Offline.Track`, but it does **not** ship a public downloader/offline-task orchestrator or concrete provider implementation. The remaining sanctioned path is therefore an Untidy-owned debug provider/repository that persists only data obtained from offline/download surfaces, paired with TIDAL-generated Downloads/Installations/OfflineTasks APIs where they return usable ids.
+
+Concrete next proof step: build a debug-only `OfflinePlaybackStore` shape plus provider adapter that persists redacted metadata for one `usage=DOWNLOAD` / `PlaybackMode.OFFLINE` probe result into app-private storage and reconstructs `PlaybackInfo.Offline.Track` from that store. This should not download bytes or claim offline playback yet; it proves the missing app-owned persistence boundary and narrows the next runtime gap to sanctioned byte/license acquisition.

@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: downloads, offline, drm, tidal
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Find the source of the real offline playback payload: search/decompile available first-party/sample artifacts or SDK call sites for an OfflinePlaybackInfoProvider implementation or provisioning path that supplies offlineLicense, Storage.path, and cached bytes/download resource ids. Do not guess UserOfflineMix user ids or downloads/{trackId} again.
+- Next: Build a debug-only OfflinePlaybackStore/provider adapter that persists one sanctioned DOWNLOAD/OFFLINE proof result as app-private metadata and reconstructs PlaybackInfo.Offline.Track from local storage; do not download bytes or claim offline playback until a sanctioned byte/license source is proven.
 - Acceptance:
   - Determine whether TIDAL API/SDK permits offline storage for this app
   - If viable, define single-track MVP implementation plan
