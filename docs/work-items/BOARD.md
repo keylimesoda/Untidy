@@ -21,6 +21,23 @@ _Generated from `work-items.json`._
 
 ## review
 
+### UNTIDY-014 — Release readiness / ship checklist
+
+- Priority: P1
+- Type: task
+- Area: qa
+- Owner: Tommy
+- Labels: release, ship-readiness, qa, docs
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/15
+- Next: Review release-readiness checklist and use it as the final ship gate after #11 and release-polish dispositions.
+- Acceptance:
+  - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
+  - Final build/test/lint evidence is posted.
+  - Any remaining release blockers have separate GitHub issues.
+  - Debug-only code cannot leak into production release surfaces.
+  - Known limitations are documented in README/specs.
+
 ### UNTIDY-018 — Senior Wear OS UX path walkthrough
 
 - Priority: P1
@@ -88,23 +105,6 @@ _Generated from `work-items.json`._
   - Relevant compile/test gate passes.
 
 ## todo
-
-### UNTIDY-014 — Release readiness / ship checklist
-
-- Priority: P1
-- Type: task
-- Area: qa
-- Owner: Tommy
-- Labels: release, ship-readiness, qa, docs
-- Spec: `docs/release-readiness-checklist.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/15
-- Next: Draft release-readiness checklist after #11 proof stabilizes; include real-watch validation, debug-only audit, UX pass, lint warning disposition, and docs freshness.
-- Acceptance:
-  - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
-  - Final build/test/lint evidence is posted.
-  - Any remaining release blockers have separate GitHub issues.
-  - Debug-only code cannot leak into production release surfaces.
-  - Known limitations are documented in README/specs.
 
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 

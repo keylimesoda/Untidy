@@ -395,7 +395,7 @@
     "id": "UNTIDY-014",
     "title": "Release readiness / ship checklist",
     "type": "task",
-    "status": "todo",
+    "status": "review",
     "priority": "P1",
     "area": "qa",
     "owner": "Tommy",
@@ -407,7 +407,9 @@
     ],
     "spec": "docs/release-readiness-checklist.md",
     "evidence": [
-      "Created from chat-history audit: Ric wants the app polished/professional/ready to ship."
+      "Created from chat-history audit: Ric wants the app polished/professional/ready to ship.",
+      "Release-readiness checklist drafted at docs/release-readiness-checklist.md.",
+      "Checklist captures current #11 offline decision gate, debug/proof-only audit, lint warning disposition, emulator and real-watch validation, UX readiness, docs readiness, and release decision record."
     ],
     "acceptance": [
       "A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.",
@@ -416,7 +418,7 @@
       "Debug-only code cannot leak into production release surfaces.",
       "Known limitations are documented in README/specs."
     ],
-    "next": "Draft release-readiness checklist after #11 proof stabilizes; include real-watch validation, debug-only audit, UX pass, lint warning disposition, and docs freshness.",
+    "next": "Review release-readiness checklist and use it as the final ship gate after #11 and release-polish dispositions.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/15",
     "githubNumber": 15
   },
