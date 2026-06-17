@@ -505,7 +505,7 @@
     "id": "UNTIDY-018",
     "title": "Senior Wear OS UX path walkthrough",
     "type": "test",
-    "status": "in-progress",
+    "status": "review",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -517,7 +517,10 @@
     ],
     "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
     "evidence": [
-      "Ric explicitly requested a Senior UX specialist well-versed in Android Wear OS; prior generic experts were underinformed."
+      "Ric explicitly requested a Senior UX specialist well-versed in Android Wear OS; prior generic experts were underinformed.",
+      "UX report created at docs/ux/wear-os-ux-walkthrough-2026-06-17.md.",
+      "Runtime artifacts captured under reports/ux-wear-os-walkthrough-2026-06-17/.",
+      "Top UX findings converted to GitHub issues #20-#24."
     ],
     "acceptance": [
       "A UX walkthrough report exists under docs/ux/ or reports/ux/.",
@@ -525,8 +528,150 @@
       "Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.",
       "No generic, non-Wear-specific advice without source/evidence."
     ],
-    "next": "Run senior Wear OS UX specialist walkthrough against emulator/source and produce evidence-backed report.",
+    "next": "Review senior Wear OS UX walkthrough report; top findings converted to follow-up issues #20-#24.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/19",
     "githubNumber": 19
+  },
+  {
+    "id": "UNTIDY-019",
+    "title": "Fix Wear search entry blank-screen UX",
+    "type": "bug",
+    "status": "todo",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "search",
+      "wear-os",
+      "ux",
+      "ime"
+    ],
+    "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
+    "evidence": [
+      "Search entry appears as blank black screen in runtime artifact 03-search-entry.png; hidden 1dp EditText host needs visible Wear prompt."
+    ],
+    "acceptance": [
+      "Search entry never appears as blank black screen.",
+      "User has visible prompt/affordance before and during IME handoff.",
+      "Existing search results flow still works.",
+      "Runtime evidence captured.",
+      "Compile/lint or relevant narrow gate passes."
+    ],
+    "next": "Add visible Wear search prompt/voice-or-type affordance and validate search results still work.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/20",
+    "githubNumber": 20
+  },
+  {
+    "id": "UNTIDY-020",
+    "title": "Tune round-screen list safe-area padding",
+    "type": "cleanup",
+    "status": "todo",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "round-screen",
+      "padding",
+      "wear-os",
+      "ux"
+    ],
+    "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
+    "evidence": [
+      "UX review found row clipping at circular edges in home, search results, and library screenshots/XML."
+    ],
+    "acceptance": [
+      "First/last actionable rows settle inside round safe area on emulator screenshots.",
+      "Search, Library, and Home screenshots show fully readable primary rows.",
+      "No major regression to scroll ergonomics.",
+      "Compile/lint or relevant narrow gate passes."
+    ],
+    "next": "Audit/tune ScalingLazyColumn/TransformingLazyColumn padding for key browse surfaces.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/21",
+    "githubNumber": 21
+  },
+  {
+    "id": "UNTIDY-021",
+    "title": "Gate or confirm New test playlist creation",
+    "type": "cleanup",
+    "status": "todo",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "playlist",
+      "write",
+      "ux",
+      "safety"
+    ],
+    "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
+    "evidence": [
+      "UX review found New test playlist is first enabled row and performs real create+add write; Ric approved test playlists for dev, not accidental production UX."
+    ],
+    "acceptance": [
+      "Users cannot accidentally create a test playlist from first row with one tap in production UX.",
+      "If debug-only, row is impossible in release builds.",
+      "If confirmation-based, confirmation/cancel text is clear on a watch.",
+      "No delete path is introduced.",
+      "Relevant compile/test gate passes."
+    ],
+    "next": "Hide New test playlist behind debug/developer mode or add explicit confirmation and clearer copy.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/22",
+    "githubNumber": 22
+  },
+  {
+    "id": "UNTIDY-022",
+    "title": "Validate Now Playing actions discoverability and rotary behavior",
+    "type": "test",
+    "status": "todo",
+    "priority": "P2",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "now-playing",
+      "rotary",
+      "wear-os",
+      "ux"
+    ],
+    "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
+    "evidence": [
+      "UX review found action sheet discoverability/rotary behavior needs Wear-specific validation, especially real watch."
+    ],
+    "acceptance": [
+      "Users can discover player actions without prior knowledge.",
+      "Action sheet scroll/rotary behavior is validated on emulator and real watch if possible.",
+      "Any added affordance stays watch-glanceable and does not clutter Now Playing.",
+      "Relevant compile/lint gate passes."
+    ],
+    "next": "Validate vertical pager/actions discoverability and rotary/bezel behavior; add affordance or rotary focus if needed.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/23",
+    "githubNumber": 23
+  },
+  {
+    "id": "UNTIDY-023",
+    "title": "Add watch-friendly retry/error recovery",
+    "type": "cleanup",
+    "status": "todo",
+    "priority": "P2",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "errors",
+      "retry",
+      "wear-os",
+      "ux"
+    ],
+    "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
+    "evidence": [
+      "UX review found album/playlist/artist errors are passive text and missing metadata actions use toast-only feedback."
+    ],
+    "acceptance": [
+      "Detail screen network/API errors have one-tap retry.",
+      "Missing metadata feedback is visible in the action context, not toast-only.",
+      "Empty states remain clear and non-alarming.",
+      "Relevant compile/lint gate passes."
+    ],
+    "next": "Add retry chips to detail errors and inline action-sheet feedback for missing metadata IDs.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/24",
+    "githubNumber": 24
   }
 ]

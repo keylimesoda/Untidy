@@ -4,22 +4,6 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
-### UNTIDY-018 — Senior Wear OS UX path walkthrough
-
-- Priority: P1
-- Type: test
-- Area: ui
-- Owner: Tommy
-- Labels: ux, wear-os, review, qa
-- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/19
-- Next: Run senior Wear OS UX specialist walkthrough against emulator/source and produce evidence-backed report.
-- Acceptance:
-  - A UX walkthrough report exists under docs/ux/ or reports/ux/.
-  - Report includes path-by-path observations, screenshots/artifact references where available, severity, and recommendations.
-  - Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.
-  - No generic, non-Wear-specific advice without source/evidence.
-
 ### UNTIDY-011 — Downloads/offline playback capability spike
 
 - Priority: P2
@@ -37,7 +21,21 @@ _Generated from `work-items.json`._
 
 ## review
 
-_None._
+### UNTIDY-018 — Senior Wear OS UX path walkthrough
+
+- Priority: P1
+- Type: test
+- Area: ui
+- Owner: Tommy
+- Labels: ux, wear-os, review, qa
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/19
+- Next: Review senior Wear OS UX walkthrough report; top findings converted to follow-up issues #20-#24.
+- Acceptance:
+  - A UX walkthrough report exists under docs/ux/ or reports/ux/.
+  - Report includes path-by-path observations, screenshots/artifact references where available, severity, and recommendations.
+  - Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.
+  - No generic, non-Wear-specific advice without source/evidence.
 
 ## todo
 
@@ -57,6 +55,56 @@ _None._
   - Any remaining release blockers have separate GitHub issues.
   - Debug-only code cannot leak into production release surfaces.
   - Known limitations are documented in README/specs.
+
+### UNTIDY-019 — Fix Wear search entry blank-screen UX
+
+- Priority: P1
+- Type: bug
+- Area: ui
+- Owner: Tommy
+- Labels: search, wear-os, ux, ime
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/20
+- Next: Add visible Wear search prompt/voice-or-type affordance and validate search results still work.
+- Acceptance:
+  - Search entry never appears as blank black screen.
+  - User has visible prompt/affordance before and during IME handoff.
+  - Existing search results flow still works.
+  - Runtime evidence captured.
+  - Compile/lint or relevant narrow gate passes.
+
+### UNTIDY-020 — Tune round-screen list safe-area padding
+
+- Priority: P1
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: round-screen, padding, wear-os, ux
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/21
+- Next: Audit/tune ScalingLazyColumn/TransformingLazyColumn padding for key browse surfaces.
+- Acceptance:
+  - First/last actionable rows settle inside round safe area on emulator screenshots.
+  - Search, Library, and Home screenshots show fully readable primary rows.
+  - No major regression to scroll ergonomics.
+  - Compile/lint or relevant narrow gate passes.
+
+### UNTIDY-021 — Gate or confirm New test playlist creation
+
+- Priority: P1
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: playlist, write, ux, safety
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/22
+- Next: Hide New test playlist behind debug/developer mode or add explicit confirmation and clearer copy.
+- Acceptance:
+  - Users cannot accidentally create a test playlist from first row with one tap in production UX.
+  - If debug-only, row is impossible in release builds.
+  - If confirmation-based, confirmation/cancel text is clear on a watch.
+  - No delete path is introduced.
+  - Relevant compile/test gate passes.
 
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 
@@ -105,6 +153,38 @@ _None._
   - Docs consistently say #11 is an implementation-proof/orchestration task using sanctioned SDK/API surfaces.
   - Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.
   - git diff --check passes.
+
+### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
+
+- Priority: P2
+- Type: test
+- Area: ui
+- Owner: Tommy
+- Labels: now-playing, rotary, wear-os, ux
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/23
+- Next: Validate vertical pager/actions discoverability and rotary/bezel behavior; add affordance or rotary focus if needed.
+- Acceptance:
+  - Users can discover player actions without prior knowledge.
+  - Action sheet scroll/rotary behavior is validated on emulator and real watch if possible.
+  - Any added affordance stays watch-glanceable and does not clutter Now Playing.
+  - Relevant compile/lint gate passes.
+
+### UNTIDY-023 — Add watch-friendly retry/error recovery
+
+- Priority: P2
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: errors, retry, wear-os, ux
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/24
+- Next: Add retry chips to detail errors and inline action-sheet feedback for missing metadata IDs.
+- Acceptance:
+  - Detail screen network/API errors have one-tap retry.
+  - Missing metadata feedback is visible in the action context, not toast-only.
+  - Empty states remain clear and non-alarming.
+  - Relevant compile/lint gate passes.
 
 ## blocked
 
