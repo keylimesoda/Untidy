@@ -617,3 +617,23 @@ Use the current app structure, not a phone download-manager pattern:
 4. Put bulk cleanup in Settings/Manage storage, not multi-select.
 5. Make every removal string explicitly local-only.
 6. Treat offline fallback as automatic source/filter behavior, with optional `Offline only` later.
+
+## 11. Post-review implementation status — 2026-06-17
+
+This design report has now served its intended gate: the lifecycle model was accepted as the implementation guide and split into concrete follow-up work instead of remaining an abstract proposal.
+
+Follow-up implementation issues created from this report:
+
+- #28 / UNTIDY-027 — Home → Downloads shelf and playable downloaded-track list.
+- #29 / UNTIDY-028 — local remove-download UX with local-only cache/metadata cleanup.
+- #30 / UNTIDY-029 — automatic offline fallback behavior for downloaded vs non-downloaded tracks.
+- #31 / UNTIDY-030 — minimal Settings Downloads controls and local-only bulk cleanup copy.
+- #32 / UNTIDY-031 — album/playlist collection download affordances and partial-state copy.
+
+Important note: the source-reference section above captured the app state at the time of this design review. Several listed gaps have since been intentionally addressed by the follow-up implementation issues. The lasting contract from this report is the product model and safety boundary:
+
+- offline UX is a Wear-sized Downloads shelf plus contextual actions, not a phone-style manager;
+- removal means Untidy-local downloaded files, markers, and cache state only;
+- Untidy must not delete TIDAL library items, playlists, or remote playlist membership;
+- release copy should avoid `proof` language on product surfaces;
+- collection downloads may expose partial state, but the one-track lifecycle remains the minimum dependable MVP.

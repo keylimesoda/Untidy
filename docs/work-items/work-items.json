@@ -799,7 +799,7 @@
     "id": "UNTIDY-026",
     "title": "Design full offline/download lifecycle UX",
     "type": "task",
-    "status": "review",
+    "status": "done",
     "priority": "P0",
     "area": "offline",
     "owner": "Tommy",
@@ -816,7 +816,9 @@
       "Report created: docs/ux/offline-download-lifecycle-ux-2026-06-17.md.",
       "Ric approved deleting/removing local downloaded content; report scopes removal to Untidy local downloads only, not TIDAL library objects.",
       "Report recommends MVP: single-track download + Downloads shelf + remove local download + automatic offline fallback.",
-      "Verification passed: git diff --check."
+      "Verification passed: git diff --check.",
+      "Follow-up implementation issues were created from the report: #28 Downloads shelf, #29 remove-download UX, #30 offline fallback, #31 Settings Downloads controls, #32 collection download UX.",
+      "Post-review implementation-status appendix added to docs/ux/offline-download-lifecycle-ux-2026-06-17.md on 2026-06-17."
     ],
     "acceptance": [
       "Report exists and is reviewed by Ric.",
@@ -824,7 +826,7 @@
       "Report explicitly recommends removal/management units.",
       "Follow-up implementation issues are created only after review."
     ],
-    "next": "Ric to review offline/download lifecycle UX report; after approval split implementation issues for Downloads screen, removal, collection downloads, offline fallback, and settings/storage.",
+    "next": "Done: lifecycle UX report accepted as implementation guide; follow-up implementation issues #28-#32 were created and are now the active/review lanes.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/27",
     "githubNumber": 27
   },

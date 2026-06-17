@@ -25,22 +25,6 @@ _None._
   - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
   - Narrow Gradle gate passes.
 
-### UNTIDY-026 — Design full offline/download lifecycle UX
-
-- Priority: P0
-- Type: task
-- Area: offline
-- Owner: Tommy
-- Labels: offline, downloads, ux, lifecycle, wear-os
-- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/27
-- Next: Ric to review offline/download lifecycle UX report; after approval split implementation issues for Downloads screen, removal, collection downloads, offline fallback, and settings/storage.
-- Acceptance:
-  - Report exists and is reviewed by Ric.
-  - Design is Wear OS-specific and grounded in current Untidy source/flows.
-  - Report explicitly recommends removal/management units.
-  - Follow-up implementation issues are created only after review.
-
 ### UNTIDY-027 — Implement Home → Downloads shelf
 
 - Priority: P0
@@ -365,6 +349,22 @@ _None._
   - Back from View Album/View Artist does not start onboarding
   - Authenticated state persists
   - Emulator regression passes
+
+### UNTIDY-026 — Design full offline/download lifecycle UX
+
+- Priority: P0
+- Type: task
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, ux, lifecycle, wear-os
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/27
+- Next: Done: lifecycle UX report accepted as implementation guide; follow-up implementation issues #28-#32 were created and are now the active/review lanes.
+- Acceptance:
+  - Report exists and is reviewed by Ric.
+  - Design is Wear OS-specific and grounded in current Untidy source/flows.
+  - Report explicitly recommends removal/management units.
+  - Follow-up implementation issues are created only after review.
 
 ### UNTIDY-006 — Decide exported TidalMediaService security posture
 
