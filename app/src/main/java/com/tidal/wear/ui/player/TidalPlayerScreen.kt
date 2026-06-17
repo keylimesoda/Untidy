@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.runtime.Composable
@@ -449,13 +450,13 @@ private fun TidalPlayerNonAmbient(
             )
         }
 
-        Box(
+        ActionsHint(
+            scale = scale,
+            accent = accent,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .offset(y = (-11).dp * scale)
-                .size(width = 24.dp * scale, height = 3.dp * scale)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(Color(0x4DFFFFFF)),
+                .offset(y = (-8).dp * scale),
+            onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
         )
 
         VolumeOverlay(
@@ -581,6 +582,39 @@ private fun SecondaryIconAt(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(24.dp * scale))
+    }
+}
+
+@Composable
+private fun ActionsHint(
+    scale: Float,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Color.Black.copy(alpha = 0.62f))
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "Actions" }
+            .padding(horizontal = 8.dp * scale, vertical = 3.dp * scale),
+        horizontalArrangement = Arrangement.spacedBy(2.dp * scale),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Actions",
+            color = TidalColors.White,
+            fontSize = (9 * scale).sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+        Icon(
+            imageVector = Icons.Filled.KeyboardArrowDown,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(12.dp * scale),
+        )
     }
 }
 

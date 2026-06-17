@@ -40,8 +40,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.Text
+import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 
 sealed interface DownloadState {
@@ -68,6 +70,7 @@ fun ActionsSheet(
     var confirmRemoveDownload by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     val preferredOutput = outputOptions.firstOrNull { it.preferred } ?: outputOptions.firstOrNull()
+    val listState = rememberTransformingLazyColumnState()
     fun runAction(action: () -> String?) {
         actionMessage = action()
     }
@@ -83,7 +86,11 @@ fun ActionsSheet(
                 .background(Color(0x4DFFFFFF)),
         )
         TransformingLazyColumn(
-            modifier = Modifier.fillMaxSize().padding(top = 8.dp),
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 8.dp)
+                .rotaryScrollableWithFocus(listState),
             contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

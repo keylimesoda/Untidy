@@ -654,7 +654,7 @@
     "id": "UNTIDY-022",
     "title": "Validate Now Playing actions discoverability and rotary behavior",
     "type": "test",
-    "status": "in-progress",
+    "status": "review",
     "priority": "P2",
     "area": "ui",
     "owner": "Tommy",
@@ -667,7 +667,10 @@
     "spec": "docs/test-plan-now-playing-actions-rotary.md",
     "evidence": [
       "UX review found action sheet discoverability/rotary behavior needs Wear-specific validation, especially real watch.",
-      "docs/test-plan-now-playing-actions-rotary.md defines the discoverability and rotary/bezel validation matrix; no live TIDAL library mutation required."
+      "docs/test-plan-now-playing-actions-rotary.md defines the discoverability and rotary/bezel validation matrix; no live TIDAL library mutation required.",
+      "Implemented a visible tappable Actions affordance on Now Playing instead of the prior unlabeled bottom handle.",
+      "Wired ActionsSheet TransformingLazyColumn to explicit rotaryScrollableWithFocus state for crown/bezel scrolling consistency.",
+      "Emulator evidence captured under reports/now-playing-actions-rotary-2026-06-17-1631/: page0.xml shows visible Actions hint; page1.xml shows action rows; compileDebugKotlin and git diff --check passed. Real-watch rotary remains a release-checklist validation item."
     ],
     "acceptance": [
       "Users can discover player actions without prior knowledge.",
@@ -675,7 +678,7 @@
       "Any added affordance stays watch-glanceable and does not clutter Now Playing.",
       "Relevant compile/lint gate passes."
     ],
-    "next": "Run the Now Playing actions/rotary validation matrix on the Wear emulator, then repeat rotary/bezel behavior on a real Wear device if available before review.",
+    "next": "Review Now Playing Actions affordance and emulator rotary evidence. Final public release still needs real-watch crown/bezel validation per release checklist.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/23",
     "githubNumber": 23
   },
