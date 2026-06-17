@@ -4,36 +4,7 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
-### UNTIDY-003 — Validate album and playlist play-all behavior
-
-- Priority: P0
-- Type: test
-- Area: playback
-- Owner: Tommy
-- Labels: album, playlist, queue, playback
-- Spec: `docs/test-plan-thinkpad-emulator.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/3
-- Next: Runtime-only gaps remain when ADB/emulator is available: multi-page >50-track album live playback and observed transitions beyond first 1-2 songs. Non-emulator queue index/cap/pagination guards now tested.
-- Acceptance:
-  - Multi-page album queues more than first page
-  - Playlist Play all starts at requested index
-  - 100-track watch cap behavior is acceptable/no silent app crash
-  - Track transitions continue beyond first 1-2 songs
-
-### UNTIDY-004 — Validate playback transition smoothness and prefetch
-
-- Priority: P0
-- Type: test
-- Area: playback
-- Owner: Tommy
-- Labels: prefetch, seamless, media3
-- Spec: `docs/test-plan-thinkpad-emulator.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/4
-- Next: Runtime-only gaps remain when ADB/emulator is available: natural end-of-track transition observation and forced manifest/network failure UI validation. Non-emulator early-end transition guard and playback-error message formatting are now tested.
-- Acceptance:
-  - Starting a track does not pause/stall unexpectedly
-  - Natural transition to next track is smooth enough for watch use
-  - Playback error UI appears for manifest/network failures
+_None._
 
 ## review
 
@@ -182,6 +153,37 @@ _Generated from `work-items.json`._
 _None._
 
 ## blocked
+
+### UNTIDY-003 — Validate album and playlist play-all behavior
+
+- Priority: P0
+- Type: test
+- Area: playback
+- Owner: Tommy
+- Labels: album, playlist, queue, playback
+- Spec: `docs/test-plan-thinkpad-emulator.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/3
+- Next: Blocked on runtime environment: ADB/emulator is unavailable from cron (adb devices lists no devices; selinuxuser_execheap is off and cron must not sudo/toggle SELinux). Unblock by starting/attaching the Wear emulator with ADB available, then run live multi-page >50-track album playback and observed >1-2 song transition validation.
+- Acceptance:
+  - Multi-page album queues more than first page
+  - Playlist Play all starts at requested index
+  - 100-track watch cap behavior is acceptable/no silent app crash
+  - Track transitions continue beyond first 1-2 songs
+
+### UNTIDY-004 — Validate playback transition smoothness and prefetch
+
+- Priority: P0
+- Type: test
+- Area: playback
+- Owner: Tommy
+- Labels: prefetch, seamless, media3
+- Spec: `docs/test-plan-thinkpad-emulator.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/4
+- Next: Blocked on runtime environment: ADB/emulator is unavailable from cron (adb devices lists no devices; selinuxuser_execheap is off and cron must not sudo/toggle SELinux). Unblock by starting/attaching the Wear emulator with ADB available, then observe natural end-of-track transition and force manifest/network failure UI validation.
+- Acceptance:
+  - Starting a track does not pause/stall unexpectedly
+  - Natural transition to next track is smooth enough for watch use
+  - Playback error UI appears for manifest/network failures
 
 ### UNTIDY-010 — Implement Add to Playlist workflow
 
