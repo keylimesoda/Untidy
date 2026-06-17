@@ -79,6 +79,7 @@ import com.tidal.wear.playback.NowPlayingStateHolder
 import com.tidal.wear.ui.album.AlbumScreen
 import com.tidal.wear.ui.artist.ArtistAlbumsScreen
 import com.tidal.wear.ui.artist.ArtistScreen
+import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.discover.DiscoverScreen
 import com.tidal.wear.ui.library.LibraryScreen
@@ -358,7 +359,7 @@ private fun HomeScreen(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .rotaryScrollableWithFocus(scrollState)
-                .padding(top = 20.dp, bottom = 16.dp),
+                .padding(top = WearListPadding.RoundScreenTop, bottom = WearListPadding.RoundScreenBottom),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {

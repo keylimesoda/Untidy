@@ -48,6 +48,7 @@ import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.components.TidalResultChip
+import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
@@ -101,6 +102,7 @@ fun DiscoverScreen(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
+            contentPadding = WearListPadding.RoundScreenCompact,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item { DiscoverTitle(selectedSection?.title ?: "Discover") }

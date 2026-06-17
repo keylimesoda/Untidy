@@ -35,6 +35,7 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.ReleaseVersionPreference
+import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.components.tidalSecondaryChipColors
 import com.tidal.wear.ui.theme.TidalColors
@@ -58,6 +59,7 @@ fun SettingsScreen(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
+            contentPadding = WearListPadding.RoundScreen,
         ) {
                 item { SectionHeader("Account") }
                 if (accountInfo != null) {

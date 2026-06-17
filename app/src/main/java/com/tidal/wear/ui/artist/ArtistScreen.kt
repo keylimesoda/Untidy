@@ -41,6 +41,7 @@ import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.art.rememberArtworkPalette
 import com.tidal.wear.ui.components.TidalResultChip
+import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
@@ -112,6 +113,7 @@ fun ArtistScreen(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
+            contentPadding = WearListPadding.RoundScreen,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {
@@ -213,6 +215,7 @@ fun ArtistAlbumsScreen(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
+            contentPadding = WearListPadding.RoundScreen,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {

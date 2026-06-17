@@ -49,6 +49,7 @@ import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.components.TidalResultChip
+import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
@@ -70,7 +71,7 @@ fun LibraryScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf(false) }
     var loadTick by remember { mutableIntStateOf(0) }
-    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 2)
 
     fun loadLibrary() {
         loading = true
@@ -91,7 +92,7 @@ fun LibraryScreen(
 
     LaunchedEffect(loadTick) { loadLibrary() }
     LaunchedEffect(selectedCategory, loading) {
-        if (!loading) listState.scrollToItem(0)
+        if (!loading) listState.scrollToItem(if (selectedCategory == null) 2 else 0)
     }
     BackHandler(enabled = selectedCategory != null) { selectedCategory = null }
 
@@ -99,6 +100,7 @@ fun LibraryScreen(
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
+            contentPadding = WearListPadding.RoundScreenCompact,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {

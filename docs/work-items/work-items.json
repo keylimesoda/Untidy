@@ -567,7 +567,7 @@
     "id": "UNTIDY-020",
     "title": "Tune round-screen list safe-area padding",
     "type": "cleanup",
-    "status": "todo",
+    "status": "review",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -579,7 +579,10 @@
     ],
     "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
     "evidence": [
-      "UX review found row clipping at circular edges in home, search results, and library screenshots/XML."
+      "UX review found row clipping at circular edges in home, search results, and library screenshots/XML.",
+      "Implemented shared WearListPadding for round-screen browse/detail lists; applied to Home, Search, Library, Discover, Album, Artist, Playlist, and Settings surfaces.",
+      "Runtime evidence captured under reports/round-safe-area-2026-06-17/: home/search-entry/library/search-results screenshots and XML after install on emulator-5554.",
+      "Verification passed: :app:compileDebugKotlin, assembleDebug, and git diff --check. lintDebug was attempted but failed on pre-existing debug OfflineProofService UnsafeOptInUsageError errors unrelated to this UI padding change."
     ],
     "acceptance": [
       "First/last actionable rows settle inside round safe area on emulator screenshots.",
@@ -587,7 +590,7 @@
       "No major regression to scroll ergonomics.",
       "Compile/lint or relevant narrow gate passes."
     ],
-    "next": "Audit/tune ScalingLazyColumn/TransformingLazyColumn padding for key browse surfaces.",
+    "next": "Review emulator evidence for shared round-screen list padding and merge if acceptable.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/21",
     "githubNumber": 21
   },

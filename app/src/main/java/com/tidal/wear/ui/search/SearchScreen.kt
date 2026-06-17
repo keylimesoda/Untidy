@@ -65,6 +65,7 @@ import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.ui.art.rememberDeferredRowArtwork
 import com.tidal.wear.ui.components.RowArtworkThumb
+import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
@@ -153,6 +154,12 @@ fun SearchScreen(
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         if (submittedQuery.isBlank()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                SearchEntryPrompt(
+                    query = query,
+                    onKeyboardRequested = { requestKeyboardTick += 1 },
+                    onSearch = ::searchNow,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                )
                 SearchInput(
                     query = query,
                     onQueryChange = { query = it },
@@ -165,6 +172,7 @@ fun SearchScreen(
             ScalingLazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize().rotaryScrollableWithFocus(listState),
+                contentPadding = WearListPadding.RoundScreenCompact,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 item {
@@ -249,6 +257,62 @@ private fun <T> androidx.wear.compose.foundation.lazy.ScalingLazyListScope.secti
     if (items.isEmpty()) return
     item { SectionHeader(title) }
     items.forEach { element -> item { itemContent(element) } }
+}
+
+@Composable
+private fun SearchEntryPrompt(
+    query: String,
+    onKeyboardRequested: () -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val hasQuery = query.isNotBlank()
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
+        Text(
+            text = "Search TIDAL",
+            color = TidalColors.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = if (hasQuery) query else "Voice or keyboard",
+            color = if (hasQuery) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
+            fontSize = if (hasQuery) 14.sp else 12.sp,
+            fontWeight = if (hasQuery) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 10.dp),
+        )
+        Chip(
+            onClick = if (hasQuery) onSearch else onKeyboardRequested,
+            colors = ChipDefaults.primaryChipColors(
+                backgroundColor = TidalColors.Cyan,
+                contentColor = TidalColors.Black,
+                iconColor = TidalColors.Black,
+            ),
+            icon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            label = {
+                Text(
+                    text = if (hasQuery) "Search" else "Speak or type",
+                    fontWeight = FontWeight.Black,
+                )
+            },
+            secondaryLabel = {
+                Text(if (hasQuery) "Tap or press keyboard search" else "Opens Wear input")
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = "Back exits search",
+            color = TidalColors.OnSurfaceDim,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        )
+    }
 }
 
 @Composable
