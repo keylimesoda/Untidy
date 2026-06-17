@@ -329,7 +329,7 @@
       "2026-06-17 13:09 PT: debug-only downloadManifestShape probe decoded the sanctioned usage=DOWNLOAD DASH manifest without logging URLs. Live artifact shows one representation, one SegmentTemplate with initialization/media templates, SegmentTimeline present, 4 absolute URLs, no ContentProtection, looksSegmentAddressable=true, and cacheFillCandidateWithoutLicense=true for track 5120026. Artifact: reports/offline-proof-2026-06-17-1309-download-manifest-shape/latest.json."
     ],
     "acceptance": [
-      "Determine whether TIDAL API/SDK permits offline storage for this app",
+      "Prove the exact TIDAL offline provisioning path for this app",
       "If viable, define single-track MVP implementation plan",
       "If not viable, remove/neutralize fake download affordances"
     ],

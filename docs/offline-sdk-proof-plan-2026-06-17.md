@@ -517,7 +517,7 @@ No production code should be changed for this proof. Recommended implementation 
 
 ## Recommendation
 
-Move #11 from permission-blocked to **sanctioned SDK proof needed**. The next actionable engineering step is a debug-only, one-track proof runner that exercises `usage=DOWNLOAD` / `PlaybackMode.OFFLINE`, installation inventory, and the SDK `OfflinePlayProvider` path. Stop immediately if the only available path is raw caching of current `PLAYBACK`/`STREAM` manifests.
+Move #11 from permission-blocked to **official offline provisioning proof needed**: Ric has confirmed the download/store/playback pathway is sanctioned and used by other TIDAL first- and third-party apps. The next actionable engineering step is a debug-only, one-track proof runner that exercises `usage=DOWNLOAD` / `PlaybackMode.OFFLINE`, installation inventory, and the SDK `OfflinePlayProvider` path. Stop immediately if the only available path is raw caching of current `PLAYBACK`/`STREAM` manifests.
 
 ## Debug proof runner result — 2026-06-17 11:00 PT
 
@@ -814,7 +814,7 @@ Search/proof steps completed:
 
 Interpretation: within the public SDK and packaged artifacts available to Untidy, offline playback provisioning is intentionally app-supplied. The TIDAL player SDK can request `usage=DOWNLOAD` manifests and can consume `PlaybackInfo.Offline.Track`, but it does **not** ship a public downloader/offline-task orchestrator or concrete provider implementation. The remaining sanctioned path is therefore an Untidy-owned debug provider/repository that persists only data obtained from offline/download surfaces, paired with TIDAL-generated Downloads/Installations/OfflineTasks APIs where they return usable ids.
 
-Concrete next proof step: build a debug-only `OfflinePlaybackStore` shape plus provider adapter that persists redacted metadata for one `usage=DOWNLOAD` / `PlaybackMode.OFFLINE` probe result into app-private storage and reconstructs `PlaybackInfo.Offline.Track` from that store. This should not download bytes or claim offline playback yet; it proves the missing app-owned persistence boundary and narrows the next runtime gap to sanctioned byte/license acquisition.
+Concrete next proof step: build a debug-only `OfflinePlaybackStore` shape plus provider adapter that persists redacted metadata for one `usage=DOWNLOAD` / `PlaybackMode.OFFLINE` probe result into app-private storage and reconstructs `PlaybackInfo.Offline.Track` from that store. This should not download bytes or claim offline playback yet; it proves the missing app-owned persistence boundary and narrows the next runtime gap to locating and wiring the official byte/license provisioning interface.
 
 ## OfflinePlaybackStore/provider adapter proof — 2026-06-17 12:56 PT
 
@@ -841,9 +841,9 @@ Redacted live result for track `5120026` / country `US`:
 | `offlinePlaybackStoreAdapter` | persisted app-private record; manifest present length `2657`; manifest hash present; `providerCanServeStoredInfo=true`; app-private storage; `SimpleCache` UID present; `downloadBytesCached=false`; `playbackClaimed=false` | Untidy can now reconstruct a `PlaybackInfo.Offline.Track` from its own app-private offline metadata store/provider boundary. This proves the app-side state/provider shape, not the final offline replay. |
 | `sdkPlaybackModeOffline` | still returns manifest-bearing `PlaybackInfo.Track`, not a complete `PlaybackInfo.Offline.Track`; offline validity fields `-1` | The SDK OFFLINE network call alone is not the complete persisted offline object source. |
 
-Concrete advancement: the app-owned store/provider boundary is now proven end-to-end at debug runtime. The remaining missing input for a true one-track offline replay is narrower: the sanctioned source of **media bytes and/or offline license** that can legally populate the app-private cache/storage referenced by the reconstructed `PlaybackInfo.Offline.Track`.
+Concrete advancement: the app-owned store/provider boundary is now proven end-to-end at debug runtime. The remaining missing input for a true one-track offline replay is narrower: the official TIDAL provisioning interface for **media bytes and/or offline license** that can populate the app-private cache/storage referenced by the reconstructed `PlaybackInfo.Offline.Track`.
 
-Next concrete proof step: inspect the DOWNLOAD manifest shape and SDK cache-read expectations to determine whether the sanctioned DOWNLOAD manifest itself contains enough segment addressing for a debug-only cache-fill experiment, while still avoiding STREAM/PLAYBACK manifests and not logging URLs. If it does not, continue searching for the offline license/download-link source before attempting playback.
+Next concrete proof step: inspect the DOWNLOAD manifest shape and SDK cache-read expectations to determine whether the DOWNLOAD manifest itself contains enough segment addressing for a debug-only cache-fill experiment, while still avoiding STREAM/PLAYBACK manifests and not logging URLs. If it does not, continue searching for the official offline license/download-link interface before attempting playback.
 
 
 ## DOWNLOAD manifest shape probe — 2026-06-17 13:09 PT

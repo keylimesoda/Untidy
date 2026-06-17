@@ -95,7 +95,7 @@ Required next proof:
 
 ### 4. Full custom downloader with app-private files
 
-**Blocked unless TIDAL explicitly permits and documents this.**
+**Blocked unless this uses the same official offline/download provisioning pathway TIDAL clients already use.**
 
 Even with app-private storage and encryption, a custom downloader must still use TIDAL's offline license/provisioning path. Do not invent local DRM or store raw audio from streaming endpoints.
 
