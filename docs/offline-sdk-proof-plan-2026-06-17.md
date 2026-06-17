@@ -873,3 +873,34 @@ Redacted live result for track `5120026` / country `US`:
 Concrete advancement: #11 has moved from "can we store offline metadata?" to "the official DOWNLOAD manifest is segment-addressable enough for a debug-only app-private cache-fill attempt." The guardrail remains intact: no STREAM/PLAYBACK manifest is used or cached.
 
 Next concrete proof step: implement a debug-only cache-fill probe that uses the sanctioned `usage=DOWNLOAD` DASH manifest and app-private Media3 cache only, records byte/cache-key counts without URLs, and does **not** claim offline playback until a network-disabled replay path succeeds. If cache filling fails, inspect the failure at the Media3 cache/key layer before going back to server-side `Downloads`/offline-license discovery.
+
+
+## DOWNLOAD manifest cache-fill proof — 2026-06-17 13:20 PT
+
+The next proof step after the DOWNLOAD manifest shape probe was to try a debug-only cache fill using only the sanctioned `usage=DOWNLOAD` DASH manifest and app-private Media3 cache. This does not claim offline playback and does not use `usage=PLAYBACK` / `playbackmode=STREAM` manifests.
+
+Code change:
+
+- `app/src/debug/java/com/tidal/wear/debug/OfflineProofService.kt`
+  - Added `downloadManifestCacheFill`.
+  - Fetches `GET /v2/trackManifests/{trackId}` with `manifestType=MPEG_DASH`, `formats=HEAACV1`, `uriScheme=DATA`, `usage=DOWNLOAD`, and `adaptive=false`.
+  - Feeds the returned DATA DASH manifest into Media3 `DashDownloader` with app-private `SimpleCache`.
+  - Records only byte counts, key counts, key hashes, manifest hashes, and progress numbers; no bearer tokens, manifest URLs, segment URLs, download hrefs, licenses, or encryption keys are logged.
+- `app/build.gradle.kts`
+  - Added debug-only Media3 datasource/exoplayer/dash dependencies so the debug harness can compile without exposing the downloader path as production UX.
+
+Runtime artifact:
+
+- `reports/offline-proof-2026-06-17-1320-cache-fill/latest.json` (gitignored local runtime artifact)
+
+Redacted live result for track `5120026` / country `US`:
+
+| Probe | Result | Meaning |
+| --- | --- | --- |
+| `trackManifestDownload` | `200`; manifest URI present; manifest hash present; no DRM data | The sanctioned DOWNLOAD manifest surface remains stable. |
+| `downloadManifestShape` | DATA DASH decoded; one representation; one SegmentTemplate; SegmentTimeline present; zero ContentProtection; `cacheFillCandidateWithoutLicense=true` | The manifest remains structurally cache-fillable for this non-DRM HEAACV1 proof track. |
+| `downloadManifestCacheFill` | `cacheFillSucceeded=true`; cache bytes added `2,428,102`; cache keys after fill `53`; downloader progress `100%`; elapsed `6,727ms`; URLs logged `false`; `playbackClaimed=false` | The sanctioned DOWNLOAD DASH manifest can populate app-private Media3 cache for one proof track. This advances the proof from metadata/store shape to actual sanctioned byte caching, but it is not yet an offline replay claim. |
+
+Concrete advancement: Untidy now has a debug-only proof that app-private Media3 cache can be filled from the official `usage=DOWNLOAD` DASH manifest. The remaining proof is whether the SDK/player offline path can replay from that cache with network disabled and the reconstructed `PlaybackInfo.Offline.Track`; if not, inspect cache-key alignment between `DashDownloader`, `OfflineStorageProvider`, and `OfflineCacheProvider` before returning to server-side `Downloads`/offline-license discovery.
+
+Next concrete proof step: add or run a debug-only network-disabled replay probe against the same cache and provider path. Do not mark #11 done until playback succeeds from cache with network disabled and the artifact proves no network fetch/STREAM manifest path was used.

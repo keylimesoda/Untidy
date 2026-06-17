@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: downloads, offline, drm, tidal
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Implement a debug-only cache-fill probe using only the sanctioned usage=DOWNLOAD DASH manifest and app-private Media3 cache; record cache bytes/keys without URLs, and do not claim offline playback until a network-disabled replay path succeeds.
+- Next: Attempt a debug-only network-disabled replay using the same sanctioned usage=DOWNLOAD DASH manifest/app-private Media3 cache and OfflinePlayProvider; verify whether cached bytes alone are enough before claiming offline playback.
 - Acceptance:
   - Prove the exact TIDAL offline provisioning path for this app
   - If viable, define single-track MVP implementation plan

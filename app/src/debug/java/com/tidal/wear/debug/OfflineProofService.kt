@@ -6,6 +6,13 @@ import android.content.Intent
 import android.os.IBinder
 import android.util.Base64
 import android.util.Log
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.exoplayer.dash.offline.DashDownloader
+import androidx.media3.exoplayer.offline.Downloader
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.datasource.cache.NoOpCacheEvictor
@@ -131,6 +138,7 @@ class OfflineProofService : Service() {
         }
         results += offlinePlaybackStoreAdapterProbe(trackId, countryCode, token, clientId)
         results += downloadManifestShapeProbe(trackId, countryCode, token, clientId)
+        results += downloadManifestCacheFillProbe(trackId, countryCode, token, clientId)
 
         val installationId = probeInstallationInventory(trackId, countryCode, token, clientId, results)
         probeOfflineDiscoverySurfaces(trackId, countryCode, token, clientId, account?.userId, results)
@@ -659,6 +667,129 @@ class OfflineProofService : Service() {
             put("exception", it::class.java.simpleName)
             put("message", it.message.orEmpty().take(180))
         })
+    }
+
+
+    private fun downloadManifestCacheFillProbe(
+        trackId: String,
+        countryCode: String,
+        token: String,
+        clientId: String,
+    ): JsonObject {
+        var cache: SimpleCache? = null
+        return runCatching {
+            val url = "https://openapi.tidal.com/v2/trackManifests/$trackId".toHttpUrl().newBuilder()
+                .addQueryParameter("manifestType", "MPEG_DASH")
+                .addQueryParameter("formats", "HEAACV1")
+                .addQueryParameter("uriScheme", "DATA")
+                .addQueryParameter("usage", "DOWNLOAD")
+                .addQueryParameter("adaptive", "false")
+                .addQueryParameter("countryCode", countryCode)
+                .build()
+            val request = Request.Builder()
+                .url(url)
+                .header("accept", JSON_API_ACCEPT)
+                .header("X-Tidal-Token", clientId)
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                val bodyText = response.body?.string().orEmpty()
+                val root = bodyText.takeIf { it.isNotBlank() }?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
+                val attrs = root?.jsonObject("data")?.jsonObject("attributes")
+                val manifest = attrs?.string("uri").orEmpty()
+                val decoded = decodeDataDashManifest(manifest)
+                val contentProtectionCount = countOccurrences(decoded, "<ContentProtection")
+                if (!response.isSuccessful || manifest.isBlank() || decoded.isBlank() || contentProtectionCount > 0) {
+                    return event("downloadManifestCacheFill", buildJsonObject {
+                        put("sourceSurface", "trackManifests usage=DOWNLOAD uriScheme=DATA")
+                        put("status", response.code)
+                        put("successful", response.isSuccessful)
+                        put("manifestPresent", manifest.isNotBlank())
+                        put("decodedDashPresent", decoded.isNotBlank())
+                        put("contentProtectionCount", contentProtectionCount)
+                        put("attemptedCacheFill", false)
+                        put("errorSummary", summarizeErrors(root).toString())
+                    })
+                }
+
+                val cacheDir = File(filesDir, "offline-proof-cachefill/cache-$trackId").apply { mkdirs() }
+                cache = SimpleCache(cacheDir, NoOpCacheEvictor(), StandaloneDatabaseProvider(applicationContext))
+                val beforeBytes = cache?.cacheSpace ?: 0L
+                val beforeKeys = cache?.keys?.size ?: 0
+                val requestHeaders = mapOf(
+                    "accept" to "*/*",
+                    "X-Tidal-Token" to clientId,
+                    "Authorization" to "Bearer $token",
+                )
+                val upstreamFactory = DefaultDataSource.Factory(
+                    applicationContext,
+                    DefaultHttpDataSource.Factory()
+                        .setUserAgent("UntidyOfflineProof/${BuildConfig.VERSION_NAME}")
+                        .setDefaultRequestProperties(requestHeaders),
+                )
+                val cacheDataSourceFactory = CacheDataSource.Factory()
+                    .setCache(requireNotNull(cache))
+                    .setUpstreamDataSourceFactory(upstreamFactory)
+                val mediaItem = MediaItem.Builder()
+                    .setMediaId("untidy-download-proof-$trackId")
+                    .setUri(manifest)
+                    .setMimeType(MimeTypes.APPLICATION_MPD)
+                    .setCustomCacheKey("untidy-download-proof-$trackId-${sha256Short(manifest)}")
+                    .build()
+                var progressContentLength = -1L
+                var progressBytesDownloaded = 0L
+                var progressPercent = -1f
+                val started = System.currentTimeMillis()
+                val downloader = DashDownloader(mediaItem, cacheDataSourceFactory)
+                downloader.download(Downloader.ProgressListener { contentLength, bytesDownloaded, percentDownloaded ->
+                    progressContentLength = contentLength
+                    progressBytesDownloaded = bytesDownloaded
+                    progressPercent = percentDownloaded
+                })
+                val elapsedMs = System.currentTimeMillis() - started
+                val afterBytes = cache?.cacheSpace ?: 0L
+                val keys = cache?.keys?.toList()?.sorted().orEmpty()
+                event("downloadManifestCacheFill", buildJsonObject {
+                    put("sourceSurface", "trackManifests usage=DOWNLOAD uriScheme=DATA")
+                    put("status", response.code)
+                    put("successful", response.isSuccessful)
+                    put("attemptedCacheFill", true)
+                    put("cacheFillSucceeded", true)
+                    put("manifestContentHash", sha256Short(manifest))
+                    put("decodedDashHash", sha256Short(decoded))
+                    put("contentProtectionCount", contentProtectionCount)
+                    put("cacheDirHash", sha256Short(cacheDir.absolutePath))
+                    put("cacheUidPresent", cache?.uid != Cache.UID_UNSET)
+                    put("cacheBytesBefore", beforeBytes)
+                    put("cacheBytesAfter", afterBytes)
+                    put("cacheBytesAdded", (afterBytes - beforeBytes).coerceAtLeast(0L))
+                    put("cacheKeysBefore", beforeKeys)
+                    put("cacheKeysAfter", keys.size)
+                    put("cacheKeyHashes", keys.joinToString(",") { sha256Short(it) })
+                    put("progressContentLength", progressContentLength)
+                    put("progressBytesDownloaded", progressBytesDownloaded)
+                    put("progressPercent", progressPercent.toDouble())
+                    put("elapsedMs", elapsedMs)
+                    put("urlsLogged", false)
+                    put("playbackClaimed", false)
+                    put("next", "network-disabled replay using same app-private cache and OfflinePlayProvider")
+                })
+            }
+        }.getOrElse {
+            event("downloadManifestCacheFill", buildJsonObject {
+                put("sourceSurface", "trackManifests usage=DOWNLOAD uriScheme=DATA")
+                put("attemptedCacheFill", true)
+                put("cacheFillSucceeded", false)
+                put("exception", it::class.java.simpleName)
+                put("message", it.message.orEmpty().take(180))
+                put("urlsLogged", false)
+                put("playbackClaimed", false)
+                put("next", "inspect Media3 DASH/cache failure before returning to Downloads/offline-license discovery")
+            })
+        }.also {
+            runCatching { cache?.release() }
+        }
     }
 
     private fun decodeDataDashManifest(manifest: String): String {
