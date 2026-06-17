@@ -660,3 +660,34 @@ Redacted live results for track `5120026` / country `US`:
 | `GET /v2/offlineTasks?include=item,collection,owners` and `page[cursor]=0` | `400 MISSING_REQUIRED_PARAMETER` | Task listing still needs a real installation/task/download seam not present in generated metadata. |
 
 Self-unblock outcome: generated metadata plus live cursor/locale alternates did not reveal a valid offline mix, download, task, or installation id. This is a useful negative proof: the next run should stop guessing `UserOfflineMixes` by user id and instead inspect non-`tidalapi` SDK artifacts for first-party orchestration around `Downloads`, `OfflineTasks`, or `OfflineDrmHelper`, or search network constants in player/offline modules for the missing server-side source.
+
+
+## Non-tidalapi player offline branch inspection — 2026-06-17 12:16 PT
+
+After the offline-mix/user-id probes failed, the next anti-lazy self-unblock step was to inspect **non-`tidalapi`** SDK/player artifacts for the offline playback orchestration path instead of guessing more endpoint ids. I decompiled `player-playback-engine`, `player-streaming-api`, and adjacent player modules with `javap -p -c -constants` and searched literal strings/network constants. This produced a useful local playback map, but did **not** reveal a hidden Downloads/OfflineTasks/create endpoint.
+
+Bytecode evidence from `com.tidal.sdk.player.playbackengine.mediasource.TidalMediaSourceCreator`:
+
+- `TidalMediaSourceCreator.create(mediaItem, playbackInfo, extras)` has a dedicated branch for `PlaybackInfo.Offline`.
+- For progressive offline playback:
+  - if `PlaybackInfo.Offline.partiallyEncrypted == true`, it uses `PlayerDecryptedHeaderProgressiveOfflineMediaSourceFactory.create(mediaItem, manifest, productId)`.
+  - otherwise it uses `PlayerProgressiveOfflineMediaSourceFactory.create(mediaItem, manifest, storage)`.
+- For DASH offline playback it uses `PlayerDashOfflineMediaSourceFactory.create(mediaItem, manifest, offlineLicense, storage, drmSessionManagerProvider)`.
+- This confirms the official player expects a **complete `PlaybackInfo.Offline` object** containing manifest, storage, and — for DASH/DRM — offline license. The player branch is not responsible for discovering server download/task ids.
+
+Bytecode evidence from `PlayerDashOfflineMediaSourceFactory` and DRM helpers:
+
+- `PlayerDashOfflineMediaSourceFactory.create(...)` parses the encoded DASH manifest, obtains a `DataSource.Factory` from `OfflineStorageProvider.getDataSourceFactoryForOfflinePlay(storage, hasOfflineLicense)`, and calls `OfflineDrmHelper.setOfflineLicense(offlineLicense, drmSessionManager)` when the offline license is non-empty.
+- `DrmSessionManagerFactory.createDrmSessionManagerForOfflinePlay(playbackInfo, extras)` returns `DRM_UNSUPPORTED` when `offlineLicense` is empty; when non-empty, it builds a normal DRM session manager from the online delegate playback info and passes an empty license URL into the callback path.
+- `TidalMediaDrmCallback.executeKeyRequest(...)` only has an implemented `DrmMode.Streaming` branch in this artifact; the offline license is therefore injected through `OfflineDrmHelper.setOfflineLicense(...)`, not fetched from a separate hidden offline callback branch discovered in player bytecode.
+
+Literal/network-constant scan outcome:
+
+- Non-`tidalapi` player artifacts exposed the storage URL sentinel `https://fsu.fa.tidal.com/storage/.m3u8@` and offline media-source/cache classes, but no hidden first-party endpoint for creating offline tasks, resolving download ids, or fetching an offline license outside the generated `tidalapi`/playback-info surfaces already probed.
+
+Concrete advancement: the remaining #11 gap is now narrowed further. Untidy can wire the local official offline playback branch, and the player branch confirms the exact required payload shape: `PlaybackInfo.Offline.Track(delegate PlaybackInfo.Track, offlineLicense, Storage, partiallyEncrypted)`. The missing source is still upstream/server-side: a sanctioned way to populate `offlineLicense`, `Storage.path`, and cached bytes for a track. Continuing to guess `downloads/{trackId}` or user-id offline mixes is lower-value than proving whether the SDK `PlaybackInfoRepositoryDefault.getOfflineTrackPlaybackInfo(...)` delegation can be supplied from local persisted proof data, or finding official/first-party code that populates `OfflinePlaybackInfoProvider`.
+
+Next concrete proof step:
+
+1. Build a debug-only compile/runtime harness around the real `TidalMediaSourceCreator` offline branch using a synthetic redacted `PlaybackInfo.Offline.Track` and app-private `Storage`, to prove which offline branch/factory path Untidy will hit for DASH vs progressive manifests without real download bytes.
+2. In parallel or next run, search/decompile any available first-party sample/app artifacts for implementations of `OfflinePlaybackInfoProvider`; that interface remains the likely boundary where TIDAL's official app/client injects server-side offline license/storage state.

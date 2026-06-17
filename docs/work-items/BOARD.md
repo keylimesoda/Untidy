@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: downloads, offline, drm, tidal
 - Spec: `docs/spec-downloads-offline-playback.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/11
-- Next: Inspect non-tidalapi SDK artifacts/player offline modules for orchestration around Downloads, OfflineTasks, OfflineDrmHelper, or hidden network constants; generated tidalapi model metadata and UserOfflineMix cursor/locale alternates did not expose the server-side id/license/task source.
+- Next: Build a debug-only compile/runtime harness around the real TidalMediaSourceCreator offline branch with synthetic redacted PlaybackInfo.Offline.Track and app-private Storage to prove DASH vs progressive factory behavior; also search for any available OfflinePlaybackInfoProvider implementation as the likely source of offline license/storage state.
 - Acceptance:
   - Determine whether TIDAL API/SDK permits offline storage for this app
   - If viable, define single-track MVP implementation plan
