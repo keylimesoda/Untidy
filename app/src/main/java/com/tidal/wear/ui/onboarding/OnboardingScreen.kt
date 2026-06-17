@@ -21,6 +21,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,7 +55,7 @@ fun OnboardingScreen(
     var session by remember { mutableStateOf<DeviceAuthSession?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    var retryCount by remember { mutableStateOf(0) }
+    var retryCount by remember { mutableIntStateOf(0) }
     val isAuthenticated by authRepository.isAuthenticated.collectAsState(initial = false)
     val view = LocalView.current
 

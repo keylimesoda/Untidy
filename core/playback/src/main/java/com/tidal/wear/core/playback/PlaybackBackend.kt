@@ -48,7 +48,8 @@ internal interface PlaybackBackend {
     val positionMs: Long
 
     fun setAudioPreset(preset: AudioPreset)
-    fun loadTrack(trackId: String)
+    suspend fun loadTrack(trackId: String)
+    fun prefetchTrack(trackId: String) {}
     fun play()
     fun pause()
     fun seek(positionSeconds: Float)
@@ -103,7 +104,7 @@ internal class TidalSdkPlaybackBackend(
         sdkPlayer.playbackEngine.streamingCellularAudioQuality = quality
     }
 
-    override fun loadTrack(trackId: String) {
+    override suspend fun loadTrack(trackId: String) {
         sdkPlayer.playbackEngine.load(MediaProduct(ProductType.TRACK, trackId))
     }
 

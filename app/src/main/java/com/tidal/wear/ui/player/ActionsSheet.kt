@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +54,7 @@ fun ActionsSheet(
     downloadState: DownloadState,
     outputOptions: List<AudioOutputOption>,
     onDownload: () -> Unit,
+    onQueue: () -> Unit,
     onOutputSettings: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onViewAlbum: () -> Unit,
@@ -77,6 +79,15 @@ fun ActionsSheet(
             contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            item {
+                ActionRow(
+                    icon = Icons.Filled.QueueMusic,
+                    label = "Queue",
+                    rightIndicator = null,
+                    iconTint = TidalColors.Cyan,
+                    onClick = onQueue,
+                )
+            }
             item {
                 ActionRow(
                     icon = Icons.Filled.Download,

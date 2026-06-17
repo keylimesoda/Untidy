@@ -27,9 +27,9 @@ import com.tidal.wear.ui.theme.TidalColors
 @Composable
 fun SecondaryChip(
     label: String,
-    icon: ImageVector = Icons.Filled.Star,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    icon: ImageVector = Icons.Filled.Star,
 ) {
     Box(
         modifier = modifier
