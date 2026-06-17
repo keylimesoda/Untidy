@@ -30,8 +30,8 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.ToggleChip
 import androidx.wear.compose.material.ToggleChipDefaults
-import androidx.wear.compose.material.ScalingLazyColumn
-import androidx.wear.compose.material.rememberScalingLazyListState
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.ReleaseVersionPreference
@@ -160,9 +160,10 @@ fun SettingsScreen(
                 }
 
                 item { SectionHeader("Downloads") }
-                item { DisabledSettingChip("Download quality", "Coming in downloads") }
-                item { DisabledSettingChip("Download over LTE", "Coming in downloads") }
-                item { DisabledSettingChip("Storage limit", "Coming in downloads") }
+                item { DisabledSettingChip("Offline playback", "Needs sanctioned TIDAL support") }
+                item { DisabledSettingChip("Download quality", "Disabled until supported") }
+                item { DisabledSettingChip("Download over LTE", "Disabled until supported") }
+                item { DisabledSettingChip("Storage limit", "Disabled until supported") }
 
                 item { SectionHeader("About") }
                 item { DisabledSettingChip("Untidy", "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") }

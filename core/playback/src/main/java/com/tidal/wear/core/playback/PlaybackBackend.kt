@@ -43,12 +43,30 @@ internal sealed interface PlaybackBackendEvent {
     data class Other(val name: String) : PlaybackBackendEvent
 }
 
+internal fun shouldHoldQueueAdvanceOnEarlyMediaEnd(
+    elapsedMs: Long,
+    durationMs: Long,
+    minimumCatalogDurationMs: Long = 60_000L,
+    earlyEndToleranceMs: Long = 45_000L,
+): Boolean {
+    if (durationMs <= minimumCatalogDurationMs) return false
+    val safeElapsedMs = elapsedMs.coerceAtLeast(0L)
+    return safeElapsedMs < durationMs - earlyEndToleranceMs
+}
+
+internal fun playbackErrorUiMessage(code: String, message: String?): String = buildString {
+    append("Playback failed")
+    message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it.take(120)) }
+        ?: code.takeIf { it.isNotBlank() }?.let { append(" (").append(it).append(")") }
+}
+
 internal interface PlaybackBackend {
     val events: Flow<PlaybackBackendEvent>
     val positionMs: Long
 
     fun setAudioPreset(preset: AudioPreset)
-    fun loadTrack(trackId: String)
+    suspend fun loadTrack(trackId: String)
+    fun prefetchTrack(trackId: String) {}
     fun play()
     fun pause()
     fun seek(positionSeconds: Float)
@@ -103,7 +121,7 @@ internal class TidalSdkPlaybackBackend(
         sdkPlayer.playbackEngine.streamingCellularAudioQuality = quality
     }
 
-    override fun loadTrack(trackId: String) {
+    override suspend fun loadTrack(trackId: String) {
         sdkPlayer.playbackEngine.load(MediaProduct(ProductType.TRACK, trackId))
     }
 

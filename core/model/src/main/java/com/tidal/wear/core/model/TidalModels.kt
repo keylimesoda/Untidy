@@ -1,5 +1,8 @@
 package com.tidal.wear.core.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class TidalTrack(
     val id: String,
     val title: String,
@@ -8,6 +11,8 @@ data class TidalTrack(
     val artworkUrl: String? = null,
     val durationMs: Long = 0L,
     val streamUrl: String? = null,
+    val albumId: String = "",
+    val artistId: String = "",
 )
 
 data class TidalAlbum(
@@ -46,6 +51,11 @@ data class TidalPlaylist(
     val creator: String = "",
     val artworkUrl: String? = null,
 )
+
+enum class AddTrackToPlaylistOutcome {
+    Added,
+    AlreadyPresent,
+}
 
 data class TidalSearchResult(
     val tracks: List<TidalTrack> = emptyList(),

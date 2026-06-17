@@ -1,3 +1,5 @@
+@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.tidal.wear.core.playback
 
 import android.app.NotificationChannel
@@ -6,12 +8,12 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -29,6 +31,7 @@ import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.playback.settings.sharedSettingsDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,7 +40,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Context.playbackSettingsDataStore by preferencesDataStore(name = "tidal_settings")
 private const val MEDIA_CHANNEL_ID = "tidal_playback"
 private const val MEDIA_NOTIFICATION_ID = 42
 private const val PLAYER_LOG_TAG = "Untidy/Player"
@@ -85,7 +87,15 @@ class TidalMediaService : MediaLibraryService() {
                             handleMediaProductEnded()
                         }
                         is PlaybackBackendEvent.QualityChanged -> logPlaybackContext("quality", event.context)
-                        is PlaybackBackendEvent.Error -> Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.code}", event.throwable)
+                        is PlaybackBackendEvent.Error -> {
+                            Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.code}", event.throwable)
+                            player.setPlaybackError(
+                                playbackErrorUiMessage(
+                                    code = event.code,
+                                    message = event.throwable?.message,
+                                ),
+                            )
+                        }
                         is PlaybackBackendEvent.Other -> if (event.name.contains("Error", ignoreCase = true)) {
                             Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.name}")
                         }
@@ -96,7 +106,21 @@ class TidalMediaService : MediaLibraryService() {
         session = MediaLibrarySession.Builder(
             this,
             sessionPlayer!!,
-            object : MediaLibrarySession.Callback {},
+            object : MediaLibrarySession.Callback {
+                override fun onConnect(
+                    session: MediaSession,
+                    controllerInfo: MediaSession.ControllerInfo,
+                ): MediaSession.ConnectionResult {
+                    if (!isAllowedController(session, controllerInfo)) {
+                        Log.w(
+                            PLAYER_LOG_TAG,
+                            "rejecting media controller package=${controllerInfo.packageName} uid=${controllerInfo.uid} trusted=${controllerInfo.isTrusted}",
+                        )
+                        return MediaSession.ConnectionResult.reject()
+                    }
+                    return super.onConnect(session, controllerInfo)
+                }
+            },
         )
             .setSessionActivity(playerActivityPendingIntent())
             .build()
@@ -104,10 +128,42 @@ class TidalMediaService : MediaLibraryService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session
 
+    private fun isAllowedController(
+        session: MediaSession,
+        controllerInfo: MediaSession.ControllerInfo,
+    ): Boolean = MediaControllerAccessPolicy.isAllowedController(
+        ownPackageName = packageName,
+        controllerPackageName = controllerInfo.packageName,
+        isTrusted = controllerInfo.isTrusted,
+        isMediaNotificationController = session.isMediaNotificationController(controllerInfo),
+    )
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val result = super.onStartCommand(intent, flags, startId)
-        Log.d(PLAYER_LOG_TAG, "onStartCommand action=${intent?.action ?: "null"}")
-        when (intent?.action) {
+        val action = intent?.action
+        Log.d(PLAYER_LOG_TAG, "onStartCommand action=${action ?: "null"}")
+
+        // This service is intentionally still exported while MediaLibraryService controller support
+        // is validated. Media3 controllers are filtered in onConnect(); explicit custom service
+        // actions must also be app-authored so another package cannot start authenticated playback,
+        // auth probes, queue jumps, or transport controls via startForegroundService().
+        if (PlaybackServiceForegroundPolicy.requiresAppCommandToken(action) &&
+            !PlaybackCommandTokenProvider.isValid(this, intent)
+        ) {
+            Log.w(PLAYER_LOG_TAG, "rejecting service action without app command token action=${action ?: "null"}")
+            stopSelfResult(startId)
+            return result
+        }
+
+        // If an app-authored idle/no-op control intent starts us as a foreground service, Android
+        // still requires us to promote to foreground quickly or stop this start request.
+        if (PlaybackServiceForegroundPolicy.shouldStopStartedServiceWhenIdle(action) && currentTrack == null) {
+            Log.d(PLAYER_LOG_TAG, "idle control action ignored; stopping foreground-service startId=$startId")
+            stopSelfResult(startId)
+            return result
+        }
+
+        when (action) {
             PlaybackActions.ACTION_PLAY_FIXTURE -> {
                 publishOngoingActivity(fixtureTrack(), isPlaying = true)
                 playTrack("fixture-run-01", fixtureTrack())
@@ -115,6 +171,11 @@ class TidalMediaService : MediaLibraryService() {
             PlaybackActions.ACTION_PROBE_DEVICE_AUTH -> probeDeviceAuth()
             PlaybackActions.ACTION_PLAY_TRACK -> {
                 val trackId = intent.getStringExtra(PlaybackActions.EXTRA_TRACK_ID).orEmpty()
+                if (trackId.isBlank()) {
+                    Log.w(PLAYER_LOG_TAG, "playTrack ignored blank track id; stopping foreground-service startId=$startId")
+                    stopSelfResult(startId)
+                    return result
+                }
                 val knownTrack = intent.toTrackOrNull()
                 currentQueue = emptyList()
                 currentQueueIndex = 0
@@ -124,14 +185,23 @@ class TidalMediaService : MediaLibraryService() {
                 )
                 playTrack(trackId = trackId, knownTrack = knownTrack)
             }
-            PlaybackActions.ACTION_PLAY_QUEUE -> playQueue(
-                queueId = intent.getStringExtra(PlaybackActions.EXTRA_QUEUE_ID).orEmpty(),
-                startIndex = intent.getIntExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, 0),
-            )
+            PlaybackActions.ACTION_PLAY_QUEUE -> {
+                val queueStarted = playQueue(
+                    queueId = intent.getStringExtra(PlaybackActions.EXTRA_QUEUE_ID).orEmpty(),
+                    queuePayload = intent.getStringExtra(PlaybackActions.EXTRA_QUEUE_PAYLOAD).orEmpty(),
+                    startIndex = intent.getIntExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, 0),
+                )
+                if (!queueStarted) {
+                    stopSelfResult(startId)
+                }
+            }
             PlaybackActions.ACTION_PAUSE -> { sessionPlayer?.pause(); currentTrack?.let { publishOngoingActivity(it, isPlaying = false) } }
             PlaybackActions.ACTION_RESUME -> { sessionPlayer?.play(); currentTrack?.let { publishOngoingActivity(it, isPlaying = true) } }
             PlaybackActions.ACTION_SKIP_NEXT -> skipToNextInQueue()
             PlaybackActions.ACTION_SKIP_PREVIOUS -> skipToPreviousInQueue()
+            PlaybackActions.ACTION_JUMP_TO_QUEUE_INDEX -> jumpToQueueIndex(
+                intent.getIntExtra(PlaybackActions.EXTRA_QUEUE_INDEX, -1),
+            )
         }
         return result
     }
@@ -163,37 +233,35 @@ class TidalMediaService : MediaLibraryService() {
             )
             currentTrack = track
             currentTrackStartedAtMs = SystemClock.elapsedRealtime()
-            sessionPlayer?.loadTrack(track)
+            prefetchNextInQueue()
+            sessionPlayer?.loadTrack(track, currentQueue, currentQueueIndex)
             publishOngoingActivity(track, isPlaying = true)
             runCatching {
                 Log.d(PLAYER_LOG_TAG, "backend load start id=$id")
                 playbackBackend?.loadTrack(id)
                 Log.d(PLAYER_LOG_TAG, "backend load completed id=$id")
-            }.onFailure {
-                Log.e(PLAYER_LOG_TAG, "backend load failed", it)
-            }
-            runCatching {
                 Log.d(PLAYER_LOG_TAG, "backend play start")
                 playbackBackend?.play()
                 Log.d(PLAYER_LOG_TAG, "backend play completed")
             }.onFailure {
-                Log.e(PLAYER_LOG_TAG, "backend play failed", it)
+                Log.e(PLAYER_LOG_TAG, "backend load/play failed", it)
+                sessionPlayer?.setPlaybackError("Playback failed: ${it.message ?: it::class.java.simpleName}")
             }
-            sessionPlayer?.setBackendPlaybackState(PlaybackBackendState.Playing)
         }
     }
 
-    private fun playQueue(queueId: String, startIndex: Int) {
-        val queue = PlaybackQueueStore.get(queueId)
+    private fun playQueue(queueId: String, queuePayload: String, startIndex: Int): Boolean {
+        val queue = PlaybackQueueStore.get(queueId).ifEmpty { PlaybackQueueStore.fromPayload(queuePayload) }
         if (queue.isEmpty()) {
-            Log.w(PLAYER_LOG_TAG, "playQueue ignored empty queue id=$queueId")
-            return
+            Log.w(PLAYER_LOG_TAG, "playQueue ignored empty queue id=$queueId payload=${queuePayload.isNotBlank()}")
+            return false
         }
         currentQueue = queue
         currentQueueIndex = startIndex.coerceIn(0, queue.lastIndex)
         val track = queue[currentQueueIndex]
         Log.d(PLAYER_LOG_TAG, "playQueue id=$queueId size=${queue.size} start=$currentQueueIndex track=${track.id}")
         playTrack(track.id, track)
+        return true
     }
 
     private fun skipToNextInQueue() {
@@ -210,6 +278,12 @@ class TidalMediaService : MediaLibraryService() {
 
     private fun hasNextInQueue(): Boolean = currentQueue.isNotEmpty() && currentQueueIndex + 1 <= currentQueue.lastIndex
 
+    private fun prefetchNextInQueue() {
+        val nextTrackId = currentQueue.getOrNull(currentQueueIndex + 1)?.id?.takeIf { it.isNotBlank() } ?: return
+        Log.d(PLAYER_LOG_TAG, "queue prefetch next index=${currentQueueIndex + 1} id=$nextTrackId")
+        playbackBackend?.prefetchTrack(nextTrackId)
+    }
+
     private fun skipToPreviousInQueue() {
         val previous = currentQueueIndex - 1
         if (currentQueue.isNotEmpty() && previous >= 0) {
@@ -222,12 +296,22 @@ class TidalMediaService : MediaLibraryService() {
         }
     }
 
+    private fun jumpToQueueIndex(index: Int) {
+        if (index !in currentQueue.indices) {
+            Log.d(PLAYER_LOG_TAG, "queue jump ignored index=$index size=${currentQueue.size}")
+            return
+        }
+        currentQueueIndex = index
+        val track = currentQueue[currentQueueIndex]
+        Log.d(PLAYER_LOG_TAG, "queue jump index=$currentQueueIndex id=${track.id}")
+        playTrack(track.id, track)
+    }
+
     private fun handleMediaProductEnded() {
         val track = currentTrack
         val elapsedMs = (SystemClock.elapsedRealtime() - currentTrackStartedAtMs).coerceAtLeast(0L)
         val durationMs = track?.durationMs ?: 0L
-        val endedEarly = durationMs > 60_000L && elapsedMs < durationMs - 45_000L
-        if (endedEarly) {
+        if (shouldHoldQueueAdvanceOnEarlyMediaEnd(elapsedMs = elapsedMs, durationMs = durationMs)) {
             Log.w(
                 PLAYER_LOG_TAG,
                 "backend ended before catalog duration id=${track?.id.orEmpty()} elapsedMs=$elapsedMs durationMs=$durationMs; not advancing queue automatically",
@@ -253,7 +337,7 @@ class TidalMediaService : MediaLibraryService() {
 
     private suspend fun configureQuality() {
         val preset = runCatching {
-            playbackSettingsDataStore.data.first()[stringPreferencesKey("audio_preset")]
+            sharedSettingsDataStore.data.first()[stringPreferencesKey("audio_preset")]
                 ?.let { AudioPreset.valueOf(it) }
         }.getOrNull() ?: AudioPreset.BatterySaver
         playbackBackend?.setAudioPreset(preset)
@@ -309,7 +393,9 @@ class TidalMediaService : MediaLibraryService() {
     private fun serviceAction(action: String, requestCode: Int): PendingIntent = PendingIntent.getService(
         this,
         requestCode,
-        Intent(this, TidalMediaService::class.java).setAction(action),
+        Intent(this, TidalMediaService::class.java)
+            .setAction(action)
+            .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this)),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
@@ -348,6 +434,8 @@ private fun Intent.toTrackOrNull(): TidalTrack? {
         album = getStringExtra(PlaybackActions.EXTRA_ALBUM).orEmpty(),
         artworkUrl = getStringExtra(PlaybackActions.EXTRA_ARTWORK_URL),
         durationMs = getLongExtra(PlaybackActions.EXTRA_DURATION_MS, 0L),
+        albumId = getStringExtra(PlaybackActions.EXTRA_ALBUM_ID).orEmpty(),
+        artistId = getStringExtra(PlaybackActions.EXTRA_ARTIST_ID).orEmpty(),
     )
 }
 
@@ -363,15 +451,25 @@ private class TidalSessionPlayer(
     private var basePositionMs = 0L
     private var baseElapsedMs = android.os.SystemClock.elapsedRealtime()
     private var endedAwaitingReplay = false
+    private var playbackError: androidx.media3.common.PlaybackException? = null
 
-    fun loadTrack(track: TidalTrack) {
+    fun loadTrack(track: TidalTrack, queue: List<TidalTrack>, queueIndex: Int) {
         Log.d(PLAYER_LOG_TAG, "SessionPlayer loadTrack id=${track.id} title=${track.title}")
+        val extras = Bundle().apply {
+            putString(PlaybackActions.EXTRA_ALBUM_ID, track.albumId)
+            putString(PlaybackActions.EXTRA_ARTIST_ID, track.artistId)
+            if (queue.isNotEmpty()) {
+                putString(PlaybackActions.EXTRA_QUEUE_PAYLOAD, PlaybackQueueStore.payloadFor(queue))
+                putInt(PlaybackActions.EXTRA_QUEUE_INDEX, queueIndex.coerceIn(0, queue.lastIndex))
+            }
+        }
         val metadata = MediaMetadata.Builder()
             .setTitle(track.title)
             .setArtist(track.artist)
             .setAlbumTitle(track.album)
             .setArtworkUri(track.artworkUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse))
             .setDurationMs(track.durationMs.takeIf { it > 0 })
+            .setExtras(extras)
             .build()
         mediaItem = MediaItem.Builder()
             .setMediaId(track.id)
@@ -383,13 +481,17 @@ private class TidalSessionPlayer(
         playbackState = Player.STATE_BUFFERING
         playWhenReady = true
         endedAwaitingReplay = false
+        playbackError = null
         invalidateState()
     }
 
     fun setBackendPlaybackState(state: PlaybackBackendState) {
         Log.d(PLAYER_LOG_TAG, "SessionPlayer setBackendPlaybackState $state")
         if (endedAwaitingReplay && state != PlaybackBackendState.Playing) return
-        if (state == PlaybackBackendState.Playing) endedAwaitingReplay = false
+        if (state == PlaybackBackendState.Playing) {
+            endedAwaitingReplay = false
+            playbackError = null
+        }
         playbackState = when (state) {
             PlaybackBackendState.Idle -> Player.STATE_IDLE
             PlaybackBackendState.Playing -> Player.STATE_READY
@@ -398,6 +500,19 @@ private class TidalSessionPlayer(
         }
         playWhenReady = state == PlaybackBackendState.Playing
         if (!playWhenReady) basePositionMs = currentPositionInternal()
+        baseElapsedMs = android.os.SystemClock.elapsedRealtime()
+        invalidateState()
+    }
+
+    fun setPlaybackError(message: String) {
+        playbackError = androidx.media3.common.PlaybackException(
+            message,
+            null,
+            androidx.media3.common.PlaybackException.ERROR_CODE_UNSPECIFIED,
+        )
+        playWhenReady = false
+        playbackState = Player.STATE_IDLE
+        basePositionMs = currentPositionInternal()
         baseElapsedMs = android.os.SystemClock.elapsedRealtime()
         invalidateState()
     }
@@ -427,6 +542,7 @@ private class TidalSessionPlayer(
             .setAvailableCommands(commands)
             .setPlaybackState(playbackState)
             .setPlayWhenReady(playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+            .setPlayerError(playbackError)
             .setContentPositionMs(currentPositionInternal())
             .setPlaylist(
                 item?.let {
@@ -447,6 +563,7 @@ private class TidalSessionPlayer(
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<Any> {
         this.playWhenReady = playWhenReady
         if (playWhenReady) {
+            playbackError = null
             if (endedAwaitingReplay || playbackState == Player.STATE_ENDED) {
                 endedAwaitingReplay = false
                 basePositionMs = 0L
@@ -472,6 +589,7 @@ private class TidalSessionPlayer(
                 basePositionMs = positionMs.coerceAtLeast(0L)
                 baseElapsedMs = android.os.SystemClock.elapsedRealtime()
                 if (playbackState == Player.STATE_ENDED) playbackState = Player.STATE_READY
+                playbackError = null
                 playbackBackend.seek(basePositionMs / 1000f)
             }
         }

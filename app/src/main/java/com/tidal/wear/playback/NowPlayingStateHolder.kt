@@ -8,12 +8,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.PlaybackActions
+import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
 import com.tidal.wear.core.playback.TidalMediaService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -22,8 +24,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 enum class PlaybackSource { Live, Fixture }
+
+data class PlaybackQueueSnapshot(
+    val items: List<TidalTrack> = emptyList(),
+    val currentIndex: Int = -1,
+) {
+    val hasKnownQueue: Boolean = items.isNotEmpty() && currentIndex in items.indices
+}
 
 data class NowPlayingUiState(
     val track: TidalTrack? = null,
@@ -34,6 +45,7 @@ data class NowPlayingUiState(
     val volume: Int = 0,
     val maxVolume: Int = 1,
     val error: String? = null,
+    val queue: PlaybackQueueSnapshot = PlaybackQueueSnapshot(),
 )
 
 class NowPlayingViewModel(application: Application) : AndroidViewModel(application) {
@@ -43,6 +55,7 @@ class NowPlayingViewModel(application: Application) : AndroidViewModel(applicati
     fun togglePlayPause() = holder.togglePlayPause()
     fun seekToPrevious() = holder.seekToPrevious()
     fun seekToNext() = holder.seekToNext()
+    fun jumpToQueueIndex(index: Int) = holder.jumpToQueueIndex(index)
     fun seekTo(ms: Long) = holder.seekTo(ms)
     fun setVolumeFraction(f: Float) = holder.setVolumeFraction(f)
 
@@ -65,6 +78,7 @@ class NowPlayingStateHolder(
     )
     val state: StateFlow<NowPlayingUiState> = _state.asStateFlow()
 
+    private val json = Json { ignoreUnknownKeys = true }
     private var controllerFuture: ListenableFuture<MediaController>
     private var controller: MediaController? = null
     private var positionJob: Job? = null
@@ -77,6 +91,9 @@ class NowPlayingStateHolder(
         }
         override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
             controller?.let(::updateFromPlayer)
+        }
+        override fun onPlayerError(error: PlaybackException) {
+            _state.value = _state.value.copy(error = error.message ?: error.errorCodeName)
         }
     }
 
@@ -111,6 +128,13 @@ class NowPlayingStateHolder(
         sendServiceAction(PlaybackActions.ACTION_SKIP_NEXT)
     }
 
+    fun jumpToQueueIndex(index: Int) {
+        sendServiceAction(
+            PlaybackActions.ACTION_JUMP_TO_QUEUE_INDEX,
+            android.os.Bundle().apply { putInt(PlaybackActions.EXTRA_QUEUE_INDEX, index) },
+        )
+    }
+
     fun seekTo(ms: Long) {
         controller?.seekTo(ms)
     }
@@ -128,10 +152,13 @@ class NowPlayingStateHolder(
         MediaController.releaseFuture(controllerFuture)
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun updateFromPlayer(player: Player) {
         val metadata = player.mediaMetadata
         val mediaId = player.currentMediaItem?.mediaId.orEmpty()
         val duration = player.duration.takeIf { it > 0 } ?: metadata.durationMs ?: 0L
+        val extras = metadata.extras
+        val queue = parseQueueSnapshot(extras)
         _state.value = _state.value.copy(
             track = if (mediaId.isNotBlank() || metadata.title != null) {
                 TidalTrack(
@@ -141,6 +168,8 @@ class NowPlayingStateHolder(
                     album = metadata.albumTitle?.toString().orEmpty(),
                     artworkUrl = metadata.artworkUri?.toString(),
                     durationMs = duration,
+                    albumId = extras?.getString(PlaybackActions.EXTRA_ALBUM_ID).orEmpty(),
+                    artistId = extras?.getString(PlaybackActions.EXTRA_ARTIST_ID).orEmpty(),
                 )
             } else {
                 null
@@ -151,8 +180,16 @@ class NowPlayingStateHolder(
             durationMs = duration,
             volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC),
             maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1),
-            error = null,
+            error = player.playerError?.let { it.message ?: it.errorCodeName },
+            queue = queue,
         )
+    }
+
+    private fun parseQueueSnapshot(extras: android.os.Bundle?): PlaybackQueueSnapshot {
+        val payload = extras?.getString(PlaybackActions.EXTRA_QUEUE_PAYLOAD).orEmpty()
+        val items = runCatching { json.decodeFromString<List<TidalTrack>>(payload) }.getOrDefault(emptyList())
+        val currentIndex = extras?.getInt(PlaybackActions.EXTRA_QUEUE_INDEX, -1) ?: -1
+        return PlaybackQueueSnapshot(items = items, currentIndex = currentIndex)
     }
 
     private fun restartPositionPolling(isPlaying: Boolean) {
@@ -168,10 +205,13 @@ class NowPlayingStateHolder(
         }
     }
 
-    private fun sendServiceAction(action: String) {
+    private fun sendServiceAction(action: String, extras: android.os.Bundle? = null) {
         ContextCompat.startForegroundService(
             context,
-            android.content.Intent(context, TidalMediaService::class.java).setAction(action),
+            android.content.Intent(context, TidalMediaService::class.java)
+                .setAction(action)
+                .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(context))
+                .apply { extras?.let(::putExtras) },
         )
     }
 }

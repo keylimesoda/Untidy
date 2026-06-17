@@ -12,3 +12,5 @@ captures/
 # Local emulator/debug captures
 artifacts/
 window_*.xml
+
+reports/

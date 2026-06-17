@@ -38,7 +38,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.runtime.Composable
@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +77,8 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.material3.ScreenScaffold
 import com.google.android.horologist.compose.rotaryinput.RotaryInputConfigDefaults
 import com.google.android.horologist.compose.rotaryinput.accumulatedBehavior
+import com.tidal.wear.core.api.TidalApiClient
+import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.playback.NowPlayingUiState
 import com.tidal.wear.playback.NowPlayingViewModel
@@ -86,6 +89,7 @@ import com.tidal.wear.ui.components.CircularPerimeterProgress
 import com.tidal.wear.ui.components.VolumeOverlay
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -97,19 +101,19 @@ fun TidalPlayerScreen(
     ambientOffset: Pair<Int, Int>,
     deviceHasLowBitAmbient: Boolean,
     burnInProtectionRequired: Boolean,
+    onOpenAlbum: (String) -> Unit = {},
+    onOpenArtist: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val albumArt = if (isAmbient) null else rememberAlbumArt(state.track)
     val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.Cyan
     val context = LocalContext.current
-    var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.NotDownloaded) }
+    val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
+    val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
+    val downloadState = DownloadState.Unavailable
 
-    fun cycleDownloadState() {
-        downloadState = when (downloadState) {
-            DownloadState.NotDownloaded -> DownloadState.Downloading(0.47f)
-            is DownloadState.Downloading -> DownloadState.Downloaded
-            DownloadState.Downloaded -> DownloadState.NotDownloaded
-        }
+    fun showDownloadUnavailable() {
+        Toast.makeText(context, "Offline playback needs a sanctioned TIDAL download path", Toast.LENGTH_LONG).show()
     }
 
     BackHandler { (context as? Activity)?.moveTaskToBack(true) }
@@ -128,8 +132,11 @@ fun TidalPlayerScreen(
             albumArt = albumArt,
             accent = accent,
             viewModel = viewModel,
+            apiClient = apiClient,
             downloadState = downloadState,
-            onDownload = ::cycleDownloadState,
+            onDownload = ::showDownloadUnavailable,
+            onOpenAlbum = onOpenAlbum,
+            onOpenArtist = onOpenArtist,
         )
     }
 }
@@ -141,8 +148,11 @@ private fun TidalPlayerNonAmbient(
     albumArt: AlbumArt?,
     accent: Color,
     viewModel: NowPlayingViewModel,
+    apiClient: TidalApiClient,
     downloadState: DownloadState,
     onDownload: () -> Unit,
+    onOpenAlbum: (String) -> Unit,
+    onOpenArtist: (String) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     val view = LocalView.current
@@ -151,7 +161,12 @@ private fun TidalPlayerNonAmbient(
     val density = LocalDensity.current
     var showVolume by remember { mutableStateOf(false) }
     var volumeChangePulse by remember { mutableIntStateOf(0) }
-    var liked by remember { mutableStateOf(false) }
+    var liked by remember(state.track?.id) { mutableStateOf(false) }
+    var likeLoading by remember(state.track?.id) { mutableStateOf(false) }
+    var likeError by remember(state.track?.id) { mutableStateOf<String?>(null) }
+    var showQueue by remember { mutableStateOf(false) }
+    var addToPlaylistTrack by remember { mutableStateOf<TidalTrack?>(null) }
+    val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
 
@@ -162,6 +177,43 @@ private fun TidalPlayerNonAmbient(
             showVolume = false
         }
     }
+    LaunchedEffect(state.track?.id) {
+        val trackId = state.track?.id
+        likeError = null
+        if (trackId.isNullOrBlank()) {
+            liked = false
+            likeLoading = false
+            return@LaunchedEffect
+        }
+        likeLoading = true
+        runCatching { apiClient.isFavoriteTrack(trackId) }
+            .onSuccess { liked = it }
+            .onFailure { likeError = "Like unavailable" }
+        likeLoading = false
+    }
+    addToPlaylistTrack?.let { trackSnapshot ->
+        AddToPlaylistSheet(
+            track = trackSnapshot,
+            apiClient = apiClient,
+            onBack = { addToPlaylistTrack = null },
+        )
+        return
+    }
+
+    if (showQueue) {
+        QueueSheet(
+            queue = state.queue,
+            currentTrack = state.track,
+            onJumpToIndex = { index ->
+                viewModel.jumpToQueueIndex(index)
+                showQueue = false
+                scope.launch { pagerState.animateScrollToPage(0) }
+            },
+            onBack = { showQueue = false },
+        )
+        return
+    }
+
     VerticalPager(
         state = pagerState,
         modifier = Modifier
@@ -214,24 +266,44 @@ private fun TidalPlayerNonAmbient(
 
         LikeIconAt(
             liked = liked,
-            description = if (liked) "Unlike" else "Like",
+            enabled = state.track != null && !likeLoading,
+            description = when {
+                likeLoading -> "Loading like state"
+                liked -> "Unlike"
+                else -> "Like"
+            },
             x = 10,
             y = 36,
             scale = scale,
             onClick = {
+                val trackId = state.track?.id ?: return@LikeIconAt
+                if (likeLoading) return@LikeIconAt
                 if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
                     view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 }
-                liked = !liked
+                val target = !liked
+                liked = target
+                likeLoading = true
+                likeError = null
+                scope.launch {
+                    runCatching { apiClient.setFavoriteTrack(trackId, target) }
+                        .onSuccess { persisted -> liked = persisted }
+                        .onFailure {
+                            liked = !target
+                            likeError = "Like failed"
+                            Toast.makeText(context, "Couldn't update like", Toast.LENGTH_SHORT).show()
+                        }
+                    likeLoading = false
+                }
             },
         )
         SecondaryIconAt(
-            icon = Icons.Filled.QueueMusic,
+            icon = Icons.AutoMirrored.Filled.QueueMusic,
             description = "Queue",
             x = 134,
             y = 36,
             scale = scale,
-            onClick = { Toast.makeText(context, "Queue coming soon", Toast.LENGTH_SHORT).show() },
+            onClick = { showQueue = true },
         )
 
         Box(
@@ -301,6 +373,21 @@ private fun TidalPlayerNonAmbient(
             TransportButton(Icons.Filled.SkipNext, "Next", visualSize = 28, iconSize = 16, scale = scale, onClick = viewModel::seekToNext)
         }
 
+        (state.error ?: likeError)?.takeIf { it.isNotBlank() }?.let { error ->
+            Text(
+                text = error,
+                color = Color(0xFFFF8A80),
+                fontSize = (10 * scale).sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 20.dp * scale)
+                    .offset(y = (-20).dp * scale),
+            )
+        }
+
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -324,6 +411,7 @@ private fun TidalPlayerNonAmbient(
                     downloadState = downloadState,
                     outputOptions = rememberAudioOutputOptions(),
                     onDownload = onDownload,
+                    onQueue = { showQueue = true },
                     onOutputSettings = {
                         runCatching {
                             context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
@@ -331,9 +419,32 @@ private fun TidalPlayerNonAmbient(
                             Toast.makeText(context, "Open Wear OS Bluetooth settings to change output", Toast.LENGTH_SHORT).show()
                         }
                     },
-                    onAddToPlaylist = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
-                    onViewAlbum = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
-                    onViewArtist = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
+                    onAddToPlaylist = {
+                        val track = state.track
+                        when {
+                            track == null -> Toast.makeText(context, "Nothing playing", Toast.LENGTH_SHORT).show()
+                            track.id.isBlank() || track.id == "tidal-current" || track.id.startsWith("fixture", ignoreCase = true) -> {
+                                Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
+                            }
+                            else -> addToPlaylistTrack = track
+                        }
+                    },
+                    onViewAlbum = {
+                        val albumId = state.track?.albumId.orEmpty()
+                        if (albumId.isBlank()) {
+                            Toast.makeText(context, "Album unavailable", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onOpenAlbum(albumId)
+                        }
+                    },
+                    onViewArtist = {
+                        val artistId = state.track?.artistId.orEmpty()
+                        if (artistId.isBlank()) {
+                            Toast.makeText(context, "Artist unavailable", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onOpenArtist(artistId)
+                        }
+                    },
                 )
             }
         }
@@ -343,6 +454,7 @@ private fun TidalPlayerNonAmbient(
 @Composable
 private fun LikeIconAt(
     liked: Boolean,
+    enabled: Boolean,
     description: String,
     x: Int,
     y: Int,
@@ -363,7 +475,7 @@ private fun LikeIconAt(
         modifier = Modifier
             .offset(x = x.dp * scale, y = y.dp * scale)
             .size(48.dp * scale)
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Crossfade(
@@ -374,7 +486,7 @@ private fun LikeIconAt(
             Icon(
                 imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                 contentDescription = description,
-                tint = tint,
+                tint = if (enabled) tint else TidalColors.OnSurfaceMuted,
                 modifier = Modifier
                     .size(24.dp * scale)
                     .graphicsLayer {

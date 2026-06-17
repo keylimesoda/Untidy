@@ -20,7 +20,8 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +44,7 @@ import androidx.wear.compose.material.Text
 import com.tidal.wear.ui.theme.TidalColors
 
 sealed interface DownloadState {
+    data object Unavailable : DownloadState
     data object NotDownloaded : DownloadState
     data class Downloading(val progress: Float) : DownloadState
     data object Downloaded : DownloadState
@@ -53,6 +55,7 @@ fun ActionsSheet(
     downloadState: DownloadState,
     outputOptions: List<AudioOutputOption>,
     onDownload: () -> Unit,
+    onQueue: () -> Unit,
     onOutputSettings: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onViewAlbum: () -> Unit,
@@ -79,10 +82,25 @@ fun ActionsSheet(
         ) {
             item {
                 ActionRow(
+                    icon = Icons.AutoMirrored.Filled.QueueMusic,
+                    label = "Queue",
+                    rightIndicator = null,
+                    iconTint = TidalColors.Cyan,
+                    onClick = onQueue,
+                )
+            }
+            item {
+                val downloadAvailable = downloadState != DownloadState.Unavailable
+                ActionRow(
                     icon = Icons.Filled.Download,
                     label = downloadLabel(downloadState),
                     rightIndicator = if (downloadState == DownloadState.Downloaded) Icons.Filled.Check else null,
-                    iconTint = if (downloadState != DownloadState.NotDownloaded) TidalColors.Cyan else TidalColors.White,
+                    iconTint = when {
+                        !downloadAvailable -> TidalColors.OnSurfaceMuted
+                        downloadState != DownloadState.NotDownloaded -> TidalColors.Cyan
+                        else -> TidalColors.White
+                    },
+                    enabled = downloadAvailable,
                     onClick = onDownload,
                 )
             }
@@ -108,9 +126,9 @@ fun ActionsSheet(
                     }
                 }
             }
-            item { ActionRow(Icons.Filled.PlaylistAdd, "Add to playlist", null, TidalColors.White, onAddToPlaylist) }
-            item { ActionRow(Icons.Filled.Album, "View album", null, TidalColors.White, onViewAlbum) }
-            item { ActionRow(Icons.Filled.Person, "View artist", null, TidalColors.White, onViewArtist) }
+            item { ActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist", null, TidalColors.White, onClick = onAddToPlaylist) }
+            item { ActionRow(Icons.Filled.Album, "View album", null, TidalColors.White, onClick = onViewAlbum) }
+            item { ActionRow(Icons.Filled.Person, "View artist", null, TidalColors.White, onClick = onViewArtist) }
         }
     }
 }
@@ -121,6 +139,7 @@ data class AudioOutputOption(
 )
 
 private fun downloadLabel(state: DownloadState): String = when (state) {
+    DownloadState.Unavailable -> "Offline unavailable"
     DownloadState.NotDownloaded -> "Download"
     is DownloadState.Downloading -> "Downloading ${(state.progress * 100).toInt()}%"
     DownloadState.Downloaded -> "Downloaded"
@@ -132,6 +151,7 @@ private fun ActionRow(
     label: String,
     rightIndicator: ImageVector?,
     iconTint: Color,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
@@ -139,7 +159,7 @@ private fun ActionRow(
             .fillMaxWidth(0.94f)
             .height(48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
@@ -150,7 +170,7 @@ private fun ActionRow(
             text = label,
             fontSize = if (label.startsWith("Downloading")) 12.sp else 14.sp,
             fontWeight = FontWeight.Normal,
-            color = TidalColors.White,
+            color = if (enabled) TidalColors.White else TidalColors.OnSurfaceMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Start,

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,9 +39,9 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
-import androidx.wear.compose.material.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.rememberScalingLazyListState
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalArtist
@@ -68,7 +69,7 @@ fun LibraryScreen(
     var selectedCategory by remember { mutableStateOf<LibraryCategory?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf(false) }
-    var loadTick by remember { mutableStateOf(0) }
+    var loadTick by remember { mutableIntStateOf(0) }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
 
     fun loadLibrary() {
@@ -146,7 +147,8 @@ fun LibraryScreen(
                 }
                 else -> {
                     val safeFavorites = favorites ?: TidalSearchResult()
-                    when (selectedCategory) {
+                    val category = selectedCategory ?: LibraryCategory.Playlists
+                    when (category) {
                         LibraryCategory.Albums -> safeFavorites.albums.forEach { album ->
                             item {
                                 LibraryResultRow(
@@ -191,7 +193,6 @@ fun LibraryScreen(
                                 )
                             }
                         }
-                        null -> Unit
                     }
                 }
             }

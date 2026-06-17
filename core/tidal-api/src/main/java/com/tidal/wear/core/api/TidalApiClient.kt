@@ -3,6 +3,7 @@ package com.tidal.wear.core.api
 import android.util.Log
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.tidal.wear.core.auth.TidalAuthRepository
+import com.tidal.wear.core.model.AddTrackToPlaylistOutcome
 import com.tidal.wear.core.model.ReleaseVersionPreference
 import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalAlbumReleaseType
@@ -21,17 +22,25 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.HttpException
+import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Header
 import retrofit2.http.Path
+import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Url
+import java.net.URLDecoder
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
@@ -120,6 +129,29 @@ interface TidalApiService {
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
+    @GET("userCollectionTracks/{id}/relationships/items")
+    suspend fun userCollectionTrackItems(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @POST("userCollectionTracks/{id}/relationships/items")
+    suspend fun addUserCollectionTrackItem(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Body body: JsonObject,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): Response<Unit>
+
+    @HTTP(method = "DELETE", path = "userCollectionTracks/{id}/relationships/items", hasBody = true)
+    suspend fun removeUserCollectionTrackItem(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Body body: JsonObject,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): Response<Unit>
+
     @GET("playlists/{id}")
     suspend fun playlist(
         @Path("id") id: String,
@@ -135,6 +167,14 @@ interface TidalApiService {
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
+    @POST("playlists/{id}/relationships/items")
+    suspend fun addPlaylistTrackItem(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Body body: JsonObject,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): Response<Unit>
+
     @GET("albums/{id}")
     suspend fun album(
         @Path("id") id: String,
@@ -146,6 +186,8 @@ interface TidalApiService {
     suspend fun albumItems(
         @Path("id") id: String,
         @Query("countryCode") countryCode: String,
+        @Query("page[limit]") pageLimit: Int? = null,
+        @Query("page[cursor]") pageCursor: String? = null,
         @Query("include") include: String = "items",
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
@@ -405,9 +447,36 @@ class TidalApiClient(
             },
         )
     suspend fun playlist(id: String): TidalPlaylist? = service.playlist(id, countryCode).dataObjects().firstOrNull()?.toPlaylist()
+
+    suspend fun editablePlaylists(): List<TidalPlaylist> = favorites().playlists
+        .filter { it.id.isNotBlank() && it.title.isNotBlank() }
+        .distinctBy { it.id }
+
+    suspend fun addTrackToPlaylist(playlistId: String, trackId: String): AddTrackToPlaylistOutcome {
+        val normalizedPlaylistId = playlistId.trim().takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("Playlist id is required")
+        val normalizedTrackId = normalizeTrackId(trackId)
+            ?: throw IllegalArgumentException("Track id is unavailable")
+        return try {
+            val response = service.addPlaylistTrackItem(
+                normalizedPlaylistId,
+                countryCode,
+                playlistTrackRelationshipBody(normalizedTrackId),
+            )
+            addTrackToPlaylistOutcome(response).also { outcome ->
+                Log.d(API_LOG_TAG, "playlist add track write ok outcome=$outcome")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.d(API_LOG_TAG, "playlist add track write failed reason=${t.safeReason()}")
+            throw t
+        }
+    }
+
     suspend fun playlistTracks(id: String): List<TidalTrack> {
         val root = try {
-            service.playlistItems(id, countryCode, include = "items,items.albums")
+            service.playlistItems(id, countryCode, include = "items,items.albums,items.artists")
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
@@ -441,7 +510,7 @@ class TidalApiClient(
     }
     suspend fun albumTracks(id: String): List<TidalTrack> {
         val v2Tracks = try {
-            service.albumItems(id, countryCode).allResourceObjects().mapNotNull { it.toTrack() }
+            v2AlbumTracks(id)
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
@@ -460,9 +529,78 @@ class TidalApiClient(
                 album = track.album.ifBlank { legacy?.album.orEmpty() },
                 artworkUrl = track.artworkUrl ?: legacy?.artworkUrl,
                 durationMs = track.durationMs.takeIf { it > 0L } ?: legacy?.durationMs ?: 0L,
+                albumId = track.albumId.ifBlank { legacy?.albumId.orEmpty() },
+                artistId = track.artistId.ifBlank { legacy?.artistId.orEmpty() },
             )
         }
     }
+
+    private suspend fun v2AlbumTracks(id: String): List<TidalTrack> {
+        val tracks = mutableListOf<TidalTrack>()
+        val seenCursors = mutableSetOf<String>()
+        var cursor: String? = null
+        while (true) {
+            val root = service.albumItems(
+                id = id,
+                countryCode = countryCode,
+                pageLimit = ALBUM_TRACK_PAGE_SIZE,
+                pageCursor = cursor,
+                include = "items,items.albums,items.artists",
+            )
+            val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+            tracks += root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }
+            val nextCursor = root.nextPageCursor()
+                ?.takeIf { it.isNotBlank() }
+                ?.takeIf { seenCursors.add(it) }
+                ?: break
+            cursor = nextCursor
+        }
+        return tracks.distinctBy { it.id }
+    }
+
+    suspend fun isFavoriteTrack(trackId: String): Boolean {
+        val normalizedId = normalizeTrackId(trackId) ?: return false
+        return runCatching { favoriteTrackIds().contains(normalizedId) }
+            .getOrElse { t ->
+                if (t is CancellationException) throw t
+                Log.d(API_LOG_TAG, "favorite track read failed reason=${t.safeReason()}")
+                throw t
+            }
+    }
+
+    suspend fun setFavoriteTrack(trackId: String, favorite: Boolean): Boolean {
+        val normalizedId = normalizeTrackId(trackId) ?: return false
+        return try {
+            if (favorite) {
+                service.addUserCollectionTrackItem("me", countryCode, userCollectionTrackRelationshipBody(normalizedId))
+            } else {
+                service.removeUserCollectionTrackItem("me", countryCode, userCollectionTrackRelationshipBody(normalizedId))
+            }
+            Log.d(API_LOG_TAG, "favorite track write ok favorite=$favorite")
+            favorite
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.d(API_LOG_TAG, "favorite track write failed favorite=$favorite reason=${t.safeReason()}")
+            throw t
+        }
+    }
+
+    private suspend fun favoriteTrackIds(): Set<String> {
+        val v2Ids = runCatching {
+            service.userCollectionTrackItems("me", countryCode)
+                .allRelationshipItemIds()
+                .mapNotNull(::normalizeTrackId)
+                .toSet()
+        }.getOrElse { t ->
+            if (t is CancellationException) throw t
+            Log.d(API_LOG_TAG, "favorite tracks relationship v2 failed reason=${t.safeReason()}")
+            emptySet()
+        }
+        if (v2Ids.isNotEmpty()) return v2Ids
+        return favorites().tracks.mapNotNull { normalizeTrackId(it.id) }.toSet()
+    }
+
     suspend fun track(id: String): TidalTrack? = service.track(id, countryCode).dataObjects().firstOrNull()?.toTrack()
     suspend fun artist(id: String): TidalArtist? = try {
         val v2Artist = service.artist(id, countryCode).dataObjects().firstOrNull()?.toArtist()
@@ -883,6 +1021,45 @@ class TidalApiClient(
     }
 }
 
+
+internal fun normalizeTrackId(trackId: String): String? = trackId
+    .substringAfterLast(':')
+    .trim()
+    .takeIf { it.isNotBlank() && it != "tidal-current" && !it.startsWith("fixture", ignoreCase = true) }
+
+internal fun userCollectionTrackRelationshipBody(trackId: String): JsonObject = playlistTrackRelationshipBody(trackId)
+
+internal fun addTrackToPlaylistOutcome(response: Response<Unit>): AddTrackToPlaylistOutcome = when {
+    response.isSuccessful -> AddTrackToPlaylistOutcome.Added
+    response.code() == 409 -> AddTrackToPlaylistOutcome.AlreadyPresent
+    else -> throw HttpException(response)
+}
+
+internal fun playlistTrackRelationshipBody(trackId: String): JsonObject = buildJsonObject {
+    put(
+        "data",
+        buildJsonArray {
+            add(
+                buildJsonObject {
+                    put("type", "tracks")
+                    put("id", trackId)
+                },
+            )
+        },
+    )
+}
+
+private fun JsonElement.allRelationshipItemIds(): List<String> {
+    val root = this as? JsonObject ?: return emptyList()
+    val direct = dataObjects().mapNotNull { it.id }
+    if (direct.isNotEmpty()) return direct
+    val relationshipData = ((root["data"] as? JsonObject)?.get("relationships") as? JsonObject)
+        ?.relationshipResourceKeys("items")
+        .orEmpty()
+    if (relationshipData.isNotEmpty()) return relationshipData.map { it.substringAfterLast(':') }
+    return includedObjects().filter { it.typeMatches("track", "tracks") }.mapNotNull { it.id }
+}
+
 private fun TidalSearchResult.isEmpty(): Boolean =
     tracks.isEmpty() && albums.isEmpty() && artists.isEmpty() && playlists.isEmpty()
 
@@ -965,13 +1142,15 @@ private fun JsonElement.includedObjects(): List<JsonObject> {
     return (root["included"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
 }
 
-private fun JsonElement.nextPageCursor(): String? {
+internal fun JsonElement.nextPageCursor(): String? {
     val root = this as? JsonObject ?: return null
     val links = root["links"] as? JsonObject ?: return null
     val next = links.string("next") ?: return null
     val encoded = Regex("""page%5Bcursor%5D=([^&]+)""").find(next)?.groupValues?.getOrNull(1)
     val plain = Regex("""page\[cursor\]=([^&]+)""").find(next)?.groupValues?.getOrNull(1)
-    return (encoded ?: plain)?.takeIf { it.isNotBlank() }
+    return (encoded ?: plain)
+        ?.let { runCatching { URLDecoder.decode(it, Charsets.UTF_8.name()) }.getOrDefault(it) }
+        ?.takeIf { it.isNotBlank() }
 }
 
 private fun JsonObject.toTrack(): TidalTrack? {
@@ -981,19 +1160,25 @@ private fun JsonObject.toTrack(): TidalTrack? {
 private fun JsonObject.toTrack(includedByKey: Map<String, JsonObject>): TidalTrack? {
     if (!typeMatches("track", "tracks")) return null
     val attrs = attributes
-    val album = relationshipResourceKeys("album", "albums")
-        .firstNotNullOfOrNull { includedByKey[it] }
+    val albumKey = relationshipResourceKeys("album", "albums").firstOrNull()
+    val artistKey = relationshipResourceKeys("artist", "artists", "artistsRoles").firstOrNull()
+    val album = albumKey?.let { includedByKey[it] }
+    val artist = artistKey?.let { includedByKey[it] }
     val albumAttrs = album?.attributes
+    val artistAttrs = artist?.attributes
     val title = attrs.string("title", "name") ?: return null
     return TidalTrack(
         id = id ?: return null,
         title = title,
         artist = attrs.string("artistName", "artist", "artists")
+            ?: artistAttrs?.string("name", "title")
             ?: albumAttrs?.string("artistName", "artist")
             ?: "",
         album = attrs.string("albumTitle", "album") ?: albumAttrs?.string("title", "name") ?: "",
         artworkUrl = attrs.imageUrl(320) ?: albumAttrs?.imageUrl(320) ?: album?.imageUrl(320),
         durationMs = attrs.long("duration", "durationMs")?.let { if (it < 10_000) it * 1000L else it } ?: 0L,
+        albumId = album?.id.orEmpty(),
+        artistId = artist?.id.orEmpty(),
     )
 }
 
@@ -1056,6 +1241,8 @@ private fun JsonObject.toLegacyTrack(): TidalTrack? {
         album = album?.string("title", "name") ?: resource.string("albumTitle", "album") ?: "",
         artworkUrl = album?.imageUrl(320) ?: resource.imageUrl(320),
         durationMs = resource.long("duration", "durationMs")?.let { if (it < 10_000) it * 1000L else it } ?: 0L,
+        albumId = album?.primitive("id")?.contentOrNull.orEmpty(),
+        artistId = resource.legacyArtistId(),
     )
 }
 
@@ -1125,6 +1312,13 @@ private fun JsonObject.legacyItems(name: String): List<JsonObject> {
     val bucket = this[name] as? JsonObject ?: return emptyList()
     return (bucket["items"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
 }
+
+
+private fun JsonObject.legacyArtistId(): String =
+    (this["artist"] as? JsonObject)?.primitive("id")?.contentOrNull
+        ?: (this["artists"] as? JsonArray)?.mapNotNull { (it as? JsonObject)?.primitive("id")?.contentOrNull }?.firstOrNull()
+        ?: (this["artists"] as? JsonObject)?.primitive("id")?.contentOrNull
+        ?: ""
 
 private fun JsonObject.legacyArtistNames(): String? = (this["artists"] as? JsonArray)
     ?.mapNotNull { (it as? JsonObject)?.string("name") }
@@ -1294,6 +1488,7 @@ private fun Throwable.safeReason(): String = when (this) {
 
 private const val JSON_API_ACCEPT = "application/vnd.api+json"
 private const val API_LOG_TAG = "Untidy/API"
+private const val ALBUM_TRACK_PAGE_SIZE = 50
 private const val ARTIST_ALBUM_PREVIEW_LIMIT = 12
 private const val ARTIST_ALBUM_PAGE_SIZE = 25
 private const val ARTIST_ALBUM_MAX_PAGES = 8

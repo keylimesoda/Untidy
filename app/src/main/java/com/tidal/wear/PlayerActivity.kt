@@ -1,5 +1,7 @@
 package com.tidal.wear
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +15,11 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material3.AppScaffold
 import com.tidal.wear.playback.NowPlayingViewModel
 import com.tidal.wear.ui.player.TidalPlayerScreen
+
+private object PlayerRoutes {
+    fun album(albumId: String): String = "album/${Uri.encode(albumId)}"
+    fun artist(artistId: String): String = "artist/${Uri.encode(artistId)}"
+}
 
 class PlayerActivity : ComponentActivity() {
     private var isAmbient by mutableStateOf(false)
@@ -54,9 +61,19 @@ class PlayerActivity : ComponentActivity() {
                         ambientOffset = ambientOffset,
                         deviceHasLowBitAmbient = deviceHasLowBitAmbient,
                         burnInProtectionRequired = burnInProtectionRequired,
+                        onOpenAlbum = { albumId -> openMainRoute(PlayerRoutes.album(albumId)) },
+                        onOpenArtist = { artistId -> openMainRoute(PlayerRoutes.artist(artistId)) },
                     )
                 }
             }
         }
+    }
+
+    private fun openMainRoute(route: String) {
+        startActivity(
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(MainActivity.EXTRA_ROUTE, route),
+        )
     }
 }

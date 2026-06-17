@@ -28,9 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.rememberScalingLazyListState
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.ReleaseVersionPreference
@@ -241,7 +241,7 @@ fun ArtistAlbumsScreen(
 private const val ARTIST_ALBUM_PREVIEW_COUNT = 12
 private const val ARTIST_ALBUM_FULL_LIMIT = 100
 
-private fun <T> androidx.wear.compose.material.ScalingLazyListScope.section(
+private fun <T> androidx.wear.compose.foundation.lazy.ScalingLazyListScope.section(
     title: String,
     items: List<T>,
     itemContent: @Composable (T) -> Unit,
@@ -251,7 +251,7 @@ private fun <T> androidx.wear.compose.material.ScalingLazyListScope.section(
     items.forEach { element -> item { itemContent(element) } }
 }
 
-private fun androidx.wear.compose.material.ScalingLazyListScope.albumSection(
+private fun androidx.wear.compose.foundation.lazy.ScalingLazyListScope.albumSection(
     title: String,
     albums: List<TidalAlbum>,
     fallbackArtist: String,

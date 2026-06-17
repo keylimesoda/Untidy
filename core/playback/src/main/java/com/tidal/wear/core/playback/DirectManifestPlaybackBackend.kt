@@ -1,3 +1,5 @@
+@file:androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.tidal.wear.core.playback
 
 import android.content.Context
@@ -15,12 +17,13 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -28,6 +31,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 internal class DirectManifestPlaybackBackend(
@@ -44,6 +48,7 @@ internal class DirectManifestPlaybackBackend(
     private val _events = MutableSharedFlow<PlaybackBackendEvent>(extraBufferCapacity = 32)
     private var audioPreset = AudioPreset.BatterySaver
     private var currentManifest: ResolvedManifest? = null
+    private val manifestRequests = ConcurrentHashMap<String, Deferred<Result<ResolvedManifest>>>()
     private val player = ExoPlayer.Builder(appContext).build().also { exo ->
         exo.addListener(
             object : Player.Listener {
@@ -73,31 +78,53 @@ internal class DirectManifestPlaybackBackend(
     override val positionMs: Long get() = player.currentPosition.coerceAtLeast(0L)
 
     override fun setAudioPreset(preset: AudioPreset) {
+        if (audioPreset != preset) {
+            manifestRequests.clear()
+        }
         audioPreset = preset
     }
 
-    override fun loadTrack(trackId: String) {
+    override suspend fun loadTrack(trackId: String) {
+        if (trackId.isBlank()) return
+        runCatching {
+            val manifest = manifestRequest(trackId).await().getOrThrow()
+            manifestRequests.remove(trackId)
+            currentManifest = manifest
+            Log.d(DIRECT_LOG_TAG, "manifest loaded id=$trackId source=${manifest.source} presentation=${manifest.presentation} previewReason=${manifest.previewReason.orEmpty()} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
+            val mediaSource = when (manifest.kind) {
+                ManifestKind.Dash -> DashMediaSource.Factory(DefaultDataSource.Factory(appContext))
+                    .createMediaSource(manifest.mediaItem(trackId))
+                ManifestKind.DirectUrl -> ProgressiveMediaSource.Factory(DefaultDataSource.Factory(appContext))
+                    .createMediaSource(manifest.mediaItem(trackId))
+            }
+            player.setMediaSource(mediaSource)
+            player.prepare()
+            _events.emit(PlaybackBackendEvent.MediaTransition(manifest.toDiagnosticContext(player.duration)))
+            _events.emit(PlaybackBackendEvent.QualityChanged(manifest.toDiagnosticContext(player.duration)))
+        }.onFailure { error ->
+            manifestRequests.remove(trackId)
+            Log.e(DIRECT_LOG_TAG, "manifest playback load failed id=$trackId", error)
+            _events.emit(PlaybackBackendEvent.Error(error::class.java.simpleName, error))
+        }.getOrThrow()
+    }
+
+    override fun prefetchTrack(trackId: String) {
+        if (trackId.isBlank()) return
+        val request = manifestRequest(trackId)
         scope.launch {
-            runCatching {
-                val manifest = withContext(Dispatchers.IO) { fetchPlaybackManifest(trackId) }
-                currentManifest = manifest
-                Log.d(DIRECT_LOG_TAG, "manifest loaded id=$trackId source=${manifest.source} presentation=${manifest.presentation} previewReason=${manifest.previewReason.orEmpty()} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
-                val mediaSource = when (manifest.kind) {
-                    ManifestKind.Dash -> DashMediaSource.Factory(DefaultDataSource.Factory(appContext))
-                        .createMediaSource(manifest.mediaItem(trackId))
-                    ManifestKind.DirectUrl -> ProgressiveMediaSource.Factory(DefaultDataSource.Factory(appContext))
-                        .createMediaSource(manifest.mediaItem(trackId))
-                }
-                player.setMediaSource(mediaSource)
-                player.prepare()
-                _events.emit(PlaybackBackendEvent.MediaTransition(manifest.toDiagnosticContext(player.duration)))
-                _events.emit(PlaybackBackendEvent.QualityChanged(manifest.toDiagnosticContext(player.duration)))
+            request.await().onSuccess { manifest ->
+                Log.d(DIRECT_LOG_TAG, "manifest prefetched id=$trackId source=${manifest.source} presentation=${manifest.presentation} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
             }.onFailure { error ->
-                Log.e(DIRECT_LOG_TAG, "manifest playback load failed id=$trackId", error)
-                _events.emit(PlaybackBackendEvent.Error(error::class.java.simpleName, error))
+                manifestRequests.remove(trackId)
+                Log.w(DIRECT_LOG_TAG, "manifest prefetch failed id=$trackId reason=${error::class.java.simpleName}: ${error.message}")
             }
         }
     }
+
+    private fun manifestRequest(trackId: String): Deferred<Result<ResolvedManifest>> =
+        manifestRequests.computeIfAbsent(trackId) { id ->
+            scope.async(Dispatchers.IO) { runCatching { fetchPlaybackManifest(id) } }
+        }
 
     override fun play() {
         player.playWhenReady = true

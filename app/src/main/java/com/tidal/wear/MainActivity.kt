@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -27,7 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -37,8 +36,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
@@ -70,6 +72,7 @@ import com.tidal.wear.core.model.TidalArtist
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.PlaybackActions
+import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
 import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
 import com.tidal.wear.playback.NowPlayingStateHolder
@@ -97,16 +100,32 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    private var routeRequest by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        routeRequest = intent.getStringExtra(EXTRA_ROUTE)
         requestNotificationPermissionIfNeeded()
-        setContent { TidalWearApp() }
+        setContent {
+            TidalWearApp(
+                routeRequest = routeRequest,
+                onRouteRequestConsumed = { routeRequest = null },
+            )
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        routeRequest = intent.getStringExtra(EXTRA_ROUTE)
+    }
+
+    companion object {
+        const val EXTRA_ROUTE = "com.tidal.wear.extra.ROUTE"
     }
 
     private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
 
@@ -134,7 +153,10 @@ private data class HomePlaybackSummary(
 )
 
 @Composable
-private fun TidalWearApp() {
+private fun TidalWearApp(
+    routeRequest: String? = null,
+    onRouteRequestConsumed: () -> Unit = {},
+) {
     MaterialTheme {
         AppScaffold(timeText = {}) {
             val navController = rememberSwipeDismissableNavController()
@@ -157,9 +179,25 @@ private fun TidalWearApp() {
             }.collectAsState(initial = HomePlaybackSummary())
             val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
             val releaseVersionPreference by settingsRepository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
+            var currentRoute by remember { mutableStateOf<String?>(null) }
 
-            LaunchedEffect(authState) {
-                val currentRoute = navController.currentDestination?.route
+            DisposableEffect(navController) {
+                val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+                    currentRoute = destination.route
+                }
+                navController.addOnDestinationChangedListener(listener)
+                currentRoute = navController.currentDestination?.route
+                onDispose { navController.removeOnDestinationChangedListener(listener) }
+            }
+
+            LaunchedEffect(routeRequest) {
+                routeRequest?.takeIf { it.isNotBlank() }?.let { route ->
+                    navController.navigate(route)
+                    onRouteRequestConsumed()
+                }
+            }
+
+            LaunchedEffect(authState, currentRoute) {
                 when (authState) {
                     AuthState.UserSignedIn -> if (currentRoute == null || currentRoute == Routes.Onboarding) {
                         navController.navigateAndClear(Routes.Home)
@@ -181,28 +219,28 @@ private fun TidalWearApp() {
                 openPlayer()
             }
             fun openAlbum(album: TidalAlbum) {
-                AlbumSelectionStore.put(album)
                 navController.navigate(Routes.album(album.id))
             }
             fun openPlaylist(playlist: TidalPlaylist) {
-                PlaylistSelectionStore.put(playlist)
                 navController.navigate(Routes.playlist(playlist.id))
             }
             fun openArtist(artist: TidalArtist) {
-                ArtistSelectionStore.put(artist)
                 navController.navigate(Routes.artist(artist.id))
             }
             fun openArtistAlbums(artist: TidalArtist) {
-                ArtistSelectionStore.put(artist)
                 navController.navigate(Routes.artistAlbums(artist.id))
             }
 
             SwipeDismissableNavHost(navController = navController, startDestination = Routes.Onboarding) {
                 composable(Routes.Onboarding) {
-                    OnboardingScreen(
-                        authRepository = authRepository,
-                        onAuthenticated = { navController.navigateAndClear(Routes.Home) },
-                    )
+                    if (authState == AuthState.UserSignedIn) {
+                        LaunchedEffect(Unit) { navController.navigateAndClear(Routes.Home) }
+                    } else {
+                        OnboardingScreen(
+                            authRepository = authRepository,
+                            onAuthenticated = { navController.navigateAndClear(Routes.Home) },
+                        )
+                    }
                 }
                 composable(Routes.Home) {
                     HomeScreen(
@@ -249,7 +287,7 @@ private fun TidalWearApp() {
                     AlbumScreen(
                         apiClient = apiClient,
                         albumId = albumId,
-                        initialAlbum = AlbumSelectionStore.get(albumId),
+                        initialAlbum = null,
                         onPlayQueue = ::playQueue,
                     )
                 }
@@ -258,7 +296,7 @@ private fun TidalWearApp() {
                     PlaylistScreen(
                         apiClient = apiClient,
                         playlistId = playlistId,
-                        initialPlaylist = PlaylistSelectionStore.get(playlistId),
+                        initialPlaylist = null,
                         onPlayQueue = ::playQueue,
                     )
                 }
@@ -267,7 +305,7 @@ private fun TidalWearApp() {
                     ArtistScreen(
                         apiClient = apiClient,
                         artistId = artistId,
-                        initialArtist = ArtistSelectionStore.get(artistId),
+                        initialArtist = null,
                         onPlayTrack = ::playTrack,
                         onPlayQueue = ::playQueue,
                         onOpenAlbum = ::openAlbum,
@@ -282,7 +320,7 @@ private fun TidalWearApp() {
                     ArtistAlbumsScreen(
                         apiClient = apiClient,
                         artistId = artistId,
-                        initialArtist = ArtistSelectionStore.get(artistId),
+                        initialArtist = null,
                         onOpenAlbum = ::openAlbum,
                         releaseVersionPreference = releaseVersionPreference,
                     )
@@ -407,7 +445,7 @@ private fun HomePrimaryAction(
 
     when {
         !signedIn -> {
-            icon = Icons.Filled.Login
+            icon = Icons.AutoMirrored.Filled.Login
             label = "Sign in to TIDAL"
             secondaryLabel = "Connect your account"
             onClick = onSignedOutClick
@@ -548,53 +586,30 @@ private fun Context.startTrackPlayback(track: TidalTrack) {
         .putExtra(PlaybackActions.EXTRA_ALBUM, track.album)
         .putExtra(PlaybackActions.EXTRA_ARTWORK_URL, track.artworkUrl)
         .putExtra(PlaybackActions.EXTRA_DURATION_MS, track.durationMs)
+        .putExtra(PlaybackActions.EXTRA_ALBUM_ID, track.albumId)
+        .putExtra(PlaybackActions.EXTRA_ARTIST_ID, track.artistId)
+        .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
 }
 
 private fun Context.resumeTrackPlayback() {
     val intent = Intent(this, TidalMediaService::class.java)
         .setAction(PlaybackActions.ACTION_RESUME)
+        .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
 }
 
 private fun Context.startQueuePlayback(tracks: List<TidalTrack>, startIndex: Int) {
-    val queueId = PlaybackQueueStore.put(tracks)
-    if (queueId.isBlank()) return
+    val playableTracks = PlaybackQueueStore.playableTracks(tracks)
+    if (playableTracks.isEmpty()) return
+    val queueId = PlaybackQueueStore.put(playableTracks)
     val intent = Intent(this, TidalMediaService::class.java)
         .setAction(PlaybackActions.ACTION_PLAY_QUEUE)
         .putExtra(PlaybackActions.EXTRA_QUEUE_ID, queueId)
-        .putExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, startIndex)
+        .putExtra(PlaybackActions.EXTRA_QUEUE_PAYLOAD, PlaybackQueueStore.payloadFor(playableTracks))
+        .putExtra(PlaybackActions.EXTRA_QUEUE_START_INDEX, PlaybackQueueStore.startIndexFor(tracks, startIndex))
+        .putExtra(PlaybackActions.EXTRA_APP_COMMAND_TOKEN, PlaybackCommandTokenProvider.token(this))
     ContextCompat.startForegroundService(this, intent)
-}
-
-private object AlbumSelectionStore {
-    private val albums = java.util.concurrent.ConcurrentHashMap<String, TidalAlbum>()
-
-    fun put(album: TidalAlbum) {
-        if (album.id.isNotBlank()) albums[album.id] = album
-    }
-
-    fun get(albumId: String): TidalAlbum? = albums[albumId]
-}
-
-private object PlaylistSelectionStore {
-    private val playlists = java.util.concurrent.ConcurrentHashMap<String, TidalPlaylist>()
-
-    fun put(playlist: TidalPlaylist) {
-        if (playlist.id.isNotBlank()) playlists[playlist.id] = playlist
-    }
-
-    fun get(playlistId: String): TidalPlaylist? = playlists[playlistId]
-}
-
-private object ArtistSelectionStore {
-    private val artists = java.util.concurrent.ConcurrentHashMap<String, TidalArtist>()
-
-    fun put(artist: TidalArtist) {
-        if (artist.id.isNotBlank()) artists[artist.id] = artist
-    }
-
-    fun get(artistId: String): TidalArtist? = artists[artistId]
 }
 
 private fun NavHostController.navigateAndClear(route: String) {

@@ -1,0 +1,378 @@
+[
+  {
+    "id": "UNTIDY-001",
+    "title": "Stabilize Wear emulator workflow under Fedora SELinux",
+    "type": "task",
+    "status": "review",
+    "priority": "P0",
+    "area": "tooling",
+    "owner": "Tommy",
+    "labels": [
+      "emulator",
+      "selinux",
+      "kvm",
+      "qa"
+    ],
+    "spec": "docs/emulator-selinux-notes.md",
+    "evidence": [
+      "KVM works",
+      "Android Emulator 37.1.4 installed",
+      "Wear AVD boots only when selinuxuser_execheap is temporarily on"
+    ],
+    "acceptance": [
+      "Document safe wrapper/toggle workflow",
+      "Keep selinuxuser_execheap off by default when emulator is not running",
+      "Record repeatable emulator boot command"
+    ],
+    "next": "Ready to close after PR #14 lands or maintainer review; safe wrapper/docs exist and final cleanup evidence shows selinuxuser_execheap off with no emulator/ADB devices remaining.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/1",
+    "githubNumber": 1
+  },
+  {
+    "id": "UNTIDY-002",
+    "title": "Run authenticated Wear emulator smoke test suite",
+    "type": "test",
+    "status": "review",
+    "priority": "P0",
+    "area": "qa",
+    "owner": "Tommy",
+    "labels": [
+      "emulator",
+      "auth",
+      "playback"
+    ],
+    "spec": "docs/test-plan-thinkpad-emulator.md",
+    "evidence": [
+      "No-login install/launch passed",
+      "Device-code flow renders and polls"
+    ],
+    "acceptance": [
+      "Authenticated app reaches Home",
+      "Search returns results",
+      "Single-track playback starts",
+      "Album Play all queues and plays multiple tracks",
+      "No AndroidRuntime crash in filtered logcat"
+    ],
+    "next": "All imported acceptance criteria now have emulator evidence; close after PR lands or maintainer review.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/2",
+    "githubNumber": 2
+  },
+  {
+    "id": "UNTIDY-003",
+    "title": "Validate album and playlist play-all behavior",
+    "type": "test",
+    "status": "blocked",
+    "priority": "P0",
+    "area": "playback",
+    "owner": "Tommy",
+    "labels": [
+      "album",
+      "playlist",
+      "queue",
+      "playback"
+    ],
+    "spec": "docs/test-plan-thinkpad-emulator.md",
+    "evidence": [
+      "Album pagination live API validated",
+      "Queue handoff payload fallback implemented",
+      "Static queue start-index guard added so playlist taps remain aligned after blank-id filtering",
+      "100-track watch cap behavior covered by PlaybackQueueStoreTest",
+      "TIDAL album next-page cursor parsing covered, including encoded page[cursor] links"
+    ],
+    "acceptance": [
+      "Multi-page album queues more than first page",
+      "Playlist Play all starts at requested index",
+      "100-track watch cap behavior is acceptable/no silent app crash",
+      "Track transitions continue beyond first 1-2 songs"
+    ],
+    "next": "Blocked on runtime environment: ADB/emulator is unavailable from cron (adb devices lists no devices; selinuxuser_execheap is off and cron must not sudo/toggle SELinux). Unblock by starting/attaching the Wear emulator with ADB available, then run live multi-page >50-track album playback and observed >1-2 song transition validation.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/3",
+    "githubNumber": 3
+  },
+  {
+    "id": "UNTIDY-004",
+    "title": "Validate playback transition smoothness and prefetch",
+    "type": "test",
+    "status": "blocked",
+    "priority": "P0",
+    "area": "playback",
+    "owner": "Tommy",
+    "labels": [
+      "prefetch",
+      "seamless",
+      "media3"
+    ],
+    "spec": "docs/test-plan-thinkpad-emulator.md",
+    "evidence": [
+      "Manifest prefetch implemented",
+      "loadTrack now suspendable",
+      "Transition guard prevents automatic queue advance when backend reports media end far earlier than catalog duration",
+      "PlaybackTransitionPolicyTest covers early-end hold, near-end advance, short-track advance, and negative elapsed handling",
+      "Playback error UI message formatter covered for backend message, blank-message code fallback, and 120-char round-display cap"
+    ],
+    "acceptance": [
+      "Starting a track does not pause/stall unexpectedly",
+      "Natural transition to next track is smooth enough for watch use",
+      "Playback error UI appears for manifest/network failures"
+    ],
+    "next": "Blocked on runtime environment: ADB/emulator is unavailable from cron (adb devices lists no devices; selinuxuser_execheap is off and cron must not sudo/toggle SELinux). Unblock by starting/attaching the Wear emulator with ADB available, then observe natural end-of-track transition and force manifest/network failure UI validation.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/4",
+    "githubNumber": 4
+  },
+  {
+    "id": "UNTIDY-005",
+    "title": "Fix/validate shared settings DataStore crash",
+    "type": "bug",
+    "status": "review",
+    "priority": "P0",
+    "area": "stability",
+    "owner": "Tommy",
+    "labels": [
+      "datastore",
+      "crash",
+      "service",
+      "settings"
+    ],
+    "spec": "reports/emulator-smoke/no-login-smoke-report-2026-06-16.md",
+    "evidence": [
+      "UI probe found multiple DataStores active for tidal_settings",
+      "Shared delegate moved to core:playback",
+      "compile passed",
+      "focused service probe stayed alive"
+    ],
+    "acceptance": [
+      "UI and playback service can coexist without duplicate DataStore crash",
+      "No AndroidRuntime DataStore exception in logcat during launch/service probes",
+      "Full Gradle gate passes"
+    ],
+    "next": "Ready to close after PR #14 lands; runtime service/UI coexistence, no DataStore AndroidRuntime crash, full Gradle gate, and diff check all passed.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/5",
+    "githubNumber": 5
+  },
+  {
+    "id": "UNTIDY-006",
+    "title": "Decide exported TidalMediaService security posture",
+    "type": "decision",
+    "status": "review",
+    "priority": "P1",
+    "area": "platform",
+    "owner": "Tommy",
+    "labels": [
+      "exported-service",
+      "security",
+      "media-controls"
+    ],
+    "spec": "docs/flow-and-cleanup-audit.md",
+    "evidence": [
+      "Service is exported as MediaLibraryService",
+      "Lint warns ExportedService",
+      "Defensive service probes exposed FGS lifecycle edge"
+    ],
+    "acceptance": [
+      "Test notification/media controls with exported=true",
+      "Test whether exported=false breaks Wear/system media controls",
+      "If exported remains true, add controller/package validation or document accepted risk"
+    ],
+    "next": "Review-ready after app-private command-token hardening for exported custom service actions; full Gradle gate passed. Remaining residual is real Wear/OEM media-controller validation before final done/merge.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/6",
+    "githubNumber": 6
+  },
+  {
+    "id": "UNTIDY-007",
+    "title": "Validate View Album / View Artist from Now Playing",
+    "type": "test",
+    "status": "review",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "now-playing",
+      "album",
+      "artist"
+    ],
+    "spec": "docs/spec-view-album-artist-from-now-playing.md",
+    "evidence": [
+      "Static wiring verified",
+      "Needs real playback metadata"
+    ],
+    "acceptance": [
+      "Action sheet buttons appear during real playback",
+      "View Album opens correct album screen",
+      "View Artist opens correct artist screen",
+      "Missing IDs show fallback toast, not crash"
+    ],
+    "next": "Ready to close after PR #14 lands if static fallback-toast verification is accepted; View Album and View Artist passed live runtime validation.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/7",
+    "githubNumber": 7
+  },
+  {
+    "id": "UNTIDY-008",
+    "title": "Live-validate favorite/like toggle",
+    "type": "test",
+    "status": "review",
+    "priority": "P1",
+    "area": "api",
+    "owner": "Tommy",
+    "labels": [
+      "favorites",
+      "tidal-api",
+      "write"
+    ],
+    "spec": "docs/flow-and-cleanup-audit.md",
+    "evidence": [
+      "API-backed favorite toggle implemented",
+      "Payload unit tests pass",
+      "Endpoints not live-auth validated"
+    ],
+    "acceptance": [
+      "Heart loads persisted favorite state",
+      "Favorite write persists to TIDAL",
+      "Unfavorite write persists to TIDAL",
+      "Failure rolls back optimistic UI with toast/error"
+    ],
+    "next": "Ready to close after PR #14 lands; live favorite and unfavorite writes passed and were restored, with full Gradle gate passed.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/8",
+    "githubNumber": 8
+  },
+  {
+    "id": "UNTIDY-009",
+    "title": "Implement Current Queue UI",
+    "type": "feature",
+    "status": "review",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "queue",
+      "feature",
+      "player-action-sheet"
+    ],
+    "spec": "docs/spec-current-queue-ui.md",
+    "evidence": [
+      "Spec written",
+      "Queue store and handoff exist"
+    ],
+    "acceptance": [
+      "Player pull-under/action sheet has Current Queue button",
+      "Queue screen shows current track and upcoming tracks",
+      "Empty queue state is safe",
+      "Compile/lint passes"
+    ],
+    "next": "Ready to close after PR #14 lands if static empty/single-track queue-state verification is accepted; Queue action/sheet/jump-to-index passed runtime validation and Gradle gate passed.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/9",
+    "githubNumber": 9
+  },
+  {
+    "id": "UNTIDY-010",
+    "title": "Implement Add to Playlist workflow",
+    "type": "feature",
+    "status": "blocked",
+    "priority": "P2",
+    "area": "api",
+    "owner": "Tommy",
+    "labels": [
+      "playlist",
+      "feature",
+      "tidal-api",
+      "write"
+    ],
+    "spec": "docs/spec-add-to-playlist.md",
+    "evidence": [
+      "Spec written",
+      "Collection write assumptions should be validated by favorite toggle first"
+    ],
+    "acceptance": [
+      "Add current track to existing playlist",
+      "Create new playlist and add track",
+      "Success/error/loading states on watch UI",
+      "Live API write validation passes"
+    ],
+    "next": "Implementation for existing-playlist add is in PR #14, but final acceptance is blocked pending Ric approval for a live TIDAL write to a disposable playlist plus proof of the create-playlist endpoint/body before enabling New playlist.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/10",
+    "githubNumber": 10
+  },
+  {
+    "id": "UNTIDY-011",
+    "title": "Downloads/offline playback capability spike",
+    "type": "spike",
+    "status": "blocked",
+    "priority": "P2",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "downloads",
+      "offline",
+      "drm",
+      "tidal"
+    ],
+    "spec": "docs/spec-downloads-offline-playback.md",
+    "evidence": [
+      "Spec written",
+      "DRM/API legality unknown"
+    ],
+    "acceptance": [
+      "Determine whether TIDAL API/SDK permits offline storage for this app",
+      "If viable, define single-track MVP implementation plan",
+      "If not viable, remove/neutralize fake download affordances"
+    ],
+    "next": "Blocked pending sanctioned TIDAL offline/download path validation; fake download UI has been neutralized.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/11",
+    "githubNumber": 11
+  },
+  {
+    "id": "UNTIDY-012",
+    "title": "Migrate remaining Wear Compose lazy/icon deprecations",
+    "type": "cleanup",
+    "status": "review",
+    "priority": "P3",
+    "area": "cleanup",
+    "owner": "Tommy",
+    "labels": [
+      "wear-compose",
+      "warnings",
+      "cleanup"
+    ],
+    "spec": "docs/refactor-backlog.md",
+    "evidence": [
+      "Discover/Library migrated",
+      "Warnings remain in Album/Artist/Playlist/Search/Settings and AutoMirrored icons"
+    ],
+    "acceptance": [
+      "No ScalingLazyColumn/rememberScalingLazyListState deprecation warnings in compile log",
+      "AutoMirrored icon warnings resolved where straightforward",
+      "Build/lint/tests pass"
+    ],
+    "next": "Do after P0/P1 runtime validation.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/12",
+    "githubNumber": 12
+  },
+  {
+    "id": "UNTIDY-013",
+    "title": "Back from View Album route drops authenticated app to onboarding",
+    "type": "bug",
+    "status": "review",
+    "priority": "P0",
+    "area": "stability",
+    "owner": "Tommy",
+    "labels": [
+      "auth",
+      "navigation",
+      "emulator",
+      "runtime"
+    ],
+    "spec": "reports/emulator-smoke/unexpected-onboarding-after-back-logcat.txt",
+    "evidence": [
+      "View Album loaded successfully",
+      "Back returned to device-code onboarding",
+      "tidal_auth.xml still exists"
+    ],
+    "acceptance": [
+      "Back from View Album/View Artist does not start onboarding",
+      "Authenticated state persists",
+      "Emulator regression passes"
+    ],
+    "next": "Ready to close after PR #14 lands; parent emulator regression verified Back from album route returns to authenticated Home, not onboarding.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/13",
+    "githubNumber": 13
+  }
+]
