@@ -327,14 +327,15 @@
       "2026-06-17 12:46 PT: searched local packaged artifacts and upstream tidal-sdk-android source for a real OfflinePlaybackInfoProvider/provisioning implementation. Indexed 23 artifacts / 6,271 classes / 626 offline candidates; javap found 137 reference hits but 0 concrete provider implementers. Upstream source at 86c48c3 confirms PlaybackInfoRepositoryDefault only delegates to the app-supplied provider, and the only implementation is a test stub. Artifacts: reports/offline-proof-2026-06-17-1246-offline-provider-impl-search/.",
       "2026-06-17 12:56 PT: debug-only OfflinePlaybackStore/provider adapter persists a sanctioned usage=DOWNLOAD manifest result as app-private metadata, reloads it, and serves a reconstructed PlaybackInfo.Offline.Track through OfflinePlayProvider with app-private SimpleCache. Runtime artifact: reports/offline-proof-2026-06-17-1256-store-adapter/latest.json. No media bytes cached and no offline playback claimed; missing seam is sanctioned media bytes/offline license source.",
       "2026-06-17 13:09 PT: debug-only downloadManifestShape probe decoded the sanctioned usage=DOWNLOAD DASH manifest without logging URLs. Live artifact shows one representation, one SegmentTemplate with initialization/media templates, SegmentTimeline present, 4 absolute URLs, no ContentProtection, looksSegmentAddressable=true, and cacheFillCandidateWithoutLicense=true for track 5120026. Artifact: reports/offline-proof-2026-06-17-1309-download-manifest-shape/latest.json.",
-      "2026-06-17 cache-fill proof: sanctioned usage=DOWNLOAD DASH manifest filled app-private Media3 cache on emulator; artifact reports 2,428,102 cache bytes, 53 cache keys, 100% downloader progress, no URLs logged, and no offline playback claim yet."
+      "2026-06-17 cache-fill proof: sanctioned usage=DOWNLOAD DASH manifest filled app-private Media3 cache on emulator; artifact reports 2,428,102 cache bytes, 53 cache keys, 100% downloader progress, no URLs logged, and no offline playback claim yet.",
+      "2026-06-17 13:45 PT: added debug-only network-disabled replay probe after sanctioned usage=DOWNLOAD cache fill. Runtime artifact shows cache fill still succeeds, ExoPlayer parses duration 200100ms, but replay misses cache and attempts disabled chunk upstream; state BUFFERING->IDLE, ExoPlaybackException Source error, playbackClaimed=false. Artifact: reports/offline-proof-2026-06-17-1345-network-disabled-replay-manifest-ok/latest.json."
     ],
     "acceptance": [
       "Prove the exact TIDAL offline provisioning path for this app",
       "If viable, define single-track MVP implementation plan",
       "If not viable, remove/neutralize fake download affordances"
     ],
-    "next": "Attempt a debug-only network-disabled replay using the same sanctioned usage=DOWNLOAD DASH manifest/app-private Media3 cache and OfflinePlayProvider; verify whether cached bytes alone are enough before claiming offline playback.",
+    "next": "Inspect and align cache keys/storage path between DashDownloader, DashMediaSource/DefaultDashChunkSource, TIDAL OfflineStorageProvider, and OfflineCacheProvider before attempting SDK offline replay again.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/11",
     "githubNumber": 11,
     "phase": "validate"

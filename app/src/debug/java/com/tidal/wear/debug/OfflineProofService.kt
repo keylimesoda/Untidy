@@ -4,6 +4,10 @@ import android.app.Application
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import android.util.Base64
 import android.util.Log
 import androidx.media3.common.MediaItem
@@ -11,6 +15,9 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.dash.DefaultDashChunkSource
+import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.dash.offline.DashDownloader
 import androidx.media3.exoplayer.offline.Downloader
 import androidx.media3.database.StandaloneDatabaseProvider
@@ -60,6 +67,7 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.regex.Pattern
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
@@ -139,6 +147,7 @@ class OfflineProofService : Service() {
         results += offlinePlaybackStoreAdapterProbe(trackId, countryCode, token, clientId)
         results += downloadManifestShapeProbe(trackId, countryCode, token, clientId)
         results += downloadManifestCacheFillProbe(trackId, countryCode, token, clientId)
+        results += downloadManifestNetworkDisabledReplayProbe(trackId, countryCode, token, clientId)
 
         val installationId = probeInstallationInventory(trackId, countryCode, token, clientId, results)
         probeOfflineDiscoverySurfaces(trackId, countryCode, token, clientId, account?.userId, results)
@@ -669,6 +678,225 @@ class OfflineProofService : Service() {
         })
     }
 
+
+
+    private fun downloadManifestNetworkDisabledReplayProbe(
+        trackId: String,
+        countryCode: String,
+        token: String,
+        clientId: String,
+    ): JsonObject {
+        var cache: SimpleCache? = null
+        var player: ExoPlayer? = null
+        return runCatching {
+            val url = "https://openapi.tidal.com/v2/trackManifests/$trackId".toHttpUrl().newBuilder()
+                .addQueryParameter("manifestType", "MPEG_DASH")
+                .addQueryParameter("formats", "HEAACV1")
+                .addQueryParameter("uriScheme", "DATA")
+                .addQueryParameter("usage", "DOWNLOAD")
+                .addQueryParameter("adaptive", "false")
+                .addQueryParameter("countryCode", countryCode)
+                .build()
+            val request = Request.Builder()
+                .url(url)
+                .header("accept", JSON_API_ACCEPT)
+                .header("X-Tidal-Token", clientId)
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                val bodyText = response.body?.string().orEmpty()
+                val root = bodyText.takeIf { it.isNotBlank() }?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
+                val attrs = root?.jsonObject("data")?.jsonObject("attributes")
+                val manifest = attrs?.string("uri").orEmpty()
+                val decoded = decodeDataDashManifest(manifest)
+                val contentProtectionCount = countOccurrences(decoded, "<ContentProtection")
+                if (!response.isSuccessful || manifest.isBlank() || decoded.isBlank() || contentProtectionCount > 0) {
+                    return event("downloadManifestNetworkDisabledReplay", buildJsonObject {
+                        put("sourceSurface", "trackManifests usage=DOWNLOAD uriScheme=DATA")
+                        put("status", response.code)
+                        put("successful", response.isSuccessful)
+                        put("manifestPresent", manifest.isNotBlank())
+                        put("decodedDashPresent", decoded.isNotBlank())
+                        put("contentProtectionCount", contentProtectionCount)
+                        put("attemptedReplay", false)
+                        put("playbackClaimed", false)
+                        put("errorSummary", summarizeErrors(root).toString())
+                    })
+                }
+
+                val cacheDir = File(filesDir, "offline-proof-cachefill/cache-$trackId").apply { mkdirs() }
+                cache = SimpleCache(cacheDir, NoOpCacheEvictor(), StandaloneDatabaseProvider(applicationContext))
+                val keysBeforeFill = cache?.keys?.size ?: 0
+                val bytesBeforeFill = cache?.cacheSpace ?: 0L
+                val requestHeaders = mapOf(
+                    "accept" to "*/*",
+                    "X-Tidal-Token" to clientId,
+                    "Authorization" to "Bearer $token",
+                )
+                val onlineUpstreamFactory = DefaultDataSource.Factory(
+                    applicationContext,
+                    DefaultHttpDataSource.Factory()
+                        .setUserAgent("UntidyOfflineProof/${BuildConfig.VERSION_NAME}")
+                        .setDefaultRequestProperties(requestHeaders),
+                )
+                val onlineCacheDataSourceFactory = CacheDataSource.Factory()
+                    .setCache(requireNotNull(cache))
+                    .setUpstreamDataSourceFactory(onlineUpstreamFactory)
+                val cacheKey = "untidy-download-proof-$trackId-${sha256Short(manifest)}"
+                val mediaItem = MediaItem.Builder()
+                    .setMediaId("untidy-download-proof-$trackId")
+                    .setUri(manifest)
+                    .setMimeType(MimeTypes.APPLICATION_MPD)
+                    .setCustomCacheKey(cacheKey)
+                    .build()
+                val downloader = DashDownloader(mediaItem, onlineCacheDataSourceFactory)
+                var progressBytesDownloaded = 0L
+                var progressPercent = -1f
+                downloader.download(Downloader.ProgressListener { _, bytesDownloaded, percentDownloaded ->
+                    progressBytesDownloaded = bytesDownloaded
+                    progressPercent = percentDownloaded
+                })
+                val bytesAfterFill = cache?.cacheSpace ?: 0L
+                val keysAfterFill = cache?.keys?.size ?: 0
+                if (bytesAfterFill <= 0L || keysAfterFill <= 0) {
+                    return event("downloadManifestNetworkDisabledReplay", buildJsonObject {
+                        put("sourceSurface", "trackManifests usage=DOWNLOAD uriScheme=DATA")
+                        put("attemptedReplay", false)
+                        put("playbackClaimed", false)
+                        put("cacheBytesAfterFill", bytesAfterFill)
+                        put("cacheKeysAfterFill", keysAfterFill)
+                        put("reason", "cache fill produced no cached bytes/keys")
+                    })
+                }
+
+                var offlineUpstreamAttempted = false
+                val offlineChunkCacheDataSourceFactory = CacheDataSource.Factory()
+                    .setCache(requireNotNull(cache))
+                    .setUpstreamDataSourceFactory {
+                        offlineUpstreamAttempted = true
+                        throw java.io.IOException("offline proof network upstream disabled for chunks")
+                    }
+                    .setFlags(CacheDataSource.FLAG_BLOCK_ON_CACHE or CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+                val offlineManifestDataSourceFactory = DefaultDataSource.Factory(applicationContext)
+                val mediaSource = DashMediaSource.Factory(
+                    DefaultDashChunkSource.Factory(offlineChunkCacheDataSourceFactory),
+                    offlineManifestDataSourceFactory,
+                ).createMediaSource(mediaItem)
+                val mainHandler = Handler(Looper.getMainLooper())
+                val latch = CountDownLatch(1)
+                val createLatch = CountDownLatch(1)
+                val states = mutableListOf<String>()
+                var errorClass = ""
+                var errorMessage = ""
+                var reachedReady = false
+                var reachedPlaying = false
+                var creationError: Throwable? = null
+                mainHandler.post {
+                    runCatching {
+                        player = ExoPlayer.Builder(applicationContext).build().also { exo ->
+                            exo.addListener(object : Player.Listener {
+                                override fun onPlaybackStateChanged(playbackState: Int) {
+                                    states += playbackStateName(playbackState)
+                                    if (playbackState == Player.STATE_READY) {
+                                        reachedReady = true
+                                        latch.countDown()
+                                    }
+                                }
+                                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                                    if (isPlaying) {
+                                        reachedPlaying = true
+                                        latch.countDown()
+                                    }
+                                }
+                                override fun onPlayerError(error: PlaybackException) {
+                                    errorClass = error::class.java.simpleName
+                                    errorMessage = error.message.orEmpty().take(180)
+                                    latch.countDown()
+                                }
+                            })
+                            exo.setMediaSource(mediaSource)
+                            exo.prepare()
+                            exo.playWhenReady = true
+                        }
+                    }.onFailure { creationError = it }
+                    createLatch.countDown()
+                }
+                createLatch.await(5, TimeUnit.SECONDS)
+                creationError?.let { throw it }
+                val waited = latch.await(12, TimeUnit.SECONDS)
+                val queryLatch = CountDownLatch(1)
+                var finalState = Player.STATE_IDLE
+                var durationMs = -1L
+                var bufferedMs = -1L
+                var currentMs = -1L
+                mainHandler.post {
+                    runCatching {
+                        finalState = player?.playbackState ?: Player.STATE_IDLE
+                        durationMs = player?.duration ?: -1L
+                        bufferedMs = player?.bufferedPosition ?: -1L
+                        currentMs = player?.currentPosition ?: -1L
+                    }
+                    queryLatch.countDown()
+                }
+                queryLatch.await(5, TimeUnit.SECONDS)
+                event("downloadManifestNetworkDisabledReplay", buildJsonObject {
+                    put("sourceSurface", "trackManifests usage=DOWNLOAD uriScheme=DATA")
+                    put("status", response.code)
+                    put("successful", response.isSuccessful)
+                    put("manifestContentHash", sha256Short(manifest))
+                    put("decodedDashHash", sha256Short(decoded))
+                    put("contentProtectionCount", contentProtectionCount)
+                    put("cacheDirHash", sha256Short(cacheDir.absolutePath))
+                    put("cacheBytesBeforeFill", bytesBeforeFill)
+                    put("cacheBytesAfterFill", bytesAfterFill)
+                    put("cacheBytesAdded", (bytesAfterFill - bytesBeforeFill).coerceAtLeast(0L))
+                    put("cacheKeysBeforeFill", keysBeforeFill)
+                    put("cacheKeysAfterFill", keysAfterFill)
+                    put("downloadProgressBytes", progressBytesDownloaded)
+                    put("downloadProgressPercent", progressPercent.toDouble())
+                    put("attemptedReplay", true)
+                    put("networkDisabledForReplay", true)
+                    put("offlineUpstreamAttempted", offlineUpstreamAttempted)
+                    put("reachedReady", reachedReady)
+                    put("reachedPlaying", reachedPlaying)
+                    put("playbackState", playbackStateName(finalState))
+                    put("durationMs", durationMs)
+                    put("bufferedMs", bufferedMs)
+                    put("currentMs", currentMs)
+                    put("waitedForTerminalSignal", waited)
+                    put("stateSequence", states.joinToString(","))
+                    put("errorClass", errorClass)
+                    put("errorMessage", errorMessage)
+                    put("urlsLogged", false)
+                    put("playbackClaimed", reachedReady && !offlineUpstreamAttempted && errorClass.isBlank())
+                    put("next", if (reachedReady && !offlineUpstreamAttempted && errorClass.isBlank()) "wire same cache/provider path into SDK OfflinePlayProvider replay proof" else "inspect cache-key alignment and DASH cache misses before claiming offline playback")
+                })
+            }
+        }.getOrElse {
+            event("downloadManifestNetworkDisabledReplay", buildJsonObject {
+                put("sourceSurface", "trackManifests usage=DOWNLOAD uriScheme=DATA")
+                put("attemptedReplay", true)
+                put("networkDisabledForReplay", true)
+                put("exception", it::class.java.simpleName)
+                put("message", it.message.orEmpty().take(180))
+                put("urlsLogged", false)
+                put("playbackClaimed", false)
+                put("next", "inspect Media3 DASH/cache replay failure before returning to Downloads/offline-license discovery")
+            })
+        }.also {
+            runCatching { Handler(Looper.getMainLooper()).post { player?.release() } }
+            runCatching { cache?.release() }
+        }
+    }
+
+    private fun playbackStateName(state: Int): String = when (state) {
+        Player.STATE_IDLE -> "IDLE"
+        Player.STATE_BUFFERING -> "BUFFERING"
+        Player.STATE_READY -> "READY"
+        Player.STATE_ENDED -> "ENDED"
+        else -> "UNKNOWN_$state"
+    }
 
     private fun downloadManifestCacheFillProbe(
         trackId: String,
