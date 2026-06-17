@@ -4,6 +4,22 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
+### UNTIDY-026 — Design full offline/download lifecycle UX
+
+- Priority: P0
+- Type: task
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, ux, lifecycle, wear-os
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/27
+- Next: Wait for UX lifecycle report, then review with Ric before implementation tickets are split.
+- Acceptance:
+  - Report exists and is reviewed by Ric.
+  - Design is Wear OS-specific and grounded in current Untidy source/flows.
+  - Report explicitly recommends removal/management units.
+  - Follow-up implementation issues are created only after review.
+
 ### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
 
 - Priority: P2

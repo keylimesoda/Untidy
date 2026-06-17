@@ -791,5 +791,34 @@
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/26",
     "githubNumber": 26,
     "phase": "implement"
+  },
+  {
+    "id": "UNTIDY-026",
+    "title": "Design full offline/download lifecycle UX",
+    "type": "task",
+    "status": "in-progress",
+    "priority": "P0",
+    "area": "offline",
+    "owner": "Tommy",
+    "labels": [
+      "offline",
+      "downloads",
+      "ux",
+      "lifecycle",
+      "wear-os"
+    ],
+    "spec": "docs/ux/offline-download-lifecycle-ux-2026-06-17.md",
+    "evidence": [
+      "Ric asked for a cohesive full lifecycle UX before further implementation: track/album/playlist discovery-download, offline-content discovery, offline fallback/mode, and removal units. Ric explicitly allowed deleting/removing local downloaded content."
+    ],
+    "acceptance": [
+      "Report exists and is reviewed by Ric.",
+      "Design is Wear OS-specific and grounded in current Untidy source/flows.",
+      "Report explicitly recommends removal/management units.",
+      "Follow-up implementation issues are created only after review."
+    ],
+    "next": "Wait for UX lifecycle report, then review with Ric before implementation tickets are split.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/27",
+    "githubNumber": 27
   }
 ]
