@@ -3,7 +3,7 @@
     "id": "UNTIDY-001",
     "title": "Stabilize Wear emulator workflow under Fedora SELinux",
     "type": "task",
-    "status": "in-progress",
+    "status": "review",
     "priority": "P0",
     "area": "tooling",
     "owner": "Tommy",
@@ -24,7 +24,7 @@
       "Keep selinuxuser_execheap off by default when emulator is not running",
       "Record repeatable emulator boot command"
     ],
-    "next": "Keep open until current emulator session exits and selinuxuser_execheap is verified off; wrapper/docs/boot command exist, but default-off posture still needs final recorded check.",
+    "next": "Ready to close after PR #14 lands or maintainer review; safe wrapper/docs exist and final cleanup evidence shows selinuxuser_execheap off with no emulator/ADB devices remaining.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/1",
     "githubNumber": 1
   },

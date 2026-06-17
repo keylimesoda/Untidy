@@ -4,6 +4,10 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
+_None._
+
+## review
+
 ### UNTIDY-001 — Stabilize Wear emulator workflow under Fedora SELinux
 
 - Priority: P0
@@ -13,13 +17,11 @@ _Generated from `work-items.json`._
 - Labels: emulator, selinux, kvm, qa
 - Spec: `docs/emulator-selinux-notes.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/1
-- Next: Keep open until current emulator session exits and selinuxuser_execheap is verified off; wrapper/docs/boot command exist, but default-off posture still needs final recorded check.
+- Next: Ready to close after PR #14 lands or maintainer review; safe wrapper/docs exist and final cleanup evidence shows selinuxuser_execheap off with no emulator/ADB devices remaining.
 - Acceptance:
   - Document safe wrapper/toggle workflow
   - Keep selinuxuser_execheap off by default when emulator is not running
   - Record repeatable emulator boot command
-
-## review
 
 ### UNTIDY-002 — Run authenticated Wear emulator smoke test suite
 
