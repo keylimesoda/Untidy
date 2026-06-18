@@ -59,6 +59,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -71,13 +72,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material3.ScreenScaffold
-import com.google.android.horologist.compose.rotaryinput.RotaryInputConfigDefaults
-import com.google.android.horologist.compose.rotaryinput.accumulatedBehavior
 import com.tidal.wear.BuildConfig
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
@@ -234,7 +232,9 @@ private fun TidalPlayerNonAmbient(
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage == 0) focusRequester.requestFocus()
+    }
     LaunchedEffect(volumeChangePulse) {
         if (volumeChangePulse > 0) {
             delay(1_500)
@@ -292,23 +292,18 @@ private fun TidalPlayerNonAmbient(
                         .background(TidalColors.Black)
                         .focusRequester(focusRequester)
                         .focusable()
-                        .rotaryScrollable(
-                            behavior = accumulatedBehavior(
-                                rateLimitCoolDownMs = 2 * RotaryInputConfigDefaults.DEFAULT_RATE_LIMIT_COOL_DOWN_MS,
-                                onValueChange = { delta ->
-                                    val maxVolume = state.maxVolume.coerceAtLeast(1)
-                                    val step = if (delta > 0) 1 else -1
-                                    val nextVolume = (state.volume + step).coerceIn(0, maxVolume)
-                                    if (nextVolume != state.volume) {
-                                        viewModel.setVolumeFraction(nextVolume.toFloat() / maxVolume.toFloat())
-                                        showVolume = true
-                                        volumeChangePulse += 1
-                                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                    }
-                                },
-                            ),
-                            focusRequester = focusRequester,
-                        ),
+                        .onRotaryScrollEvent { event ->
+                            val maxVolume = state.maxVolume.coerceAtLeast(1)
+                            val step = if (event.verticalScrollPixels > 0f) 1 else -1
+                            val nextVolume = (state.volume + step).coerceIn(0, maxVolume)
+                            if (nextVolume != state.volume) {
+                                viewModel.setVolumeFraction(nextVolume.toFloat() / maxVolume.toFloat())
+                                showVolume = true
+                                volumeChangePulse += 1
+                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            }
+                            true
+                        },
                 ) {
         CircularPerimeterProgress(
             progress = progress,
