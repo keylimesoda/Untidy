@@ -624,7 +624,7 @@
     "id": "UNTIDY-021",
     "title": "Gate or confirm New test playlist creation",
     "type": "cleanup",
-    "status": "review",
+    "status": "done",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -637,7 +637,9 @@
     "spec": "docs/ux/wear-os-ux-walkthrough-2026-06-17.md",
     "evidence": [
       "UX review found New test playlist is first enabled row and performs real create+add write; Ric approved test playlists for dev, not accidental production UX.",
-      "AddToPlaylistSheet hides the New test playlist row unless BuildConfig.DEBUG, preventing accidental production create+add writes without introducing a delete path."
+      "AddToPlaylistSheet hides the New test playlist row unless BuildConfig.DEBUG, preventing accidental production create+add writes without introducing a delete path.",
+      "Final review 2026-06-17: source inspection confirmed AddToPlaylistSheet passes showCreatePlaylist = BuildConfig.DEBUG and CreatePlaylistRow only renders inside that debug gate.",
+      "Verification passed: source scripts/env-android.sh >/dev/null && bash ./gradlew :app:compileReleaseKotlin :app:compileDebugKotlin --no-daemon; git diff --check."
     ],
     "acceptance": [
       "Users cannot accidentally create a test playlist from first row with one tap in production UX.",
@@ -646,7 +648,7 @@
       "No delete path is introduced.",
       "Relevant compile/test gate passes."
     ],
-    "next": "Review debug-only New test playlist gate; create row is hidden in release builds while preserving dev/test flow.",
+    "next": "Done. Debug/test playlist create+add row is impossible in release builds, remains available in debug builds, and no delete path was introduced.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/22",
     "githubNumber": 22
   },

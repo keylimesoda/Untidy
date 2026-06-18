@@ -24,11 +24,11 @@ Release readiness means:
 1. ship with offline/download scoped out and clearly neutralized/documented, or
 2. ship after a one-track offline MVP is proven and gated appropriately.
 
-**P1 UX items currently in review:**
+**P1 UX items already disposed:**
 
 - #20 / UNTIDY-019 — Search entry no longer presents a blank black screen; visible Wear prompt landed.
 - #21 / UNTIDY-020 — Round-screen safe-area padding landed.
-- #22 / UNTIDY-021 — New test playlist creation is gated to debug builds.
+- #22 / UNTIDY-021 — New test playlist creation is gated to debug builds and closed done.
 
 **Open release-polish items still needing disposition:**
 
@@ -145,7 +145,7 @@ Use `docs/ux/wear-os-ux-walkthrough-2026-06-17.md` as the baseline.
 - [ ] #19 UX walkthrough reviewed/accepted.
 - [ ] #20 search blank-screen fix reviewed and accepted.
 - [ ] #21 round safe-area padding reviewed and accepted.
-- [ ] #22 New test playlist gating reviewed and accepted.
+- [x] #22 New test playlist gating reviewed and accepted.
 - [ ] #23 Now Playing action discoverability/rotary behavior validated or explicitly deferred.
 - [ ] #24 retry/error recovery implemented or explicitly deferred.
 - [ ] No remaining user-visible copy says “Coming soon” for a path that is actually proof-in-progress or debug-only.

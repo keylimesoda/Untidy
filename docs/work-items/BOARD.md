@@ -57,23 +57,6 @@ _None._
   - No major regression to scroll ergonomics.
   - Compile/lint or relevant narrow gate passes.
 
-### UNTIDY-021 — Gate or confirm New test playlist creation
-
-- Priority: P1
-- Type: cleanup
-- Area: ui
-- Owner: Tommy
-- Labels: playlist, write, ux, safety
-- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/22
-- Next: Review debug-only New test playlist gate; create row is hidden in release builds while preserving dev/test flow.
-- Acceptance:
-  - Users cannot accidentally create a test playlist from first row with one tap in production UX.
-  - If debug-only, row is impossible in release builds.
-  - If confirmation-based, confirmation/cancel text is clear on a watch.
-  - No delete path is introduced.
-  - Relevant compile/test gate passes.
-
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 
 - Priority: P2
@@ -370,6 +353,23 @@ _None._
   - Existing search results flow still works.
   - Runtime evidence captured.
   - Compile/lint or relevant narrow gate passes.
+
+### UNTIDY-021 — Gate or confirm New test playlist creation
+
+- Priority: P1
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: playlist, write, ux, safety
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/22
+- Next: Done. Debug/test playlist create+add row is impossible in release builds, remains available in debug builds, and no delete path was introduced.
+- Acceptance:
+  - Users cannot accidentally create a test playlist from first row with one tap in production UX.
+  - If debug-only, row is impossible in release builds.
+  - If confirmation-based, confirmation/cancel text is clear on a watch.
+  - No delete path is introduced.
+  - Relevant compile/test gate passes.
 
 ### UNTIDY-024 — Align offline cache keys for network-disabled replay
 
