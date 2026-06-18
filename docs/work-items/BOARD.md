@@ -22,6 +22,8 @@ _Generated from `work-items.json`._
   - Offline/download real-watch result is either passed or explicitly deferred for non-public beta.
   - Findings are linked back to #15 release decision record.
 
+## review
+
 ### UNTIDY-036 — P0 playback must continue after app background/screen-off
 
 - Priority: P0
@@ -31,9 +33,7 @@ _Generated from `work-items.json`._
 - Labels: playback, foreground-service, media3, release-blocker
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/37
-- Next: Swarm immediately: reproduce or collect logs, identify service/queue/background failure, fix playback continuation across app background/screen-off/multiple songs.
-
-## review
+- Next: Review physical-watch playback persistence fix. Validate commit 24e6071 on watch: start multi-track playback, background app/screen off for several songs, capture filtered logcat if it stops.
 
 ### UNTIDY-014 — Release readiness / ship checklist
 

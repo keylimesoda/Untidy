@@ -1132,7 +1132,7 @@
     "id": "UNTIDY-036",
     "title": "P0 playback must continue after app background/screen-off",
     "type": "bug",
-    "status": "in-progress",
+    "status": "review",
     "priority": "P0",
     "area": "playback",
     "owner": "Tommy",
@@ -1144,10 +1144,13 @@
     ],
     "spec": "docs/release-readiness-checklist.md",
     "evidence": [
-      "Created from Ric physical-watch validation feedback on 2026-06-17."
+      "Created from Ric physical-watch validation feedback on 2026-06-17.",
+      "Commit 24e6071 added WAKE_LOCK permission and ExoPlayer C.WAKE_MODE_NETWORK for direct playback backend.",
+      "TidalMediaService now logs onTaskRemoved/onDestroy playing/track/queue state for physical-watch follow-up.",
+      "Verification passed: :core:playback:testDebugUnitTest :core:playback:compileDebugKotlin :app:compileDebugKotlin and git diff --check."
     ],
     "acceptance": [],
-    "next": "Swarm immediately: reproduce or collect logs, identify service/queue/background failure, fix playback continuation across app background/screen-off/multiple songs.",
+    "next": "Review physical-watch playback persistence fix. Validate commit 24e6071 on watch: start multi-track playback, background app/screen off for several songs, capture filtered logcat if it stops.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/37",
     "githubNumber": 37
   }
