@@ -76,7 +76,24 @@ _Generated from `work-items.json`._
 
 ## todo
 
-_None._
+### UNTIDY-038 — Add watch-local Recent shelf for explicit play history
+
+- Priority: P1
+- Type: feature
+- Area: ui
+- Owner: Tommy
+- Labels: recent, watch-ux, navigation, play-history
+- Spec: `docs/work-items/BOARD.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/39
+- Next: Design/implement local Recent store and screen; resolve track detail/context fallback before coding track tap behavior.
+- Acceptance:
+  - Home includes Recent.
+  - Recent screen shows explicit play-history items only.
+  - No artists are written/displayed.
+  - Tapping album/playlist opens metadata detail route.
+  - Tapping track opens track context page/sheet or documented MVP fallback, not blind autoplay.
+  - History persists across app restart.
+  - Compile and emulator smoke pass.
 
 ## blocked
 

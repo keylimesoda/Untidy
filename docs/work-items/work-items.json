@@ -1153,5 +1153,36 @@
     "next": "Review physical-watch playback persistence fix. Validate commit 24e6071 on watch: start multi-track playback, background app/screen off for several songs, capture filtered logcat if it stops.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/37",
     "githubNumber": 37
+  },
+  {
+    "id": "UNTIDY-038",
+    "title": "Add watch-local Recent shelf for explicit play history",
+    "type": "feature",
+    "status": "todo",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "recent",
+      "watch-ux",
+      "navigation",
+      "play-history"
+    ],
+    "spec": "docs/work-items/BOARD.md",
+    "evidence": [
+      "Ric approved Recent shelf concept but corrected tap behavior: tap opens metadata/detail page, not autoplay. Artists excluded because there is no Play Artist action."
+    ],
+    "acceptance": [
+      "Home includes Recent.",
+      "Recent screen shows explicit play-history items only.",
+      "No artists are written/displayed.",
+      "Tapping album/playlist opens metadata detail route.",
+      "Tapping track opens track context page/sheet or documented MVP fallback, not blind autoplay.",
+      "History persists across app restart.",
+      "Compile and emulator smoke pass."
+    ],
+    "next": "Design/implement local Recent store and screen; resolve track detail/context fallback before coding track tap behavior.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/39",
+    "githubNumber": 39
   }
 ]
