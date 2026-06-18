@@ -717,7 +717,7 @@
     "id": "UNTIDY-024",
     "title": "Align offline cache keys for network-disabled replay",
     "type": "feature",
-    "status": "review",
+    "status": "done",
     "priority": "P1",
     "area": "offline",
     "owner": "Tommy",
@@ -735,7 +735,10 @@
       "Runtime artifact reports network-disabled replay success: offlineUpstreamAttempted=false, reachedReady=true, reachedPlaying=true, playbackState=READY, playbackClaimed=true.",
       "Artifact: reports/offline-proof-2026-06-17-1358-cache-miss-key-probe/latest.json.",
       "No PLAYBACK/STREAM manifest use and no URL/token/license/key logging in artifact.",
-      "End-user UX implementation issue created: https://github.com/keylimesoda/Untidy/issues/26."
+      "End-user UX implementation issue created: https://github.com/keylimesoda/Untidy/issues/26.",
+      "2026-06-17 17:55 PT review closeout: re-read runtime artifact and verified acceptance signals in reports/offline-proof-2026-06-17-1358-cache-miss-key-probe/latest.json.",
+      "Closeout verification: canonicalCacheKeyFactory=true, offlineUpstreamAttempted=false, reachedReady=true, reachedPlaying=true, playbackState=READY, durationMs=200100, playbackClaimed=true.",
+      "Closeout redaction scan found no URL, bearer/access/refresh token, segment URL, or raw secret leakage; remaining license/key strings are field names/redaction metadata, not values."
     ],
     "acceptance": [
       "Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.",
@@ -743,7 +746,7 @@
       "Single-track MVP implementation plan is updated with exact storage/cache/provider contract.",
       "If production code is touched, narrow Gradle gate and runtime emulator proof pass."
     ],
-    "next": "Review canonical cache-key replay proof. Product UX implementation continues in UNTIDY-025 / GitHub #26.",
+    "next": "Closed: canonical cache-key replay proof is accepted; product offline UX/playback work continues through already-created follow-up issues and release-readiness review.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/25",
     "githubNumber": 25
   },

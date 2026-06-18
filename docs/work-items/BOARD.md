@@ -74,22 +74,6 @@ _None._
   - No delete path is introduced.
   - Relevant compile/test gate passes.
 
-### UNTIDY-024 — Align offline cache keys for network-disabled replay
-
-- Priority: P1
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: offline, downloads, cache, media3, tidal
-- Spec: `docs/offline-sdk-proof-plan-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/25
-- Next: Review canonical cache-key replay proof. Product UX implementation continues in UNTIDY-025 / GitHub #26.
-- Acceptance:
-  - Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.
-  - Artifact shows no STREAM/PLAYBACK manifest use and no URL/token/license leakage.
-  - Single-track MVP implementation plan is updated with exact storage/cache/provider contract.
-  - If production code is touched, narrow Gradle gate and runtime emulator proof pass.
-
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 
 - Priority: P2
@@ -402,6 +386,22 @@ _None._
   - Existing search results flow still works.
   - Runtime evidence captured.
   - Compile/lint or relevant narrow gate passes.
+
+### UNTIDY-024 — Align offline cache keys for network-disabled replay
+
+- Priority: P1
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, cache, media3, tidal
+- Spec: `docs/offline-sdk-proof-plan-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/25
+- Next: Closed: canonical cache-key replay proof is accepted; product offline UX/playback work continues through already-created follow-up issues and release-readiness review.
+- Acceptance:
+  - Debug proof artifact shows network-disabled replay reaches READY/playing from app-private cache without chunk network upstream.
+  - Artifact shows no STREAM/PLAYBACK manifest use and no URL/token/license leakage.
+  - Single-track MVP implementation plan is updated with exact storage/cache/provider contract.
+  - If production code is touched, narrow Gradle gate and runtime emulator proof pass.
 
 ### UNTIDY-028 — Implement local remove-download UX
 
