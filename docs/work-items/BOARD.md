@@ -57,22 +57,6 @@ _None._
   - Media controls/playback service still function in emulator and preferably real Wear OS validation.
   - Security posture is documented in code or docs.
 
-### UNTIDY-023 — Add watch-friendly retry/error recovery
-
-- Priority: P2
-- Type: cleanup
-- Area: ui
-- Owner: Tommy
-- Labels: errors, retry, wear-os, ux
-- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/24
-- Next: Review retry/error recovery implementation: detail screens now use tap-to-retry chips and action sheet shows inline metadata errors instead of toast-only feedback.
-- Acceptance:
-  - Detail screen network/API errors have one-tap retry.
-  - Missing metadata feedback is visible in the action context, not toast-only.
-  - Empty states remain clear and non-alarming.
-  - Relevant compile/lint gate passes.
-
 ## todo
 
 _None._
@@ -458,6 +442,22 @@ _None._
   - Users can discover player actions without prior knowledge.
   - Action sheet scroll/rotary behavior is validated on emulator and real watch if possible.
   - Any added affordance stays watch-glanceable and does not clutter Now Playing.
+  - Relevant compile/lint gate passes.
+
+### UNTIDY-023 — Add watch-friendly retry/error recovery
+
+- Priority: P2
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: errors, retry, wear-os, ux
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/24
+- Next: Closed after re-verification: retry/error recovery acceptance is satisfied by RetryStatusChip detail errors, inline Now Playing action feedback, :app:compileDebugKotlin, and git diff --check.
+- Acceptance:
+  - Detail screen network/API errors have one-tap retry.
+  - Missing metadata feedback is visible in the action context, not toast-only.
+  - Empty states remain clear and non-alarming.
   - Relevant compile/lint gate passes.
 
 ### UNTIDY-030 — Enable minimal Settings Downloads controls

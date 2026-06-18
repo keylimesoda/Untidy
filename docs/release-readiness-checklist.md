@@ -33,7 +33,10 @@ Release readiness means:
 - #16 / UNTIDY-015 — WearRecents/task-affinity lint warnings.
 - #17 / UNTIDY-016 — ExportedService lint warning/security posture.
 - #23 / UNTIDY-022 — Now Playing actions discoverability and rotary behavior.
-- #24 / UNTIDY-023 — Watch-friendly retry/error recovery.
+
+**Recently disposed release-polish items:**
+
+- #24 / UNTIDY-023 — Watch-friendly retry/error recovery is closed done after source re-verification and `:app:compileDebugKotlin` / `git diff --check`.
 
 ## Release gate checklist
 
@@ -116,7 +119,7 @@ Required emulator smoke paths:
 - [ ] Debug-only `New test playlist` row is absent in release-equivalent build and present only in debug if intentionally retained.
 - [x] Offline/download shipped/proof state matches the #11 release decision: #11 is closed, #25/#26 carry the accepted `usage=DOWNLOAD` proof/MVP evidence, and remaining UX scope is tracked separately.
 - [ ] Settings/account/playback/download sections render and back behavior works.
-- [ ] Error/empty states do not create dead ends; #24 disposition recorded.
+- [x] Error/empty states do not create dead ends; #24 disposition recorded: detail screens use one-tap retry chips and Now Playing action failures render inline status feedback.
 
 ### 5. Runtime validation — real Wear device
 
@@ -144,7 +147,7 @@ Use `docs/ux/wear-os-ux-walkthrough-2026-06-17.md` as the baseline.
 - [ ] #21 round safe-area padding reviewed and accepted.
 - [x] #22 New test playlist gating reviewed and accepted.
 - [ ] #23 Now Playing action discoverability/rotary behavior validated or explicitly deferred.
-- [ ] #24 retry/error recovery implemented or explicitly deferred.
+- [x] #24 retry/error recovery implemented and closed done.
 - [ ] No remaining user-visible copy says “Coming soon” for a path that is actually proof-in-progress or debug-only.
 - [ ] Disabled/proof-in-progress states are honest, concise, and watch-readable.
 
