@@ -834,7 +834,7 @@
     "id": "UNTIDY-027",
     "title": "Implement Home \u2192 Downloads shelf",
     "type": "feature",
-    "status": "review",
+    "status": "done",
     "priority": "P0",
     "area": "offline",
     "owner": "Tommy",
@@ -857,7 +857,7 @@
       "UI uses Wear list/safe-area patterns.",
       "Compile and emulator smoke pass."
     ],
-    "next": "Review Downloads shelf implementation. Home Downloads route opens Downloads screen; downloaded tracks list and can start playback. Runtime evidence: reports/downloads-shelf-2026-06-17-1533/.",
+    "next": "Closed after review: Home Downloads chip routes to Downloads shelf; downloaded track list/playback and local-only remove controls verified by emulator artifacts reports/downloads-shelf-2026-06-17-1533/.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/28",
     "githubNumber": 28
   },

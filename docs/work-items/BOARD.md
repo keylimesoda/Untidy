@@ -25,23 +25,6 @@ _None._
   - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
   - Narrow Gradle gate passes.
 
-### UNTIDY-027 — Implement Home → Downloads shelf
-
-- Priority: P0
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: downloads, offline, ux, shelf
-- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/28
-- Next: Review Downloads shelf implementation. Home Downloads route opens Downloads screen; downloaded tracks list and can start playback. Runtime evidence: reports/downloads-shelf-2026-06-17-1533/.
-- Acceptance:
-  - Home Downloads row opens Downloads screen.
-  - Downloads screen shows empty state or downloaded tracks.
-  - A downloaded track row can start playback.
-  - UI uses Wear list/safe-area patterns.
-  - Compile and emulator smoke pass.
-
 ### UNTIDY-014 — Release readiness / ship checklist
 
 - Priority: P1
@@ -365,6 +348,23 @@ _None._
   - Design is Wear OS-specific and grounded in current Untidy source/flows.
   - Report explicitly recommends removal/management units.
   - Follow-up implementation issues are created only after review.
+
+### UNTIDY-027 — Implement Home → Downloads shelf
+
+- Priority: P0
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: downloads, offline, ux, shelf
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/28
+- Next: Closed after review: Home Downloads chip routes to Downloads shelf; downloaded track list/playback and local-only remove controls verified by emulator artifacts reports/downloads-shelf-2026-06-17-1533/.
+- Acceptance:
+  - Home Downloads row opens Downloads screen.
+  - Downloads screen shows empty state or downloaded tracks.
+  - A downloaded track row can start playback.
+  - UI uses Wear list/safe-area patterns.
+  - Compile and emulator smoke pass.
 
 ### UNTIDY-006 — Decide exported TidalMediaService security posture
 
