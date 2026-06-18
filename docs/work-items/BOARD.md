@@ -170,17 +170,6 @@ _None._
   - Empty states remain clear and non-alarming.
   - Relevant compile/lint gate passes.
 
-### UNTIDY-031 — Add album/playlist collection download UX
-
-- Priority: P2
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: album, playlist, downloads, collections
-- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/32
-- Next: Close after reviewing collection download affordances plus failure-count state model; runtime evidence remains reports/collection-download-ux-2026-06-17-1621/.
-
 ## todo
 
 _None._
@@ -487,6 +476,17 @@ _None._
   - Remove all downloads is local-only and confirms that TIDAL library is kept.
   - Sign-out copy explicitly distinguishes account sign-out from local downloads.
   - No Settings release copy says proof/proof-in-progress.
+
+### UNTIDY-031 — Add album/playlist collection download UX
+
+- Priority: P2
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: album, playlist, downloads, collections
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/32
+- Next: Closed after collection download chips, failure-count state modeling, unit coverage, and runtime evidence.
 
 ### UNTIDY-012 — Migrate remaining Wear Compose lazy/icon deprecations
 

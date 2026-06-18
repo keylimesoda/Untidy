@@ -965,7 +965,7 @@
     "id": "UNTIDY-031",
     "title": "Add album/playlist collection download UX",
     "type": "feature",
-    "status": "review",
+    "status": "done",
     "priority": "P2",
     "area": "offline",
     "owner": "Tommy",
@@ -985,10 +985,11 @@
       "Runtime evidence captured under reports/collection-download-ux-2026-06-17-1621/: playlist route shows collection chip with Downloaded 1/1 and All playable tracks on watch after scrolling.",
       "Collection summary now models failed track count separately from full/partial/empty state, with Wear chip copy such as \u201c1 failed\u201d / \u201cPartial 1/3 \u00b7 tap to retry later\u201d.",
       ":core:playback:testDebugUnitTest covers distinct playable/downloaded/failed collection counts and verifies failures prevent a false fully-downloaded state.",
-      "Verification on 2026-06-17: source scripts/env-android.sh >/dev/null && bash ./gradlew :core:playback:testDebugUnitTest :app:compileDebugKotlin --no-daemon; git diff --check."
+      "Verification on 2026-06-17: source scripts/env-android.sh >/dev/null && bash ./gradlew :core:playback:testDebugUnitTest :app:compileDebugKotlin --no-daemon; git diff --check.",
+      "Closed GitHub #32 after acceptance review; offline collection playback uses local-valid subset when offline via existing queue filtering."
     ],
     "acceptance": [],
-    "next": "Close after reviewing collection download affordances plus failure-count state model; runtime evidence remains reports/collection-download-ux-2026-06-17-1621/.",
+    "next": "Closed after collection download chips, failure-count state modeling, unit coverage, and runtime evidence.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/32",
     "githubNumber": 32
   }
