@@ -179,7 +179,7 @@ _None._
 - Labels: album, playlist, downloads, collections
 - Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/32
-- Next: Review collection-level album/playlist download affordances. Runtime evidence: reports/collection-download-ux-2026-06-17-1621/.
+- Next: Close after reviewing collection download affordances plus failure-count state model; runtime evidence remains reports/collection-download-ux-2026-06-17-1621/.
 
 ## todo
 

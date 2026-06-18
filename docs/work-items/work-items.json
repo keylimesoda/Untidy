@@ -982,10 +982,13 @@
       "Collection state is derived from local downloaded-track markers and distinguishes full, partial, empty, and unavailable states.",
       "Tapping collection download chip does not mutate TIDAL or silently delete anything; it advertises next-phase collection download while preserving single-track MVP scope.",
       ":app:compileDebugKotlin --no-daemon passed; git diff --check passed.",
-      "Runtime evidence captured under reports/collection-download-ux-2026-06-17-1621/: playlist route shows collection chip with Downloaded 1/1 and All playable tracks on watch after scrolling."
+      "Runtime evidence captured under reports/collection-download-ux-2026-06-17-1621/: playlist route shows collection chip with Downloaded 1/1 and All playable tracks on watch after scrolling.",
+      "Collection summary now models failed track count separately from full/partial/empty state, with Wear chip copy such as \u201c1 failed\u201d / \u201cPartial 1/3 \u00b7 tap to retry later\u201d.",
+      ":core:playback:testDebugUnitTest covers distinct playable/downloaded/failed collection counts and verifies failures prevent a false fully-downloaded state.",
+      "Verification on 2026-06-17: source scripts/env-android.sh >/dev/null && bash ./gradlew :core:playback:testDebugUnitTest :app:compileDebugKotlin --no-daemon; git diff --check."
     ],
     "acceptance": [],
-    "next": "Review collection-level album/playlist download affordances. Runtime evidence: reports/collection-download-ux-2026-06-17-1621/.",
+    "next": "Close after reviewing collection download affordances plus failure-count state model; runtime evidence remains reports/collection-download-ux-2026-06-17-1621/.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/32",
     "githubNumber": 32
   }

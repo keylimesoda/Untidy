@@ -16,13 +16,36 @@ data class DownloadedTrackSummary(
 data class CollectionDownloadSummary(
     val playableCount: Int,
     val downloadedCount: Int,
+    val failedCount: Int = 0,
 )
 
-fun Context.collectionDownloadSummary(tracks: List<TidalTrack>): CollectionDownloadSummary {
+fun CollectionDownloadSummary.hasFailures(): Boolean = failedCount > 0
+
+fun CollectionDownloadSummary.isFullyDownloaded(): Boolean =
+    playableCount > 0 && downloadedCount >= playableCount && failedCount == 0
+
+fun CollectionDownloadSummary.isPartiallyDownloaded(): Boolean =
+    playableCount > 0 && downloadedCount > 0 && !isFullyDownloaded()
+
+fun Context.collectionDownloadSummary(tracks: List<TidalTrack>): CollectionDownloadSummary =
+    collectionDownloadSummary(
+        tracks = tracks,
+        isDownloaded = ::isOfflineTrackDownloaded,
+        isFailed = ::isOfflineTrackDownloadFailed,
+    )
+
+internal fun collectionDownloadSummary(
+    tracks: List<TidalTrack>,
+    isDownloaded: (String) -> Boolean,
+    isFailed: (String) -> Boolean,
+): CollectionDownloadSummary {
     val playableIds = tracks.mapNotNull { it.id.takeIf(String::isNotBlank) }.distinct()
     if (playableIds.isEmpty()) return CollectionDownloadSummary(playableCount = 0, downloadedCount = 0)
-    val downloadedCount = playableIds.count { isOfflineTrackDownloaded(it) }
-    return CollectionDownloadSummary(playableCount = playableIds.size, downloadedCount = downloadedCount)
+    return CollectionDownloadSummary(
+        playableCount = playableIds.size,
+        downloadedCount = playableIds.count(isDownloaded),
+        failedCount = playableIds.count(isFailed),
+    )
 }
 
 fun Context.readOfflineDownloadedTracks(): List<DownloadedTrackSummary> {
@@ -45,15 +68,36 @@ fun Context.markOfflineTrackDownloaded(track: TidalTrack) {
     getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
         .edit()
         .putBoolean("$DOWNLOADED_PREFIX${track.id}", true)
+        .remove("$FAILED_PREFIX${track.id}")
         .putString("title:${track.id}", track.title)
         .putString("artist:${track.id}", track.artist)
         .putLong("downloadedAt:${track.id}", System.currentTimeMillis())
         .apply()
 }
 
+fun Context.markOfflineTrackDownloadFailed(trackId: String) {
+    if (trackId.isBlank()) return
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean("$FAILED_PREFIX$trackId", true)
+        .apply()
+}
+
+fun Context.clearOfflineTrackDownloadFailed(trackId: String) {
+    if (trackId.isBlank()) return
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .remove("$FAILED_PREFIX$trackId")
+        .apply()
+}
+
 fun Context.isOfflineTrackDownloaded(trackId: String): Boolean =
     getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
         .getBoolean("$DOWNLOADED_PREFIX$trackId", false)
+
+fun Context.isOfflineTrackDownloadFailed(trackId: String): Boolean =
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+        .getBoolean("$FAILED_PREFIX$trackId", false)
 
 /**
  * Removes only Untidy-local offline state for a downloaded track.
@@ -71,6 +115,7 @@ fun Context.removeOfflineTrackDownload(trackId: String): Boolean {
         .remove("title:$trackId")
         .remove("artist:$trackId")
         .remove("downloadedAt:$trackId")
+        .remove("$FAILED_PREFIX$trackId")
         .apply()
     return true
 }
@@ -99,3 +144,4 @@ private fun File.directorySizeBytes(): Long {
 
 private const val OFFLINE_DOWNLOAD_PREFS = "offline-downloads"
 private const val DOWNLOADED_PREFIX = "downloaded:"
+private const val FAILED_PREFIX = "failed:"

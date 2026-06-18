@@ -41,6 +41,8 @@ import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.offline.collectionDownloadSummary
+import com.tidal.wear.core.playback.offline.hasFailures
+import com.tidal.wear.core.playback.offline.isFullyDownloaded
 import com.tidal.wear.ui.art.rememberArtworkPalette
 import com.tidal.wear.ui.components.PlaylistArtwork
 import com.tidal.wear.ui.components.RetryStatusChip
@@ -288,22 +290,26 @@ private fun CollectionDownloadChip(
 
 private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.actionLabel(defaultLabel: String): String = when {
     playableCount <= 0 -> "Offline unavailable"
+    hasFailures() -> "$failedCount failed"
     downloadedCount <= 0 -> defaultLabel
-    downloadedCount >= playableCount -> "Downloaded $downloadedCount/$playableCount"
+    isFullyDownloaded() -> "Downloaded $downloadedCount/$playableCount"
     else -> "Partial $downloadedCount/$playableCount"
 }
 
 private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.detailLabel(kind: String): String = when {
     playableCount <= 0 -> "$kind has no playable tracks"
+    hasFailures() && downloadedCount > 0 -> "Partial $downloadedCount/$playableCount · tap to retry later"
+    hasFailures() -> "Tap to retry later"
     downloadedCount <= 0 -> "Tracks save one at a time for now"
-    downloadedCount >= playableCount -> "All playable tracks on watch"
+    isFullyDownloaded() -> "All playable tracks on watch"
     else -> "Local-valid subset plays offline"
 }
 
 private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.toastLabel(defaultPrefix: String): String = when {
     playableCount <= 0 -> "Offline unavailable"
+    hasFailures() -> "Failed tracks can retry in downloads"
     downloadedCount <= 0 -> "$defaultPrefix is coming after track MVP"
-    downloadedCount >= playableCount -> "Downloaded tracks play offline"
+    isFullyDownloaded() -> "Downloaded tracks play offline"
     else -> "Partial download plays offline subset"
 }
 
