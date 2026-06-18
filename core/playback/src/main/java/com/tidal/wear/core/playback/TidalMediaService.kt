@@ -57,6 +57,7 @@ class TidalMediaService : MediaLibraryService() {
     private var currentQueueIndex: Int = 0
     private var currentTrackStartedAtMs: Long = 0L
     private var serviceOwnedLoadInProgress = false
+    private var foregroundStarted = false
     private lateinit var apiClient: TidalApiClient
     private lateinit var authRepository: com.tidal.wear.core.auth.TidalAuthRepository
 
@@ -432,7 +433,22 @@ class TidalMediaService : MediaLibraryService() {
             .build()
         ongoingActivity.apply(this)
 
-        startForeground(MEDIA_NOTIFICATION_ID, builder.build())
+        val notification = builder.build()
+        if (foregroundStarted) {
+            getSystemService(NotificationManager::class.java)?.notify(MEDIA_NOTIFICATION_ID, notification)
+            return
+        }
+        runCatching {
+            startForeground(MEDIA_NOTIFICATION_ID, notification)
+            foregroundStarted = true
+        }.onFailure { error ->
+            if (error is ForegroundServiceStartNotAllowedException || error::class.java.simpleName == "ForegroundServiceStartNotAllowedException") {
+                Log.w(PLAYER_LOG_TAG, "startForeground not allowed; posting media notification only", error)
+                getSystemService(NotificationManager::class.java)?.notify(MEDIA_NOTIFICATION_ID, notification)
+            } else {
+                throw error
+            }
+        }
     }
 
     private fun playerActivityPendingIntent(): PendingIntent = PendingIntent.getActivity(
@@ -458,6 +474,7 @@ class TidalMediaService : MediaLibraryService() {
 
     override fun onDestroy() {
         Log.d(PLAYER_LOG_TAG, "onDestroy isPlaying=${sessionPlayer?.isPlaying == true} track=${currentTrack?.id.orEmpty()} queueSize=${currentQueue.size} queueIndex=$currentQueueIndex")
+        foregroundStarted = false
         session?.release()
         session = null
         sessionPlayer?.release()
