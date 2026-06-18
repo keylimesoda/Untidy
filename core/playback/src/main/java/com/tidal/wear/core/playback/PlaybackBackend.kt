@@ -11,7 +11,9 @@ import com.tidal.sdk.player.playbackengine.model.Event
 import com.tidal.sdk.player.playbackengine.model.PlaybackContext
 import com.tidal.sdk.player.playbackengine.model.PlaybackState
 import com.tidal.wear.core.auth.TidalAuthRepository
+import androidx.media3.common.Player
 import com.tidal.wear.core.model.AudioPreset
+import com.tidal.wear.core.model.TidalTrack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -63,9 +65,15 @@ internal fun playbackErrorUiMessage(code: String, message: String?): String = bu
 internal interface PlaybackBackend {
     val events: Flow<PlaybackBackendEvent>
     val positionMs: Long
+    val sessionPlayer: Player? get() = null
 
     fun setAudioPreset(preset: AudioPreset)
     suspend fun loadTrack(trackId: String)
+    suspend fun loadTrack(track: TidalTrack) = loadTrack(track.id)
+    suspend fun loadQueue(tracks: List<TidalTrack>, startIndex: Int) {
+        tracks.getOrNull(startIndex)?.let { loadTrack(it) }
+    }
+    suspend fun appendTrack(track: TidalTrack) {}
     fun prefetchTrack(trackId: String) {}
     fun play()
     fun pause()

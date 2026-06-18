@@ -7,6 +7,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKSPACE_ROOT="$(cd "$REPO_ROOT/../.." && pwd)"
+if [[ ! -x "$WORKSPACE_ROOT/tools/jdks/jdk-17/bin/java" && -x "$(cd "$REPO_ROOT/../../.." && pwd)/tools/jdks/jdk-17/bin/java" ]]; then
+  WORKSPACE_ROOT="$(cd "$REPO_ROOT/../../.." && pwd)"
+fi
 
 export JAVA_HOME="$WORKSPACE_ROOT/tools/jdks/jdk-17"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
