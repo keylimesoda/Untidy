@@ -30,12 +30,13 @@ Release readiness means:
 
 **Open release-polish items still needing disposition:**
 
-- #16 / UNTIDY-015 — WearRecents/task-affinity lint warnings.
-- #17 / UNTIDY-016 — ExportedService lint warning/security posture.
-- #23 / UNTIDY-022 — Now Playing actions discoverability and rotary behavior.
+- None in GitHub/local board. The remaining release gate is #15 itself: final build/test/lint sweep, emulator release-readiness pass, and real-watch/deferral decision.
 
 **Recently disposed release-polish items:**
 
+- #16 / UNTIDY-015 — WearRecents/task-affinity lint warning disposition is closed done after source verification (`REORDER_TO_FRONT | SINGLE_TOP`, no `CLEAR_TOP`) and `:app:lintDebug :app:compileDebugKotlin :core:playback:testDebugUnitTest` / `git diff --check`.
+- #17 / UNTIDY-016 — ExportedService lint/security posture is closed done after manifest rationale, controller filtering, app-command-token safeguards, playback policy tests, and `:app:lintDebug :app:compileDebugKotlin :core:playback:testDebugUnitTest` / `git diff --check`.
+- #23 / UNTIDY-022 — Now Playing actions discoverability/rotary validation is closed done after runtime validation.
 - #24 / UNTIDY-023 — Watch-friendly retry/error recovery is closed done after source re-verification and `:app:compileDebugKotlin` / `git diff --check`.
 
 ## Release gate checklist
@@ -71,9 +72,9 @@ Required disposition:
 
 Current known lint disposition backlog:
 
-- [ ] `UnsafeOptInUsageError` in debug-only `OfflineProofService.kt` resolved or suppressed with debug-only rationale before release gate.
-- [ ] `ExportedService` warning resolved/suppressed/documented via #17.
-- [ ] `WearRecents` / task-affinity warnings resolved/suppressed/documented via #16.
+- [x] `UnsafeOptInUsageError` in debug-only `OfflineProofService.kt` resolved with debug-source file-level Media3 `UnstableApi` opt-in; `:app:lintDebug` passes.
+- [x] `ExportedService` warning resolved/suppressed/documented via #17.
+- [x] `WearRecents` / task-affinity warnings resolved/suppressed/documented via #16.
 - [ ] `GradleDependency` warnings either updated or intentionally deferred with dependency-bump issue/rationale.
 
 ### 3. Debug/proof-only code audit
@@ -198,8 +199,7 @@ Evidence reviewed:
 
 ## Current recommended next steps
 
-1. Close/review the remaining release-polish items already in review: #16, #17, and #24.
-2. Run #23 real-watch/rotary validation before public beta, or record it as a non-public-beta deferral.
-3. Use the completed #25/#26/#28-#31 offline artifacts to decide whether single-track offline MVP ships now, with #32 collection downloads deferred if needed.
-4. Run the final Gradle gate and release-readiness emulator sweep against the selected release scope.
-5. Update #15 with the final go/no-go comment and close only after GitHub Issues and the local board agree.
+1. Run the final full Gradle gate and release-readiness emulator sweep against the selected release scope.
+2. Decide whether real-watch validation is required before public beta or record it as an explicit non-public-beta deferral in #15.
+3. Use the completed #25/#26/#28-#32 offline artifacts to decide whether single-track offline MVP ships now and collection-download UX is accepted for beta scope.
+4. Update #15 with the final go/no-go comment and close only after GitHub Issues and the local board agree.

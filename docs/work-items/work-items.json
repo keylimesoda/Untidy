@@ -435,7 +435,7 @@
     "id": "UNTIDY-015",
     "title": "Resolve WearRecents/task-affinity lint warnings",
     "type": "cleanup",
-    "status": "review",
+    "status": "done",
     "priority": "P2",
     "area": "ui",
     "owner": "Tommy",
@@ -450,7 +450,8 @@
       "Chat-history audit found remaining WearRecents lint warning in PlayerActivity FLAG_ACTIVITY_CLEAR_TOP and debug manifest task-affinity warning.",
       "PlayerActivity.openMainRoute now uses FLAG_ACTIVITY_REORDER_TO_FRONT | FLAG_ACTIVITY_SINGLE_TOP instead of CLEAR_TOP.",
       "Code rationale added: avoid Wear OS recents task surgery while reusing singleTop MainActivity with empty taskAffinity.",
-      "Verification passed: :app:compileDebugKotlin, git diff --check, and source scan found no FLAG_ACTIVITY_CLEAR_TOP/WearRecents source hit."
+      "Verification passed: :app:compileDebugKotlin, git diff --check, and source scan found no FLAG_ACTIVITY_CLEAR_TOP/WearRecents source hit.",
+      "Final closeout verification passed: source scripts/env-android.sh && bash ./gradlew :app:lintDebug :app:compileDebugKotlin :core:playback:testDebugUnitTest --no-daemon && git diff --check. Debug OfflineProofService now has file-level Media3 UnstableApi opt-in, clearing the release-readiness lint blocker."
     ],
     "acceptance": [
       "WearRecents warnings are fixed or intentionally suppressed with a comment/rationale.",
@@ -458,7 +459,7 @@
       "Navigation from Now Playing remains stable.",
       "Narrow build/lint verification passes."
     ],
-    "next": "Review Wear-safe route handoff change; PlayerActivity now uses REORDER_TO_FRONT|SINGLE_TOP instead of CLEAR_TOP while preserving authenticated route delivery through MainActivity.onNewIntent.",
+    "next": "Done. WearRecents/task-affinity disposition verified: PlayerActivity uses REORDER_TO_FRONT|SINGLE_TOP with rationale, no CLEAR_TOP remains, and lint/compile gate passes.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/16",
     "githubNumber": 16
   },
@@ -466,7 +467,7 @@
     "id": "UNTIDY-016",
     "title": "Dispose ExportedService lint warning with documented security posture",
     "type": "cleanup",
-    "status": "review",
+    "status": "done",
     "priority": "P2",
     "area": "platform",
     "owner": "Tommy",
@@ -482,7 +483,8 @@
       "TidalMediaService remains exported intentionally for MediaLibraryService/MediaBrowserService discovery.",
       "Manifest now has narrow tools:ignore=\"ExportedService\" with inline rationale.",
       "Security posture documented: MediaSession onConnect controller filtering plus app-command-token checks for explicit playback/control start commands.",
-      "Verification passed: :core:playback:testDebugUnitTest :app:processDebugMainManifest :app:compileDebugKotlin and git diff --check."
+      "Verification passed: :core:playback:testDebugUnitTest :app:processDebugMainManifest :app:compileDebugKotlin and git diff --check.",
+      "Final closeout verification passed: source scripts/env-android.sh && bash ./gradlew :app:lintDebug :app:compileDebugKotlin :core:playback:testDebugUnitTest --no-daemon && git diff --check. Debug OfflineProofService now has file-level Media3 UnstableApi opt-in, clearing the release-readiness lint blocker."
     ],
     "acceptance": [
       "ExportedService lint warning is fixed or suppressed with explicit rationale.",
@@ -490,7 +492,7 @@
       "Media controls/playback service still function in emulator and preferably real Wear OS validation.",
       "Security posture is documented in code or docs."
     ],
-    "next": "Review exported media service disposition: service remains exported for Media3/Wear controller discovery with manifest suppression/rationale plus controller filtering and app-command-token safeguards.",
+    "next": "Done. ExportedService disposition verified: TidalMediaService remains exported with manifest rationale, controller filtering, app-command-token safeguards, and lint/playback unit gates pass.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/17",
     "githubNumber": 17
   },

@@ -25,38 +25,6 @@ _None._
   - Debug-only code cannot leak into production release surfaces.
   - Known limitations are documented in README/specs.
 
-### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
-
-- Priority: P2
-- Type: cleanup
-- Area: ui
-- Owner: Tommy
-- Labels: wear-os, recents, lint, navigation
-- Spec: `docs/refactor-backlog.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/16
-- Next: Review Wear-safe route handoff change; PlayerActivity now uses REORDER_TO_FRONT|SINGLE_TOP instead of CLEAR_TOP while preserving authenticated route delivery through MainActivity.onNewIntent.
-- Acceptance:
-  - WearRecents warnings are fixed or intentionally suppressed with a comment/rationale.
-  - Back from View Album/View Artist remains fixed.
-  - Navigation from Now Playing remains stable.
-  - Narrow build/lint verification passes.
-
-### UNTIDY-016 — Dispose ExportedService lint warning with documented security posture
-
-- Priority: P2
-- Type: cleanup
-- Area: platform
-- Owner: Tommy
-- Labels: exported-service, security, lint, media-controls
-- Spec: `docs/flow-and-cleanup-audit.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/17
-- Next: Review exported media service disposition: service remains exported for Media3/Wear controller discovery with manifest suppression/rationale plus controller filtering and app-command-token safeguards.
-- Acceptance:
-  - ExportedService lint warning is fixed or suppressed with explicit rationale.
-  - Controller access policy tests still pass.
-  - Media controls/playback service still function in emulator and preferably real Wear OS validation.
-  - Security posture is documented in code or docs.
-
 ## todo
 
 _None._
@@ -411,6 +379,38 @@ _None._
   - Prove the exact TIDAL offline provisioning path for this app
   - If viable, define single-track MVP implementation plan
   - If not viable, remove/neutralize fake download affordances
+
+### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
+
+- Priority: P2
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: wear-os, recents, lint, navigation
+- Spec: `docs/refactor-backlog.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/16
+- Next: Done. WearRecents/task-affinity disposition verified: PlayerActivity uses REORDER_TO_FRONT|SINGLE_TOP with rationale, no CLEAR_TOP remains, and lint/compile gate passes.
+- Acceptance:
+  - WearRecents warnings are fixed or intentionally suppressed with a comment/rationale.
+  - Back from View Album/View Artist remains fixed.
+  - Navigation from Now Playing remains stable.
+  - Narrow build/lint verification passes.
+
+### UNTIDY-016 — Dispose ExportedService lint warning with documented security posture
+
+- Priority: P2
+- Type: cleanup
+- Area: platform
+- Owner: Tommy
+- Labels: exported-service, security, lint, media-controls
+- Spec: `docs/flow-and-cleanup-audit.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/17
+- Next: Done. ExportedService disposition verified: TidalMediaService remains exported with manifest rationale, controller filtering, app-command-token safeguards, and lint/playback unit gates pass.
+- Acceptance:
+  - ExportedService lint warning is fixed or suppressed with explicit rationale.
+  - Controller access policy tests still pass.
+  - Media controls/playback service still function in emulator and preferably real Wear OS validation.
+  - Security posture is documented in code or docs.
 
 ### UNTIDY-017 — Normalize offline/download docs to corrected #11 framing
 
