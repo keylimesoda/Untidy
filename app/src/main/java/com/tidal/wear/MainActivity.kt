@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.automirrored.filled.Login
@@ -77,6 +78,10 @@ import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.playback.NowPlayingStateHolder
+import com.tidal.wear.recent.RecentItemType
+import com.tidal.wear.recent.RecentRepository
+import com.tidal.wear.ui.recent.RecentScreen
+import com.tidal.wear.ui.recent.TrackContextScreen
 import com.tidal.wear.ui.album.AlbumScreen
 import com.tidal.wear.ui.artist.ArtistAlbumsScreen
 import com.tidal.wear.ui.artist.ArtistScreen
@@ -139,6 +144,8 @@ private object Routes {
     const val Discover = "discover"
     const val Search = "search"
     const val Downloads = "downloads"
+    const val Recent = "recent"
+    const val TrackContext = "recent/track/{trackId}"
     const val Album = "album/{albumId}"
     const val Playlist = "playlist/{playlistId}"
     const val Artist = "artist/{artistId}"
@@ -146,6 +153,7 @@ private object Routes {
     const val Library = "library"
     const val Settings = "settings"
 
+    fun trackContext(trackId: String): String = "recent/track/${Uri.encode(trackId)}"
     fun album(albumId: String): String = "album/${Uri.encode(albumId)}"
     fun playlist(playlistId: String): String = "playlist/${Uri.encode(playlistId)}"
     fun artist(artistId: String): String = "artist/${Uri.encode(artistId)}"
@@ -168,6 +176,7 @@ private fun TidalWearApp(
             val context = LocalContext.current
             val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
             val settingsRepository = remember(context) { SettingsRepository(context.applicationContext) }
+            val recentRepository = remember(context) { RecentRepository(context.applicationContext) }
             val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
             val appContext = remember(context) { context.applicationContext }
             val nowPlayingScope = rememberCoroutineScope()
@@ -184,6 +193,7 @@ private fun TidalWearApp(
             }.collectAsState(initial = HomePlaybackSummary())
             val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
             val releaseVersionPreference by settingsRepository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
+            val recentItems by recentRepository.items.collectAsState(initial = emptyList())
             var currentRoute by remember { mutableStateOf<String?>(null) }
 
             DisposableEffect(navController) {
@@ -219,29 +229,45 @@ private fun TidalWearApp(
             }
 
             fun openPlayer() = context.startActivity(Intent(context, PlayerActivity::class.java))
+            fun onPlaybackRejected() {
+                Toast.makeText(context, "Not downloaded · connect to stream this track", Toast.LENGTH_LONG).show()
+            }
             fun playTrack(track: TidalTrack) {
                 val started = context.startTrackPlayback(track)
+                if (started) recentRepository.recordTrack(track)
                 openPlayer()
-                if (!started) {
-                    Toast.makeText(context, "Not downloaded · connect to stream this track", Toast.LENGTH_LONG).show()
-                }
+                if (!started) onPlaybackRejected()
             }
             fun playQueue(tracks: List<TidalTrack>, startIndex: Int) {
                 val started = context.startQueuePlayback(tracks, startIndex)
+                if (started) tracks.getOrNull(startIndex)?.let(recentRepository::recordTrack)
                 openPlayer()
-                if (!started) {
-                    Toast.makeText(context, "Not downloaded · connect to stream this track", Toast.LENGTH_LONG).show()
-                }
+                if (!started) onPlaybackRejected()
             }
-            fun openAlbum(album: TidalAlbum) {
-                navController.navigate(Routes.album(album.id))
+            fun playAlbum(album: TidalAlbum, tracks: List<TidalTrack>) {
+                val started = context.startQueuePlayback(tracks, 0)
+                if (started) recentRepository.recordAlbum(album)
+                openPlayer()
+                if (!started) onPlaybackRejected()
             }
-            fun openPlaylist(playlist: TidalPlaylist) {
-                navController.navigate(Routes.playlist(playlist.id))
+            fun playPlaylist(playlist: TidalPlaylist, tracks: List<TidalTrack>) {
+                val started = context.startQueuePlayback(tracks, 0)
+                if (started) recentRepository.recordPlaylist(playlist)
+                openPlayer()
+                if (!started) onPlaybackRejected()
             }
-            fun openArtist(artist: TidalArtist) {
-                navController.navigate(Routes.artist(artist.id))
+            fun openAlbumId(albumId: String) {
+                navController.navigate(Routes.album(albumId))
             }
+            fun openPlaylistId(playlistId: String) {
+                navController.navigate(Routes.playlist(playlistId))
+            }
+            fun openArtistId(artistId: String) {
+                navController.navigate(Routes.artist(artistId))
+            }
+            fun openAlbum(album: TidalAlbum) = openAlbumId(album.id)
+            fun openPlaylist(playlist: TidalPlaylist) = openPlaylistId(playlist.id)
+            fun openArtist(artist: TidalArtist) = openArtistId(artist.id)
             fun openArtistAlbums(artist: TidalArtist) {
                 navController.navigate(Routes.artistAlbums(artist.id))
             }
@@ -270,6 +296,7 @@ private fun TidalWearApp(
                                 openPlayer()
                             } ?: navController.navigate(Routes.Search)
                         },
+                        onRecent = { navController.navigate(Routes.Recent) },
                         onOffline = { navController.navigate(Routes.Downloads) },
                     )
                 }
@@ -277,6 +304,25 @@ private fun TidalWearApp(
                     DownloadsScreen(
                         context = appContext,
                         onPlayTrack = ::playTrack,
+                    )
+                }
+                composable(Routes.Recent) {
+                    RecentScreen(
+                        items = recentItems,
+                        onOpenTrack = { item -> navController.navigate(Routes.trackContext(item.id)) },
+                        onOpenAlbum = ::openAlbumId,
+                        onOpenPlaylist = ::openPlaylistId,
+                    )
+                }
+                composable(Routes.TrackContext) { entry ->
+                    val trackId = entry.arguments?.getString("trackId")?.let(Uri::decode).orEmpty()
+                    TrackContextScreen(
+                        apiClient = apiClient,
+                        initialRecent = recentItems.firstOrNull { it.type == RecentItemType.Track && it.id == trackId },
+                        trackId = trackId,
+                        onPlayTrack = ::playTrack,
+                        onOpenAlbum = ::openAlbumId,
+                        onOpenArtist = ::openArtistId,
                     )
                 }
                 composable(Routes.Discover) {
@@ -311,6 +357,7 @@ private fun TidalWearApp(
                         apiClient = apiClient,
                         albumId = albumId,
                         initialAlbum = null,
+                        onPlayAlbum = ::playAlbum,
                         onPlayQueue = ::playQueue,
                     )
                 }
@@ -320,6 +367,7 @@ private fun TidalWearApp(
                         apiClient = apiClient,
                         playlistId = playlistId,
                         initialPlaylist = null,
+                        onPlayPlaylist = ::playPlaylist,
                         onPlayQueue = ::playQueue,
                     )
                 }
@@ -361,7 +409,10 @@ private fun TidalWearApp(
                     SettingsScreen(
                         authRepository = authRepository,
                         onOpenDownloads = { navController.navigate(Routes.Downloads) },
-                        onSignedOut = { navController.navigateAndClear(Routes.Onboarding) },
+                        onSignedOut = {
+                            recentRepository.clear()
+                            navController.navigateAndClear(Routes.Onboarding)
+                        },
                     )
                 }
             }
@@ -377,6 +428,7 @@ private fun HomeScreen(
     isPlaying: Boolean,
     onNowPlaying: () -> Unit,
     onResume: () -> Unit,
+    onRecent: () -> Unit,
     onOffline: () -> Unit,
 ) {
     val signedIn = authState == AuthState.UserSignedIn
@@ -411,10 +463,16 @@ private fun HomeScreen(
                     )
                 }
                 HomeListChip(
-                    label = "Discover",
-                    secondaryLabel = "Personalized mixes",
-                    icon = Icons.Filled.Star,
-                    onClick = { navController.navigate(Routes.Discover) },
+                    label = "Recent",
+                    secondaryLabel = "Things you played",
+                    icon = Icons.Filled.History,
+                    onClick = onRecent,
+                )
+                HomeListChip(
+                    label = "Downloads",
+                    secondaryLabel = "Saved on watch",
+                    icon = Icons.Filled.Download,
+                    onClick = onOffline,
                 )
                 HomeListChip(
                     label = "Library",
@@ -423,10 +481,10 @@ private fun HomeScreen(
                     onClick = { navController.navigate(Routes.Library) },
                 )
                 HomeListChip(
-                    label = "Downloads",
-                    secondaryLabel = "Saved on watch",
-                    icon = Icons.Filled.Download,
-                    onClick = onOffline,
+                    label = "Discover",
+                    secondaryLabel = "Personalized mixes",
+                    icon = Icons.Filled.Star,
+                    onClick = { navController.navigate(Routes.Discover) },
                 )
                 HomeListChip(
                     label = "Settings",

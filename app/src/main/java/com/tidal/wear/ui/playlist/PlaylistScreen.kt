@@ -58,6 +58,7 @@ fun PlaylistScreen(
     apiClient: TidalApiClient,
     playlistId: String,
     initialPlaylist: TidalPlaylist?,
+    onPlayPlaylist: (TidalPlaylist, List<TidalTrack>) -> Unit,
     onPlayQueue: (List<TidalTrack>, Int) -> Unit,
 ) {
     var playlist by remember(playlistId, initialPlaylist) { mutableStateOf(initialPlaylist) }
@@ -138,7 +139,15 @@ fun PlaylistScreen(
                 item {
                     PlayAllChip(
                         accent = accent,
-                        onClick = { onPlayQueue(tracks, 0) },
+                        onClick = {
+                            val recentPlaylist = playlist ?: TidalPlaylist(
+                                id = playlistId,
+                                title = title,
+                                creator = creator,
+                                artworkUrl = playlistArtworkUrl,
+                            )
+                            onPlayPlaylist(recentPlaylist, tracks)
+                        },
                     )
                 }
                 item {

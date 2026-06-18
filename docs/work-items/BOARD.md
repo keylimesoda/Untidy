@@ -22,25 +22,6 @@ _Generated from `work-items.json`._
   - Offline/download real-watch result is either passed or explicitly deferred for non-public beta.
   - Findings are linked back to #15 release decision record.
 
-### UNTIDY-038 — Add watch-local Recent shelf for explicit play history
-
-- Priority: P1
-- Type: feature
-- Area: ui
-- Owner: Tommy
-- Labels: recent, watch-ux, navigation, play-history
-- Spec: `docs/specs/recent-shelf.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/39
-- Next: Spec drafted; run focused UX/dev review, then implement with stage updates as gates pass.
-- Acceptance:
-  - Home includes Recent.
-  - Recent screen shows explicit play-history items only.
-  - No artists are written/displayed.
-  - Tapping album/playlist opens metadata detail route.
-  - Tapping track opens track context page/sheet or documented MVP fallback, not blind autoplay.
-  - History persists across app restart.
-  - Compile and emulator smoke pass.
-
 ## review
 
 ### UNTIDY-036 — P0 playback must continue after app background/screen-off
@@ -81,6 +62,25 @@ _Generated from `work-items.json`._
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/35
 - Next: Review Home action in Now Playing action sheet on physical watch; Back intentionally backgrounds the app while playback continues.
+
+### UNTIDY-038 — Add watch-local Recent shelf for explicit play history
+
+- Priority: P1
+- Type: feature
+- Area: ui
+- Owner: Tommy
+- Labels: recent, watch-ux, navigation, play-history
+- Spec: `docs/specs/recent-shelf.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/39
+- Next: Review implemented Recent shelf and run emulator/physical watch smoke for Home → Recent with a populated history item before final done.
+- Acceptance:
+  - Home includes Recent.
+  - Recent screen shows explicit play-history items only.
+  - No artists are written/displayed.
+  - Tapping album/playlist opens metadata detail route.
+  - Tapping track opens track context page/sheet or documented MVP fallback, not blind autoplay.
+  - History persists across app restart.
+  - Compile and emulator smoke pass.
 
 ### UNTIDY-035 — Review and tune TIDAL-appropriate typography
 

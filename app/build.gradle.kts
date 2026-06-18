@@ -94,6 +94,8 @@ dependencies {
     implementation("com.google.android.horologist:horologist-compose-layout:0.6.22")
     implementation("com.google.android.horologist:horologist-compose-material:0.6.22")
     implementation("com.google.android.horologist:horologist-media-ui:0.6.22")
+
+    testImplementation("junit:junit:4.13.2")
 }
 
 fun String.kotlinLiteral(): String = buildString {

@@ -59,6 +59,7 @@ fun AlbumScreen(
     apiClient: TidalApiClient,
     albumId: String,
     initialAlbum: TidalAlbum?,
+    onPlayAlbum: (TidalAlbum, List<TidalTrack>) -> Unit,
     onPlayQueue: (List<TidalTrack>, Int) -> Unit,
 ) {
     var album by remember(albumId, initialAlbum) { mutableStateOf(initialAlbum) }
@@ -138,7 +139,16 @@ fun AlbumScreen(
                 item {
                     PlayAlbumChip(
                         accent = accent,
-                        onClick = { onPlayQueue(tracks, 0) },
+                        onClick = {
+                            val recentAlbum = album ?: TidalAlbum(
+                                id = albumId,
+                                title = title,
+                                artist = tracks.firstOrNull()?.artist.orEmpty(),
+                                artworkUrl = artworkUrl,
+                                trackCount = tracks.size,
+                            )
+                            onPlayAlbum(recentAlbum, tracks)
+                        },
                     )
                 }
                 item {

@@ -1158,7 +1158,7 @@
     "id": "UNTIDY-038",
     "title": "Add watch-local Recent shelf for explicit play history",
     "type": "feature",
-    "status": "in-progress",
+    "status": "review",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -1171,7 +1171,12 @@
     "spec": "docs/specs/recent-shelf.md",
     "evidence": [
       "Ric approved Recent shelf concept but corrected tap behavior: tap opens metadata/detail page, not autoplay. Artists excluded because there is no Play Artist action.",
-      "Spec drafted at docs/specs/recent-shelf.md with Ric correction: tap opens metadata/detail, no artists, no auto-advance writes."
+      "Spec drafted at docs/specs/recent-shelf.md with Ric correction: tap opens metadata/detail, no artists, no auto-advance writes.",
+      "Implemented watch-local Recent repository with SharedPreferences persistence, type+id dedupe, 20-item cap, and unit coverage for dedupe/cap/no-artist type set.",
+      "Home now includes a Recent chip; Recent screen opens album/playlist detail routes and track taps open a minimal Track Context screen without autoplay.",
+      "Explicit UI play writes are wired for track play, album Play Album, and playlist Play all; service/backend transitions remain untouched, so auto-advance is not recorded.",
+      "Sign-out clear hook added via Settings onSignedOut path.",
+      "Verification passed: :app:lintDebug :app:testDebugUnitTest :app:compileDebugKotlin plus git diff --check."
     ],
     "acceptance": [
       "Home includes Recent.",
@@ -1182,7 +1187,7 @@
       "History persists across app restart.",
       "Compile and emulator smoke pass."
     ],
-    "next": "Spec drafted; run focused UX/dev review, then implement with stage updates as gates pass.",
+    "next": "Review implemented Recent shelf and run emulator/physical watch smoke for Home \u2192 Recent with a populated history item before final done.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/39",
     "githubNumber": 39
   }
