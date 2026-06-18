@@ -107,21 +107,6 @@ _None._
   - Single-track MVP implementation plan is updated with exact storage/cache/provider contract.
   - If production code is touched, narrow Gradle gate and runtime emulator proof pass.
 
-### UNTIDY-029 — Implement offline fallback behavior
-
-- Priority: P1
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: offline, fallback, network, ux
-- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/30
-- Next: Review offline fallback runtime evidence, then close if accepted; next implementation lane is #31 minimal Settings Downloads controls.
-- Acceptance:
-  - Offline mode does not strand the user on live-only screens.
-  - Downloaded tracks remain discoverable/playable through Home -> Downloads.
-  - Non-downloaded tracks fail with clear user-facing copy.
-
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 
 - Priority: P2
@@ -456,6 +441,21 @@ _None._
 - Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/29
 - Next: Done: local remove-download UX accepted with emulator tap-through proof and local-only cache/metadata cleanup evidence.
+
+### UNTIDY-029 — Implement offline fallback behavior
+
+- Priority: P1
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, fallback, network, ux
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/30
+- Next: Closed after review: offline fallback runtime evidence and compile gate are sufficient for the P1 fallback MVP; real-watch/manual release validation remains covered by #15/#23.
+- Acceptance:
+  - Offline mode does not strand the user on live-only screens.
+  - Downloaded tracks remain discoverable/playable through Home -> Downloads.
+  - Non-downloaded tracks fail with clear user-facing copy.
 
 ### UNTIDY-010 — Implement Add to Playlist workflow
 

@@ -893,7 +893,7 @@
     "id": "UNTIDY-029",
     "title": "Implement offline fallback behavior",
     "type": "feature",
-    "status": "review",
+    "status": "done",
     "priority": "P1",
     "area": "offline",
     "owner": "Tommy",
@@ -908,14 +908,16 @@
       "Offline fallback code routes Search/Discover live-only failures to connection-required copy plus Downloads shortcut.",
       "Playback start guards now allow offline playback only for downloaded tracks and show Not downloaded / connect-to-stream copy for non-downloaded tracks.",
       "Runtime artifact: reports/offline-fallback-2026-06-17-1601/ with discover-offline.xml/png and downloads-offline.xml/png.",
-      "Verification: :app:compileDebugKotlin --no-daemon passed; git diff --check passed."
+      "Verification: :app:compileDebugKotlin --no-daemon passed; git diff --check passed.",
+      "Review closeout 2026-06-17: artifact XML confirms offline Discover shows connection-required copy plus Open Downloads, and Downloads remains reachable with the downloaded Pearl Jam track.",
+      "Review closeout verification: source scripts/env-android.sh >/dev/null && bash ./gradlew :app:compileDebugKotlin --no-daemon; git diff --check."
     ],
     "acceptance": [
       "Offline mode does not strand the user on live-only screens.",
       "Downloaded tracks remain discoverable/playable through Home -> Downloads.",
       "Non-downloaded tracks fail with clear user-facing copy."
     ],
-    "next": "Review offline fallback runtime evidence, then close if accepted; next implementation lane is #31 minimal Settings Downloads controls.",
+    "next": "Closed after review: offline fallback runtime evidence and compile gate are sufficient for the P1 fallback MVP; real-watch/manual release validation remains covered by #15/#23.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/30",
     "githubNumber": 30
   },
