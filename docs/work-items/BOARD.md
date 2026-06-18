@@ -41,22 +41,6 @@ _None._
   - Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.
   - No generic, non-Wear-specific advice without source/evidence.
 
-### UNTIDY-020 — Tune round-screen list safe-area padding
-
-- Priority: P1
-- Type: cleanup
-- Area: ui
-- Owner: Tommy
-- Labels: round-screen, padding, wear-os, ux
-- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/21
-- Next: Review emulator evidence for shared round-screen list padding and merge if acceptable.
-- Acceptance:
-  - First/last actionable rows settle inside round safe area on emulator screenshots.
-  - Search, Library, and Home screenshots show fully readable primary rows.
-  - No major regression to scroll ergonomics.
-  - Compile/lint or relevant narrow gate passes.
-
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 
 - Priority: P2
@@ -352,6 +336,22 @@ _None._
   - User has visible prompt/affordance before and during IME handoff.
   - Existing search results flow still works.
   - Runtime evidence captured.
+  - Compile/lint or relevant narrow gate passes.
+
+### UNTIDY-020 — Tune round-screen list safe-area padding
+
+- Priority: P1
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: round-screen, padding, wear-os, ux
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/21
+- Next: Done: round-screen safe-area padding accepted with emulator screenshot/XML evidence and narrow build/diff verification.
+- Acceptance:
+  - First/last actionable rows settle inside round safe area on emulator screenshots.
+  - Search, Library, and Home screenshots show fully readable primary rows.
+  - No major regression to scroll ergonomics.
   - Compile/lint or relevant narrow gate passes.
 
 ### UNTIDY-021 — Gate or confirm New test playlist creation
