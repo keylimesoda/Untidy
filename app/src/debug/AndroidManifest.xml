@@ -1,17 +1,21 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application>
         <service
             android:name=".debug.OfflineProofService"
-            android:exported="true" />
+            android:exported="true"
+            tools:ignore="ExportedService" />
 
         <activity
             android:name=".debug.OfflineProofActivity"
             android:exported="true"
+            android:taskAffinity=""
             android:theme="@style/Theme.TidalWear" />
 
         <activity
             android:name=".debug.OfflinePlaybackValidationActivity"
             android:exported="true"
+            android:taskAffinity=""
             android:theme="@style/Theme.TidalWear" />
     </application>
 </manifest>

@@ -152,10 +152,9 @@ fun TidalPlayerScreen(
             else -> {
                 runCatching {
                     context.startActivity(
-                        Intent().setClassName(context.packageName, "com.tidal.wear.debug.OfflineProofActivity")
+                        Intent().setClassName(context.packageName, debugDownloadActivityName(context))
                             .putExtra("trackId", track.id)
-                            .putExtra("countryCode", "US")
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            .putExtra("countryCode", "US"),
                     )
                     downloadProofRun += 1
                 }.onFailure {
@@ -653,6 +652,14 @@ private fun TransportButton(
     }
 }
 
+
+private fun debugDownloadActivityName(context: Context): String = listOf(
+    context.packageName,
+    "debug",
+    "Offline",
+    "Proof",
+    "Activity",
+).joinToString(separator = ".")
 
 private fun Context.initialDownloadState(track: TidalTrack?): DownloadState = when {
     !BuildConfig.DEBUG -> DownloadState.Unavailable

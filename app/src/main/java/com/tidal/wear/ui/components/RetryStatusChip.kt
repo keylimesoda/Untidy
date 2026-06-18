@@ -16,9 +16,9 @@ import com.tidal.wear.ui.theme.TidalColors
 @Composable
 fun RetryStatusChip(
     title: String,
-    subtitle: String = "Tap to retry",
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitle: String = "Tap to retry",
 ) {
     Chip(
         modifier = modifier
