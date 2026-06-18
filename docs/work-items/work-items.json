@@ -1094,7 +1094,10 @@
     ],
     "spec": "docs/release-readiness-checklist.md",
     "evidence": [
-      "Created from Ric physical-watch validation feedback on 2026-06-17."
+      "Created from Ric physical-watch validation feedback on 2026-06-17.",
+      "Recommendation: keep Now Playing Back watch-native by backgrounding the app while playback continues; add one Home row to the existing pull-up Actions sheet rather than a phone-style drawer or extra global nav page.",
+      "Patch adds Home as the first ActionsSheet row and routes PlayerActivity to MainActivity home using the existing REORDER_TO_FRONT | SINGLE_TOP handoff; MainActivity clears to Home when receiving that route.",
+      "Verification passed: source scripts/env-android.sh && bash ./gradlew :app:compileDebugKotlin --no-daemon; git diff --check. Physical-watch confirmation remains the next review step."
     ],
     "acceptance": [],
     "next": "Review Home action in Now Playing action sheet on physical watch; Back intentionally backgrounds the app while playback continues.",
