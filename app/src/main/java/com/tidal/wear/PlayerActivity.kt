@@ -17,6 +17,8 @@ import com.tidal.wear.playback.NowPlayingViewModel
 import com.tidal.wear.ui.player.TidalPlayerScreen
 
 private object PlayerRoutes {
+    const val Home = "home"
+
     fun album(albumId: String): String = "album/${Uri.encode(albumId)}"
     fun artist(artistId: String): String = "artist/${Uri.encode(artistId)}"
 }
@@ -61,6 +63,7 @@ class PlayerActivity : ComponentActivity() {
                         ambientOffset = ambientOffset,
                         deviceHasLowBitAmbient = deviceHasLowBitAmbient,
                         burnInProtectionRequired = burnInProtectionRequired,
+                        onOpenHome = { openMainRoute(PlayerRoutes.Home) },
                         onOpenAlbum = { albumId -> openMainRoute(PlayerRoutes.album(albumId)) },
                         onOpenArtist = { artistId -> openMainRoute(PlayerRoutes.artist(artistId)) },
                     )

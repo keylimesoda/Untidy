@@ -110,6 +110,7 @@ fun TidalPlayerScreen(
     ambientOffset: Pair<Int, Int>,
     deviceHasLowBitAmbient: Boolean,
     burnInProtectionRequired: Boolean,
+    onOpenHome: () -> Unit = {},
     onOpenAlbum: (String) -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
 ) {
@@ -195,6 +196,7 @@ fun TidalPlayerScreen(
             downloadState = downloadState,
             onDownload = ::startDebugDownload,
             onRemoveDownload = ::removeCurrentDownload,
+            onOpenHome = onOpenHome,
             onOpenAlbum = onOpenAlbum,
             onOpenArtist = onOpenArtist,
         )
@@ -212,6 +214,7 @@ private fun TidalPlayerNonAmbient(
     downloadState: DownloadState,
     onDownload: () -> Unit,
     onRemoveDownload: () -> String?,
+    onOpenHome: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
 ) {
@@ -473,6 +476,7 @@ private fun TidalPlayerNonAmbient(
                     outputOptions = rememberAudioOutputOptions(),
                     onDownload = onDownload,
                     onRemoveDownload = onRemoveDownload,
+                    onHome = onOpenHome,
                     onQueue = { showQueue = true },
                     onOutputSettings = {
                         runCatching {

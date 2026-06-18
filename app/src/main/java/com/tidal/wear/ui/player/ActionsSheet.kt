@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -59,6 +60,7 @@ fun ActionsSheet(
     outputOptions: List<AudioOutputOption>,
     onDownload: () -> Unit,
     onRemoveDownload: () -> String?,
+    onHome: () -> Unit,
     onQueue: () -> Unit,
     onOutputSettings: () -> Unit,
     onAddToPlaylist: () -> String?,
@@ -96,10 +98,19 @@ fun ActionsSheet(
         ) {
             item {
                 ActionRow(
+                    icon = Icons.Filled.Home,
+                    label = "Home",
+                    rightIndicator = null,
+                    iconTint = TidalColors.Cyan,
+                    onClick = onHome,
+                )
+            }
+            item {
+                ActionRow(
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     label = "Queue",
                     rightIndicator = null,
-                    iconTint = TidalColors.Cyan,
+                    iconTint = TidalColors.White,
                     onClick = onQueue,
                 )
             }

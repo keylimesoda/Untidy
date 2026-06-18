@@ -197,7 +197,11 @@ private fun TidalWearApp(
 
             LaunchedEffect(routeRequest) {
                 routeRequest?.takeIf { it.isNotBlank() }?.let { route ->
-                    navController.navigate(route)
+                    if (route == Routes.Home) {
+                        navController.navigateAndClear(Routes.Home)
+                    } else {
+                        navController.navigate(route)
+                    }
                     onRouteRequestConsumed()
                 }
             }
