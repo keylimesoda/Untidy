@@ -43,7 +43,8 @@ Implemented and working in the emulator today:
 - ⌚ **Back from Now Playing exits to the watch** while playback continues in the background.
 - 🔁 **Explicit / clean duplicate preference** — when both versions exist, Untidy picks the one you want automatically.
 - 🎛️ **Rotary / bezel scrolling** across all main lists (search, library, discover, artist, album, playlist, queue).
-- ⚙️ **Settings** for playback quality, explicit/clean preference, and account.
+- ⚙️ **Settings** for playback quality, explicit/clean preference, account, and local download cleanup.
+- ⬇️ **Single-track offline MVP** — sanctioned `usage=DOWNLOAD` cache/proof path, Downloads shelf, local remove-download UX, and offline fallback states. Real-watch validation is still pending before public/beta release.
 
 > Untidy targets **Wear OS 4+ (API 33)** and declares itself as a **standalone** Wear app — it does not require a companion phone app to function.
 
@@ -54,10 +55,17 @@ Things that are explicitly **not done yet** and are next up:
 - 🧪 Real-watch deployment and QA on Galaxy Watch hardware (currently emulator-tested).
 - 🔵 Samsung-specific behavior checks (One UI Watch quirks, bezel ergonomics, BT audio routing).
 - 🟢 Ongoing Activity / return-to-playback validation from the watch face and recents.
-- ⬇️ Downloads and offline playback.
+- ⬇️ Real-watch offline validation and broader album/playlist download execution beyond the current single-track MVP.
 - 🏪 Distribution channel decisions (sideload today; store listing later).
 
 If you're shipping a Galaxy Watch and want to help shake out real-device issues, watch the issues tab.
+
+
+### Current limitations
+
+- Real Wear OS hardware validation is still pending. Emulator evidence covers the main routes, but rotary/crown input, OEM text input, Bluetooth audio, media controls, screen-off playback, and offline DRM/cache behavior need a physical watch pass before public/beta release.
+- Offline support is intentionally narrow today: single-track MVP evidence, Downloads shelf, local-only removal, and offline fallback states. Album/playlist collection download UX is present, but full collection download execution and real-watch offline validation remain follow-up scope.
+- Untidy is an unofficial client. You need your own active TIDAL account and developer credentials, and all playback/download behavior must stay within TIDAL's SDK/API terms.
 
 ## Project layout
 
@@ -149,7 +157,9 @@ This is the part that is not yet validated by the maintainers — see the roadma
 | Real Galaxy Watch deployment + QA     | ⏳ Pending            |
 | Samsung-specific behavior checks      | ⏳ Pending            |
 | Ongoing Activity / return-to-playback | ⏳ Validation pending |
-| Downloads / offline playback          | ❌ Not yet            |
+| Downloads shelf / local cleanup       | ✅ Emulator-tested     |
+| Single-track offline MVP              | ✅ Emulator-tested     |
+| Real-watch offline validation         | ⏳ Pending            |
 
 Treat this as a **public beta**. Things will move; APIs and UI may change between commits.
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,7 +60,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var confirmErase by remember { mutableStateOf(false) }
     var confirmRemoveDownloads by remember { mutableStateOf(false) }
-    var downloadsRefreshTick by remember { mutableStateOf(0) }
+    var downloadsRefreshTick by remember { mutableIntStateOf(0) }
     val downloadedTracks = remember(downloadsRefreshTick) { context.readOfflineDownloadedTracks() }
     val downloadsStorageBytes = remember(downloadsRefreshTick) { context.offlineDownloadsStorageBytes() }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -231,9 +232,9 @@ fun SettingsScreen(
                 }
 
                 item { SectionHeader("Legal") }
-                item { DisabledSettingChip("Open-source licenses", "Coming before release") }
+                item { DisabledSettingChip("Open-source licenses", "Kotlin · Compose · Media3 · TIDAL SDK") }
                 item { DisabledSettingChip("Privacy", "Tokens are local and erasable") }
-                item { DisabledSettingChip("TIDAL attribution", "Coming before release") }
+                item { DisabledSettingChip("TIDAL attribution", "Unofficial client · TIDAL marks belong to TIDAL") }
                 item {
                     Text(
                         text = "Stream policy: AAC/MP4A non-lossless to preserve battery.",

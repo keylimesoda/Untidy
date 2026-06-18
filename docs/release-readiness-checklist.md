@@ -30,7 +30,7 @@ Release readiness means:
 
 **Open release-polish items still needing disposition:**
 
-- None in GitHub/local board. The remaining release gate is #15 itself: final build/test/lint sweep, emulator release-readiness pass, and real-watch/deferral decision.
+- #33 / UNTIDY-032 — Real Wear OS release validation. Emulator evidence is current, but public/beta release still needs physical-watch validation or an explicit non-public-beta deferral.
 
 **Recently disposed release-polish items:**
 
@@ -46,8 +46,8 @@ Release readiness means:
 - [ ] `main` is clean: `git status --short --branch` shows no local changes.
 - [ ] No open PRs remain unmerged or unreviewed.
 - [ ] GitHub Issues and `docs/work-items/BOARD.md` agree.
-- [ ] Every open issue is one of:
-  - [ ] explicit release blocker,
+- [x] Every open issue is one of:
+  - [x] explicit release blocker (#33),
   - [ ] accepted release deferral,
   - [ ] post-release backlog.
 - [x] #11 has a release decision: capability spike closed; current release choice is single-track offline MVP acceptance vs collection-download/real-watch deferral.
@@ -65,32 +65,32 @@ git diff --check
 
 Required disposition:
 
-- [ ] `assembleDebug` passes.
-- [ ] `testDebugUnitTest` passes.
-- [ ] `git diff --check` passes.
-- [ ] `lintDebug` either passes or every remaining warning/error is linked to an issue/explicit rationale below.
+- [x] `assembleDebug` passes. 2026-06-17 final gate: `lintDebug assembleDebug testDebugUnitTest` passed.
+- [x] `testDebugUnitTest` passes. 2026-06-17 final gate: `lintDebug assembleDebug testDebugUnitTest` passed.
+- [x] `git diff --check` passes. 2026-06-17 final gate passed.
+- [x] `lintDebug` either passes or every remaining warning/error is linked to an issue/explicit rationale below. 2026-06-17 final gate passed.
 
 Current known lint disposition backlog:
 
 - [x] `UnsafeOptInUsageError` in debug-only `OfflineProofService.kt` resolved with debug-source file-level Media3 `UnstableApi` opt-in; `:app:lintDebug` passes.
 - [x] `ExportedService` warning resolved/suppressed/documented via #17.
 - [x] `WearRecents` / task-affinity warnings resolved/suppressed/documented via #16.
-- [ ] `GradleDependency` warnings either updated or intentionally deferred with dependency-bump issue/rationale.
+- [x] `GradleDependency` warnings either updated or intentionally deferred with dependency-bump issue/rationale. Current `lintDebug` passes with no release-blocking GradleDependency finding.
 
 ### 3. Debug/proof-only code audit
 
-- [ ] Search for debug-only/proof code:
+- [x] Search for debug-only/proof code:
 
 ```bash
 rg -n "OfflineProof|debug-only|BuildConfig.DEBUG|Untidy Test|faux|proof|TODO|FIXME|HACK" app core docs -S
 ```
 
-- [ ] `OfflineProofService` is only available in debug source sets or otherwise impossible to trigger in release.
-- [ ] No debug proof endpoint/activity/service is exported in release.
+- [x] `OfflineProofService` is only available in debug source sets or otherwise impossible to trigger in release (`app/src/debug/AndroidManifest.xml`, `app/src/debug/java/...`).
+- [x] No debug proof endpoint/activity/service is exported in release. Debug proof components are under `app/src/debug/` only.
 - [ ] `New test playlist` create+add row is impossible in release builds (#22).
-- [ ] No test/faux playlist creation can be triggered by normal release users.
-- [ ] No logs print tokens, licenses, download URLs, manifest URLs, encryption keys, or private user data.
-- [ ] Any retained debug artifacts are documented as non-release tooling.
+- [x] No test/faux playlist creation can be triggered by normal release users. The row is gated by `BuildConfig.DEBUG`.
+- [x] No logs print tokens, licenses, download URLs, manifest URLs, encryption keys, or private user data in reviewed proof artifacts/log paths.
+- [x] Any retained debug artifacts are documented as non-release tooling.
 
 ### 4. Runtime validation — emulator
 
@@ -105,10 +105,10 @@ Capture final artifacts under `reports/release-readiness-YYYY-MM-DD/`.
 
 Required emulator smoke paths:
 
-- [ ] Clean install and launch.
+- [x] Clean install and launch. 2026-06-17 `ensure-wear-emulator.sh` installed/launched on emulator-5554.
 - [ ] Signed-out/onboarding path, if auth state is cleared.
-- [ ] Authenticated home loads without crash.
-- [ ] Search entry shows visible Wear prompt, not blank black screen (#20).
+- [x] Authenticated home loads without crash. Fresh route XML captured under `reports/release-readiness-2026-06-17-final/home.xml`.
+- [x] Search entry shows visible Wear prompt, not blank black screen (#20). Fresh route XML captured under `reports/release-readiness-2026-06-17-final/search.xml`.
 - [ ] Search results render and primary result opens.
 - [ ] Library category list and selected category render inside round safe area (#21).
 - [ ] Album screen play-all/start-track path works.
@@ -119,7 +119,7 @@ Required emulator smoke paths:
 - [ ] Add to Playlist existing-playlist path works against an approved test playlist or is explicitly deferred.
 - [ ] Debug-only `New test playlist` row is absent in release-equivalent build and present only in debug if intentionally retained.
 - [x] Offline/download shipped/proof state matches the #11 release decision: #11 is closed, #25/#26 carry the accepted `usage=DOWNLOAD` proof/MVP evidence, and remaining UX scope is tracked separately.
-- [ ] Settings/account/playback/download sections render and back behavior works.
+- [x] Settings/account/playback/download sections render. Fresh route XML captured under `reports/release-readiness-2026-06-17-final/settings.xml`; full back-behavior sweep remains part of #33 real-watch validation.
 - [x] Error/empty states do not create dead ends; #24 disposition recorded: detail screens use one-tap retry chips and Now Playing action failures render inline status feedback.
 
 ### 5. Runtime validation — real Wear device
@@ -149,13 +149,13 @@ Use `docs/ux/wear-os-ux-walkthrough-2026-06-17.md` as the baseline.
 - [x] #22 New test playlist gating reviewed and accepted.
 - [ ] #23 Now Playing action discoverability/rotary behavior validated or explicitly deferred.
 - [x] #24 retry/error recovery implemented and closed done.
-- [ ] No remaining user-visible copy says “Coming soon” for a path that is actually proof-in-progress or debug-only.
+- [x] No remaining user-visible copy says “Coming soon” for a path that is actually proof-in-progress or debug-only. Production proof copy toast and Settings legal/attribution placeholders fixed; static grep passed.
 - [ ] Disabled/proof-in-progress states are honest, concise, and watch-readable.
 
 ### 7. Documentation readiness
 
-- [ ] README accurately describes what Untidy currently supports.
-- [ ] README or docs identify known limitations.
+- [x] README accurately describes what Untidy currently supports. Refreshed with single-track offline MVP, Downloads shelf/local cleanup, and real-watch-pending scope.
+- [x] README or docs identify known limitations. Current limitations section added.
 - [ ] Offline/download docs use the corrected framing: sanctioned SDK/API proof, not permission-blocked in principle (#18).
 - [ ] Guardrail remains documented: do not implement offline by caching `PLAYBACK` / `STREAM` manifests.
 - [ ] Emulator SELinux wrapper docs are current and do not imply persistent SELinux changes.

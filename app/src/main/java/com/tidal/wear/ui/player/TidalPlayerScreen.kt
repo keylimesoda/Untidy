@@ -131,7 +131,7 @@ fun TidalPlayerScreen(
         downloadState = DownloadState.Downloading(0.02f)
         repeat(36) { attempt ->
             delay(1_000)
-            val proof = withContext(Dispatchers.IO) { context.latestOfflineProofFor(track.id) }
+            val proof = withContext(Dispatchers.IO) { context.latestOfflineDownloadProofFor(track.id) }
             if (proof == true) {
                 withContext(Dispatchers.IO) { context.markOfflineTrackDownloaded(track) }
                 downloadState = DownloadState.Downloaded
@@ -140,10 +140,10 @@ fun TidalPlayerScreen(
             downloadState = DownloadState.Downloading(((attempt + 1).toFloat() / 36f).coerceIn(0.02f, 0.95f))
         }
         downloadState = DownloadState.NotDownloaded
-        Toast.makeText(context, "Offline proof did not finish", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Offline download did not finish", Toast.LENGTH_SHORT).show()
     }
 
-    fun startDebugDownloadProof() {
+    fun startDebugDownload() {
         val track = currentTrack
         when {
             !BuildConfig.DEBUG -> Toast.makeText(context, "Offline downloads are not available in this build", Toast.LENGTH_LONG).show()
@@ -159,7 +159,7 @@ fun TidalPlayerScreen(
                     )
                     downloadProofRun += 1
                 }.onFailure {
-                    Toast.makeText(context, "Offline proof unavailable", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Offline download unavailable", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -194,7 +194,7 @@ fun TidalPlayerScreen(
             viewModel = viewModel,
             apiClient = apiClient,
             downloadState = downloadState,
-            onDownload = ::startDebugDownloadProof,
+            onDownload = ::startDebugDownload,
             onRemoveDownload = ::removeCurrentDownload,
             onOpenAlbum = onOpenAlbum,
             onOpenArtist = onOpenArtist,
@@ -665,7 +665,7 @@ private fun TidalTrack.isDownloadProofEligible(): Boolean = id.isNotBlank() &&
     id != "tidal-current" &&
     !id.startsWith("fixture", ignoreCase = true)
 
-private fun Context.latestOfflineProofFor(trackId: String): Boolean? = runCatching {
+private fun Context.latestOfflineDownloadProofFor(trackId: String): Boolean? = runCatching {
     val latest = File(filesDir, "offline-proof/latest.json")
     if (!latest.isFile) return@runCatching null
     val root = JSONObject(latest.readText())

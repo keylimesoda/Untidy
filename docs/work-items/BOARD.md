@@ -17,7 +17,7 @@ _None._
 - Labels: release, ship-readiness, qa, docs
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/15
-- Next: Review release-readiness checklist and use it as the final ship gate after the remaining release-polish dispositions.
+- Next: Release gate evidence is current. Do not close until #33 real-watch validation is resolved or explicitly deferred for non-public beta.
 - Acceptance:
   - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
   - Final build/test/lint evidence is posted.
@@ -27,7 +27,23 @@ _None._
 
 ## todo
 
-_None._
+### UNTIDY-032 — Real Wear OS release validation
+
+- Priority: P0
+- Type: test
+- Area: qa
+- Owner: Tommy
+- Labels: real-watch, release, qa, wear-os
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/33
+- Next: Run on a physical Wear OS watch before public/beta release, or record explicit non-public-beta deferral in #15.
+- Acceptance:
+  - Real watch model and Wear OS version are recorded.
+  - APK/build variant and commit under test are recorded.
+  - Core navigation and playback results are documented with artifact notes.
+  - Rotary/input/media-session/Bluetooth behavior is explicitly pass/fail/deferred.
+  - Offline/download real-watch result is either passed or explicitly deferred for non-public beta.
+  - Findings are linked back to #15 release decision record.
 
 ## blocked
 
@@ -348,6 +364,22 @@ _None._
   - Offline mode does not strand the user on live-only screens.
   - Downloaded tracks remain discoverable/playable through Home -> Downloads.
   - Non-downloaded tracks fail with clear user-facing copy.
+
+### UNTIDY-033 — Resolve release legal/attribution/docs placeholders
+
+- Priority: P1
+- Type: task
+- Area: qa
+- Owner: Tommy
+- Labels: release, docs, legal, attribution
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/34
+- Next: Closed: Settings legal/attribution placeholders replaced and README current limitations/offline scope refreshed.
+- Acceptance:
+  - Settings legal/attribution placeholders are removed, replaced, or hidden with rationale.
+  - README or docs contain current known limitations and offline/download release scope.
+  - Static grep evidence is posted showing no release-facing placeholder/proof copy in production source.
+  - Relevant Gradle compile gate and git diff --check pass.
 
 ### UNTIDY-010 — Implement Add to Playlist workflow
 
