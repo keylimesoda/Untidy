@@ -925,7 +925,7 @@
     "id": "UNTIDY-030",
     "title": "Enable minimal Settings Downloads controls",
     "type": "cleanup",
-    "status": "review",
+    "status": "done",
     "priority": "P2",
     "area": "offline",
     "owner": "Tommy",
@@ -940,7 +940,11 @@
       "app/src/main/java/com/tidal/wear/ui/settings/SettingsScreen.kt: Downloads settings now show Manage downloads, track/storage summary, deferred quality/LTE/storage-cap copy, and local-only remove-all confirmation.",
       "core/playback/src/main/java/com/tidal/wear/core/playback/offline/OfflineDownloads.kt: added local-only remove-all downloads and storage-byte summary helpers.",
       "reports/settings-downloads-controls-2026-06-17-1611/: emulator XML/screenshots for Settings Downloads controls.",
-      "Verification: :app:compileDebugKotlin, assembleDebug/install/direct settings route smoke, git diff --check."
+      "Verification: :app:compileDebugKotlin, assembleDebug/install/direct settings route smoke, git diff --check.",
+      "Closeout review confirmed artifact reports/settings-downloads-controls-2026-06-17-1611/summary.txt records :app:compileDebugKotlin, assembleDebug/install/direct Settings route smoke, and git diff --check passed.",
+      "Closeout review confirmed settings-downloads-scrolled.xml shows DOWNLOADS and Manage downloads.",
+      "Closeout review confirmed settings-downloads-scrolled2.xml shows Download quality, Download over LTE, Storage limit, Remove all downloads, and Local files only copy.",
+      "Closeout review confirmed Settings source uses Remove local copies? / Keeps TIDAL library confirmation and account erase copy Signs out \u00b7 keeps downloads when local downloads exist."
     ],
     "acceptance": [
       "Settings Downloads section is coherent with the productized single-track MVP.",
@@ -949,7 +953,7 @@
       "Sign-out copy explicitly distinguishes account sign-out from local downloads.",
       "No Settings release copy says proof/proof-in-progress."
     ],
-    "next": "Review minimal Settings Downloads controls and local-only cleanup copy. Runtime evidence: reports/settings-downloads-controls-2026-06-17-1611/.",
+    "next": "Closed after review: Settings Downloads controls are coherent with the single-track MVP, can open Manage downloads, show track/storage summary, keep remove-all local-only with TIDAL-library-safe copy, and distinguish sign-out from downloads.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/31",
     "githubNumber": 31
   },

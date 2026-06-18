@@ -187,23 +187,6 @@ _None._
   - Empty states remain clear and non-alarming.
   - Relevant compile/lint gate passes.
 
-### UNTIDY-030 — Enable minimal Settings Downloads controls
-
-- Priority: P2
-- Type: cleanup
-- Area: offline
-- Owner: Tommy
-- Labels: settings, downloads, storage, ux
-- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/31
-- Next: Review minimal Settings Downloads controls and local-only cleanup copy. Runtime evidence: reports/settings-downloads-controls-2026-06-17-1611/.
-- Acceptance:
-  - Settings Downloads section is coherent with the productized single-track MVP.
-  - Settings can open Manage downloads and shows count/storage summary when available.
-  - Remove all downloads is local-only and confirms that TIDAL library is kept.
-  - Sign-out copy explicitly distinguishes account sign-out from local downloads.
-  - No Settings release copy says proof/proof-in-progress.
-
 ### UNTIDY-031 — Add album/playlist collection download UX
 
 - Priority: P2
@@ -487,6 +470,23 @@ _None._
   - Prove the exact TIDAL offline provisioning path for this app
   - If viable, define single-track MVP implementation plan
   - If not viable, remove/neutralize fake download affordances
+
+### UNTIDY-030 — Enable minimal Settings Downloads controls
+
+- Priority: P2
+- Type: cleanup
+- Area: offline
+- Owner: Tommy
+- Labels: settings, downloads, storage, ux
+- Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/31
+- Next: Closed after review: Settings Downloads controls are coherent with the single-track MVP, can open Manage downloads, show track/storage summary, keep remove-all local-only with TIDAL-library-safe copy, and distinguish sign-out from downloads.
+- Acceptance:
+  - Settings Downloads section is coherent with the productized single-track MVP.
+  - Settings can open Manage downloads and shows count/storage summary when available.
+  - Remove all downloads is local-only and confirms that TIDAL library is kept.
+  - Sign-out copy explicitly distinguishes account sign-out from local downloads.
+  - No Settings release copy says proof/proof-in-progress.
 
 ### UNTIDY-012 — Migrate remaining Wear Compose lazy/icon deprecations
 
