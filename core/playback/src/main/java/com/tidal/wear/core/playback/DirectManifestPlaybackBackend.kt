@@ -108,8 +108,9 @@ internal class DirectManifestPlaybackBackend(
             val mediaSource = when (manifest.kind) {
                 ManifestKind.Dash -> {
                     val offlineCache = downloadedTrackCache(trackId)
+                    player.setWakeMode(if (offlineCache != null) C.WAKE_MODE_LOCAL else C.WAKE_MODE_NETWORK)
                     val mediaSourceFactory = if (offlineCache != null) {
-                        Log.d(DIRECT_LOG_TAG, "using offline cache for downloaded track id=$trackId")
+                        Log.d(DIRECT_LOG_TAG, "using offline cache for downloaded track id=$trackId wakeMode=LOCAL")
                         DashMediaSource.Factory(
                             CacheDataSource.Factory()
                                 .setCache(offlineCache)
@@ -121,8 +122,11 @@ internal class DirectManifestPlaybackBackend(
                     }
                     mediaSourceFactory.createMediaSource(manifest.mediaItem(trackId))
                 }
-                ManifestKind.DirectUrl -> ProgressiveMediaSource.Factory(DefaultDataSource.Factory(appContext))
-                    .createMediaSource(manifest.mediaItem(trackId))
+                ManifestKind.DirectUrl -> {
+                    player.setWakeMode(C.WAKE_MODE_NETWORK)
+                    ProgressiveMediaSource.Factory(DefaultDataSource.Factory(appContext))
+                        .createMediaSource(manifest.mediaItem(trackId))
+                }
             }
             player.setMediaSource(mediaSource)
             player.prepare()
@@ -167,6 +171,7 @@ internal class DirectManifestPlaybackBackend(
     }
 
     override fun release() {
+        player.setWakeMode(C.WAKE_MODE_NONE)
         player.release()
         offlineCaches.values.forEach { cache -> runCatching { cache.release() } }
         offlineCaches.clear()
