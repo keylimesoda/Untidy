@@ -13,7 +13,7 @@ _Generated from `work-items.json`._
 - Labels: real-watch, release, qa, wear-os
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/33
-- Next: Physical watch validation started; new findings filed as #35/#36/#37. Resolve P0 playback persistence before release.
+- Next: Formal device validation matrix remains open: record watch model/Wear OS version, input/rotary, Bluetooth/audio route, media controls, recents/back-stack, screen-off/background, and offline/download deferral/pass notes. Known-good overnight physical-watch prerelease is published.
 - Acceptance:
   - Real watch model and Wear OS version are recorded.
   - APK/build variant and commit under test are recorded.
@@ -22,18 +22,24 @@ _Generated from `work-items.json`._
   - Offline/download real-watch result is either passed or explicitly deferred for non-public beta.
   - Findings are linked back to #15 release decision record.
 
-## review
+### UNTIDY-040 — Refresh GitHub README with source-backed Wear OS/TIDAL positioning
 
-### UNTIDY-036 — P0 playback must continue after app background/screen-off
-
-- Priority: P0
-- Type: bug
-- Area: playback
+- Priority: P1
+- Type: task
+- Area: cleanup
 - Owner: Tommy
-- Labels: playback, foreground-service, media3, release-blocker
-- Spec: `docs/release-readiness-checklist.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/37
-- Next: Review physical-watch playback persistence fix. Validate commit 24e6071 on watch: start multi-track playback, background app/screen off for several songs, capture filtered logcat if it stops.
+- Labels: documentation, readme, tidal, wear-os, repo-hygiene
+- Spec: `README.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/41
+- Next: In progress with README subagent; parent must review source-backed wording, verify markdown, commit, and push.
+- Acceptance:
+  - README accurately describes current capabilities and limitations.
+  - Official TIDAL platform/support claims are source-backed or conservatively phrased.
+  - Known-good release/tag is linked.
+  - Build/test/install instructions are current.
+  - Markdown sanity checks pass.
+
+## review
 
 ### UNTIDY-014 — Release readiness / ship checklist
 
@@ -44,54 +50,13 @@ _Generated from `work-items.json`._
 - Labels: release, ship-readiness, qa, docs
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/15
-- Next: Physical watch validation found new blockers #35/#37; release gate remains open until they are resolved and #33 is updated.
+- Next: Only #33 formal real-watch validation and #41 README refresh remain before closing release-readiness.
 - Acceptance:
   - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
   - Final build/test/lint evidence is posted.
   - Any remaining release blockers have separate GitHub issues.
   - Debug-only code cannot leak into production release surfaces.
   - Known limitations are documented in README/specs.
-
-### UNTIDY-034 — Now Playing needs a clear route back to app Home
-
-- Priority: P1
-- Type: bug
-- Area: ui
-- Owner: Tommy
-- Labels: now-playing, navigation, wear-os, ux
-- Spec: `docs/release-readiness-checklist.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/35
-- Next: Review Home action in Now Playing action sheet on physical watch; Back intentionally backgrounds the app while playback continues.
-
-### UNTIDY-038 — Add watch-local Recent shelf for explicit play history
-
-- Priority: P1
-- Type: feature
-- Area: ui
-- Owner: Tommy
-- Labels: recent, watch-ux, navigation, play-history
-- Spec: `docs/specs/recent-shelf.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/39
-- Next: Review Recent shelf implementation and emulator smoke. Physical watch validation remains optional/final release check.
-- Acceptance:
-  - Home includes Recent.
-  - Recent screen shows explicit play-history items only.
-  - No artists are written/displayed.
-  - Tapping album/playlist opens metadata detail route.
-  - Tapping track opens track context page/sheet or documented MVP fallback, not blind autoplay.
-  - History persists across app restart.
-  - Compile and emulator smoke pass.
-
-### UNTIDY-035 — Review and tune TIDAL-appropriate typography
-
-- Priority: P2
-- Type: cleanup
-- Area: ui
-- Owner: Tommy
-- Labels: typography, brand, wear-os, polish
-- Spec: `docs/ux/typography-brand-review-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/36
-- Next: Review recommendation; optionally schedule a post-release Inter/Manrope visual A/B on physical hardware if a custom accent face is still desired.
 
 ## todo
 
@@ -245,6 +210,33 @@ _None._
   - A downloaded track row can start playback.
   - UI uses Wear list/safe-area patterns.
   - Compile and emulator smoke pass.
+
+### UNTIDY-036 — P0 playback must continue after app background/screen-off
+
+- Priority: P0
+- Type: bug
+- Area: playback
+- Owner: Tommy
+- Labels: playback, foreground-service, media3, release-blocker
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/37
+- Next: Closed after Media3-backed known-good physical-watch snapshot survived overnight use without the 1-2 song stop reported originally.
+
+### UNTIDY-037 — Playback architecture review against Media3/Wear best practice
+
+- Priority: P0
+- Type: task
+- Area: playback
+- Owner: Tommy
+- Labels: media3, wear-os, architecture, playback
+- Spec: `GitHub issue #38`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/38
+- Next: Closed after Media3 player-of-record refactor shipped in known-good physical-watch snapshot; remaining formal validation stays in #33.
+- Acceptance:
+  - Source-backed architecture review exists.
+  - Architecture review report exists.
+  - Recommended refactor is specific enough to implement.
+  - No new playback persistence patch ships without architecture review.
 
 ### UNTIDY-006 — Decide exported TidalMediaService security posture
 
@@ -433,6 +425,52 @@ _None._
   - Static grep evidence is posted showing no release-facing placeholder/proof copy in production source.
   - Relevant Gradle compile gate and git diff --check pass.
 
+### UNTIDY-034 — Now Playing needs a clear route back to app Home
+
+- Priority: P1
+- Type: bug
+- Area: ui
+- Owner: Tommy
+- Labels: now-playing, navigation, wear-os, ux
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/35
+- Next: Closed after Home action fix shipped in known-good physical-watch snapshot; Back remains watch-native/backgrounds playback, Home row returns to app hub.
+
+### UNTIDY-038 — Add watch-local Recent shelf for explicit play history
+
+- Priority: P1
+- Type: feature
+- Area: ui
+- Owner: Tommy
+- Labels: recent, watch-ux, navigation, play-history
+- Spec: `docs/specs/recent-shelf.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/39
+- Next: Closed after Recent shelf implementation, emulator smoke, and inclusion in known-good physical-watch snapshot.
+- Acceptance:
+  - Home includes Recent.
+  - Recent screen shows explicit play-history items only.
+  - No artists are written/displayed.
+  - Tapping album/playlist opens metadata detail route.
+  - Tapping track opens track context page/sheet or documented MVP fallback, not blind autoplay.
+  - History persists across app restart.
+  - Compile and emulator smoke pass.
+
+### UNTIDY-039 — Polish playback startup, search keyboard handoff, and watch speaker output label
+
+- Priority: P1
+- Type: bug
+- Area: ui
+- Owner: Tommy
+- Labels: playback, search, output-label, watch-ux, polish
+- Spec: `GitHub issue #40`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/40
+- Next: Closed after commit f532a2e polished playback loading, search keyboard handoff, and built-in speaker output label.
+- Acceptance:
+  - Playback startup does not flash empty/default tap/start listening copy before metadata arrives.
+  - Search entry no longer flashes the full fallback prompt before keyboard handoff.
+  - Built-in local output is labeled Watch speaker.
+  - Compile/lint/test gate passes.
+
 ### UNTIDY-010 — Implement Add to Playlist workflow
 
 - Priority: P2
@@ -571,6 +609,17 @@ _None._
 - Spec: `docs/ux/offline-download-lifecycle-ux-2026-06-17.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/32
 - Next: Closed after collection download chips, failure-count state modeling, unit coverage, and runtime evidence.
+
+### UNTIDY-035 — Review and tune TIDAL-appropriate typography
+
+- Priority: P2
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: typography, brand, wear-os, polish
+- Spec: `docs/ux/typography-brand-review-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/36
+- Next: Closed after typography review recommended system Wear sans and no proprietary TIDAL-font imitation for release.
 
 ### UNTIDY-012 — Migrate remaining Wear Compose lazy/icon deprecations
 

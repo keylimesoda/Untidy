@@ -437,7 +437,7 @@
       "Debug-only code cannot leak into production release surfaces.",
       "Known limitations are documented in README/specs."
     ],
-    "next": "Physical watch validation found new blockers #35/#37; release gate remains open until they are resolved and #33 is updated.",
+    "next": "Only #33 formal real-watch validation and #41 README refresh remain before closing release-readiness.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/15",
     "githubNumber": 15
   },
@@ -1043,7 +1043,7 @@
       "Offline/download real-watch result is either passed or explicitly deferred for non-public beta.",
       "Findings are linked back to #15 release decision record."
     ],
-    "next": "Physical watch validation started; new findings filed as #35/#36/#37. Resolve P0 playback persistence before release.",
+    "next": "Formal device validation matrix remains open: record watch model/Wear OS version, input/rotary, Bluetooth/audio route, media controls, recents/back-stack, screen-off/background, and offline/download deferral/pass notes. Known-good overnight physical-watch prerelease is published.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/33",
     "githubNumber": 33
   },
@@ -1082,7 +1082,7 @@
     "id": "UNTIDY-034",
     "title": "Now Playing needs a clear route back to app Home",
     "type": "bug",
-    "status": "review",
+    "status": "done",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -1100,7 +1100,7 @@
       "Verification passed: source scripts/env-android.sh && bash ./gradlew :app:compileDebugKotlin --no-daemon; git diff --check. Physical-watch confirmation remains the next review step."
     ],
     "acceptance": [],
-    "next": "Review Home action in Now Playing action sheet on physical watch; Back intentionally backgrounds the app while playback continues.",
+    "next": "Closed after Home action fix shipped in known-good physical-watch snapshot; Back remains watch-native/backgrounds playback, Home row returns to app hub.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/35",
     "githubNumber": 35
   },
@@ -1108,7 +1108,7 @@
     "id": "UNTIDY-035",
     "title": "Review and tune TIDAL-appropriate typography",
     "type": "cleanup",
-    "status": "review",
+    "status": "done",
     "priority": "P2",
     "area": "ui",
     "owner": "Tommy",
@@ -1124,7 +1124,7 @@
       "Typography/brand review completed: docs/ux/typography-brand-review-2026-06-17.md recommends staying on Wear/system sans, no proprietary TIDAL font copying, and future open-font A/B only after physical-watch validation."
     ],
     "acceptance": [],
-    "next": "Review recommendation; optionally schedule a post-release Inter/Manrope visual A/B on physical hardware if a custom accent face is still desired.",
+    "next": "Closed after typography review recommended system Wear sans and no proprietary TIDAL-font imitation for release.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/36",
     "githubNumber": 36
   },
@@ -1132,7 +1132,7 @@
     "id": "UNTIDY-036",
     "title": "P0 playback must continue after app background/screen-off",
     "type": "bug",
-    "status": "review",
+    "status": "done",
     "priority": "P0",
     "area": "playback",
     "owner": "Tommy",
@@ -1150,15 +1150,44 @@
       "Verification passed: :core:playback:testDebugUnitTest :core:playback:compileDebugKotlin :app:compileDebugKotlin and git diff --check."
     ],
     "acceptance": [],
-    "next": "Review physical-watch playback persistence fix. Validate commit 24e6071 on watch: start multi-track playback, background app/screen off for several songs, capture filtered logcat if it stops.",
+    "next": "Closed after Media3-backed known-good physical-watch snapshot survived overnight use without the 1-2 song stop reported originally.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/37",
     "githubNumber": 37
+  },
+  {
+    "id": "UNTIDY-037",
+    "title": "Playback architecture review against Media3/Wear best practice",
+    "type": "task",
+    "status": "done",
+    "priority": "P0",
+    "area": "playback",
+    "owner": "Tommy",
+    "labels": [
+      "media3",
+      "wear-os",
+      "architecture",
+      "playback"
+    ],
+    "spec": "GitHub issue #38",
+    "evidence": [
+      "Media3 player-of-record refactor shipped",
+      "Known-good physical-watch snapshot used overnight successfully"
+    ],
+    "acceptance": [
+      "Source-backed architecture review exists.",
+      "Architecture review report exists.",
+      "Recommended refactor is specific enough to implement.",
+      "No new playback persistence patch ships without architecture review."
+    ],
+    "next": "Closed after Media3 player-of-record refactor shipped in known-good physical-watch snapshot; remaining formal validation stays in #33.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/38",
+    "githubNumber": 38
   },
   {
     "id": "UNTIDY-038",
     "title": "Add watch-local Recent shelf for explicit play history",
     "type": "feature",
-    "status": "review",
+    "status": "done",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -1189,8 +1218,70 @@
       "History persists across app restart.",
       "Compile and emulator smoke pass."
     ],
-    "next": "Review Recent shelf implementation and emulator smoke. Physical watch validation remains optional/final release check.",
+    "next": "Closed after Recent shelf implementation, emulator smoke, and inclusion in known-good physical-watch snapshot.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/39",
     "githubNumber": 39
+  },
+  {
+    "id": "UNTIDY-039",
+    "title": "Polish playback startup, search keyboard handoff, and watch speaker output label",
+    "type": "bug",
+    "status": "done",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "playback",
+      "search",
+      "output-label",
+      "watch-ux",
+      "polish"
+    ],
+    "spec": "GitHub issue #40",
+    "evidence": [
+      "Fixed in f532a2e",
+      "Full Gradle gate lintDebug assembleDebug testDebugUnitTest passed",
+      "git diff --check passed"
+    ],
+    "acceptance": [
+      "Playback startup does not flash empty/default tap/start listening copy before metadata arrives.",
+      "Search entry no longer flashes the full fallback prompt before keyboard handoff.",
+      "Built-in local output is labeled Watch speaker.",
+      "Compile/lint/test gate passes."
+    ],
+    "next": "Closed after commit f532a2e polished playback loading, search keyboard handoff, and built-in speaker output label.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/40",
+    "githubNumber": 40
+  },
+  {
+    "id": "UNTIDY-040",
+    "title": "Refresh GitHub README with source-backed Wear OS/TIDAL positioning",
+    "type": "task",
+    "status": "in-progress",
+    "priority": "P1",
+    "area": "cleanup",
+    "owner": "Tommy",
+    "labels": [
+      "documentation",
+      "readme",
+      "tidal",
+      "wear-os",
+      "repo-hygiene"
+    ],
+    "spec": "README.md",
+    "evidence": [
+      "Issue created after Ric corrected that there is no first-party TIDAL Wear OS experience",
+      "README PM subagent is drafting with source-backed research requirement"
+    ],
+    "acceptance": [
+      "README accurately describes current capabilities and limitations.",
+      "Official TIDAL platform/support claims are source-backed or conservatively phrased.",
+      "Known-good release/tag is linked.",
+      "Build/test/install instructions are current.",
+      "Markdown sanity checks pass."
+    ],
+    "next": "In progress with README subagent; parent must review source-backed wording, verify markdown, commit, and push.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/41",
+    "githubNumber": 41
   }
 ]
