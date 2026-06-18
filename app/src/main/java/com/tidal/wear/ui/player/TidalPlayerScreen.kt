@@ -146,7 +146,7 @@ fun TidalPlayerScreen(
     fun startDebugDownloadProof() {
         val track = currentTrack
         when {
-            !BuildConfig.DEBUG -> Toast.makeText(context, "Offline download proof is in progress", Toast.LENGTH_LONG).show()
+            !BuildConfig.DEBUG -> Toast.makeText(context, "Offline downloads are not available in this build", Toast.LENGTH_LONG).show()
             track?.isDownloadProofEligible() != true -> Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
             downloadState is DownloadState.Downloading -> Unit
             else -> {
