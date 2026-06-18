@@ -1082,7 +1082,7 @@
     "id": "UNTIDY-034",
     "title": "Now Playing needs a clear route back to app Home",
     "type": "bug",
-    "status": "todo",
+    "status": "review",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -1097,7 +1097,7 @@
       "Created from Ric physical-watch validation feedback on 2026-06-17."
     ],
     "acceptance": [],
-    "next": "Reason through and implement a Wear-appropriate route from Now Playing back to Untidy Home/Search/Library without making Back obnoxious.",
+    "next": "Review Home action in Now Playing action sheet on physical watch; Back intentionally backgrounds the app while playback continues.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/35",
     "githubNumber": 35
   },
@@ -1105,7 +1105,7 @@
     "id": "UNTIDY-035",
     "title": "Review and tune TIDAL-appropriate typography",
     "type": "cleanup",
-    "status": "todo",
+    "status": "review",
     "priority": "P2",
     "area": "ui",
     "owner": "Tommy",
@@ -1115,12 +1115,13 @@
       "wear-os",
       "polish"
     ],
-    "spec": "docs/release-readiness-checklist.md",
+    "spec": "docs/ux/typography-brand-review-2026-06-17.md",
     "evidence": [
-      "Created from Ric physical-watch validation feedback on 2026-06-17."
+      "Created from Ric physical-watch validation feedback on 2026-06-17.",
+      "Typography/brand review completed: docs/ux/typography-brand-review-2026-06-17.md recommends staying on Wear/system sans, no proprietary TIDAL font copying, and future open-font A/B only after physical-watch validation."
     ],
     "acceptance": [],
-    "next": "Audit current typography and recommend/implement legally safe, Wear-readable, TIDAL-appropriate styling.",
+    "next": "Review recommendation; optionally schedule a post-release Inter/Manrope visual A/B on physical hardware if a custom accent face is still desired.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/36",
     "githubNumber": 36
   },

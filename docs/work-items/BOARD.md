@@ -52,8 +52,6 @@ _Generated from `work-items.json`._
   - Debug-only code cannot leak into production release surfaces.
   - Known limitations are documented in README/specs.
 
-## todo
-
 ### UNTIDY-034 — Now Playing needs a clear route back to app Home
 
 - Priority: P1
@@ -63,7 +61,7 @@ _Generated from `work-items.json`._
 - Labels: now-playing, navigation, wear-os, ux
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/35
-- Next: Reason through and implement a Wear-appropriate route from Now Playing back to Untidy Home/Search/Library without making Back obnoxious.
+- Next: Review Home action in Now Playing action sheet on physical watch; Back intentionally backgrounds the app while playback continues.
 
 ### UNTIDY-035 — Review and tune TIDAL-appropriate typography
 
@@ -72,9 +70,13 @@ _Generated from `work-items.json`._
 - Area: ui
 - Owner: Tommy
 - Labels: typography, brand, wear-os, polish
-- Spec: `docs/release-readiness-checklist.md`
+- Spec: `docs/ux/typography-brand-review-2026-06-17.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/36
-- Next: Audit current typography and recommend/implement legally safe, Wear-readable, TIDAL-appropriate styling.
+- Next: Review recommendation; optionally schedule a post-release Inter/Manrope visual A/B on physical hardware if a custom accent face is still desired.
+
+## todo
+
+_None._
 
 ## blocked
 
