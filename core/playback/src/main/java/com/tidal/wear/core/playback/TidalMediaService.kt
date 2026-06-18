@@ -2,7 +2,6 @@
 
 package com.tidal.wear.core.playback
 
-import android.app.ForegroundServiceStartNotAllowedException
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -56,8 +55,6 @@ class TidalMediaService : MediaLibraryService() {
     private var currentQueue: List<TidalTrack> = emptyList()
     private var currentQueueIndex: Int = 0
     private var currentTrackStartedAtMs: Long = 0L
-    private var serviceOwnedLoadInProgress = false
-    private var foregroundStarted = false
     private lateinit var apiClient: TidalApiClient
     private lateinit var authRepository: com.tidal.wear.core.auth.TidalAuthRepository
 
@@ -82,12 +79,8 @@ class TidalMediaService : MediaLibraryService() {
                     Log.d(PLAYER_LOG_TAG, "backend event: ${event::class.simpleName.orEmpty()}")
                     when (event) {
                         is PlaybackBackendEvent.StateChanged -> {
-                            Log.d(PLAYER_LOG_TAG, "backend state: ${event.state} loadInProgress=$serviceOwnedLoadInProgress")
-                            if (serviceOwnedLoadInProgress && event.state != PlaybackBackendState.Playing) {
-                                Log.d(PLAYER_LOG_TAG, "suppressing transient backend state during track load: ${event.state}")
-                            } else {
-                                player.setBackendPlaybackState(event.state)
-                            }
+                            Log.d(PLAYER_LOG_TAG, "backend state: ${event.state}")
+                            player.setBackendPlaybackState(event.state)
                         }
                         is PlaybackBackendEvent.MediaTransition -> logPlaybackContext("transition", event.context)
                         is PlaybackBackendEvent.MediaEnded -> {
@@ -238,9 +231,7 @@ class TidalMediaService : MediaLibraryService() {
 
     private fun playTrack(trackId: String, knownTrack: TidalTrack? = null) {
         val id = trackId.ifBlank { return }
-        serviceOwnedLoadInProgress = true
         if (!canStartLiveOrDownloadedPlayback(id)) {
-            serviceOwnedLoadInProgress = false
             Log.w(PLAYER_LOG_TAG, "playTrack offline fallback: not downloaded id=$id")
             sessionPlayer?.setPlaybackError("Not downloaded · connect to stream this track")
             knownTrack?.let { publishOngoingActivity(it, isPlaying = false) }
@@ -261,16 +252,13 @@ class TidalMediaService : MediaLibraryService() {
             sessionPlayer?.loadTrack(track, currentQueue, currentQueueIndex)
             publishOngoingActivity(track, isPlaying = true)
             runCatching {
-                serviceOwnedLoadInProgress = true
                 Log.d(PLAYER_LOG_TAG, "backend load start id=$id")
                 playbackBackend?.loadTrack(id)
                 Log.d(PLAYER_LOG_TAG, "backend load completed id=$id")
                 Log.d(PLAYER_LOG_TAG, "backend play start")
                 playbackBackend?.play()
                 Log.d(PLAYER_LOG_TAG, "backend play completed")
-                serviceOwnedLoadInProgress = false
             }.onFailure {
-                serviceOwnedLoadInProgress = false
                 Log.e(PLAYER_LOG_TAG, "backend load/play failed", it)
                 sessionPlayer?.setPlaybackError("Playback failed: ${it.message ?: it::class.java.simpleName}")
             }
@@ -433,22 +421,7 @@ class TidalMediaService : MediaLibraryService() {
             .build()
         ongoingActivity.apply(this)
 
-        val notification = builder.build()
-        if (foregroundStarted) {
-            getSystemService(NotificationManager::class.java)?.notify(MEDIA_NOTIFICATION_ID, notification)
-            return
-        }
-        runCatching {
-            startForeground(MEDIA_NOTIFICATION_ID, notification)
-            foregroundStarted = true
-        }.onFailure { error ->
-            if (error is ForegroundServiceStartNotAllowedException || error::class.java.simpleName == "ForegroundServiceStartNotAllowedException") {
-                Log.w(PLAYER_LOG_TAG, "startForeground not allowed; posting media notification only", error)
-                getSystemService(NotificationManager::class.java)?.notify(MEDIA_NOTIFICATION_ID, notification)
-            } else {
-                throw error
-            }
-        }
+        startForeground(MEDIA_NOTIFICATION_ID, builder.build())
     }
 
     private fun playerActivityPendingIntent(): PendingIntent = PendingIntent.getActivity(
@@ -474,7 +447,6 @@ class TidalMediaService : MediaLibraryService() {
 
     override fun onDestroy() {
         Log.d(PLAYER_LOG_TAG, "onDestroy isPlaying=${sessionPlayer?.isPlaying == true} track=${currentTrack?.id.orEmpty()} queueSize=${currentQueue.size} queueIndex=$currentQueueIndex")
-        foregroundStarted = false
         session?.release()
         session = null
         sessionPlayer?.release()
