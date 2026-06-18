@@ -441,10 +441,12 @@ class TidalMediaService : MediaLibraryService() {
     )
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.d(PLAYER_LOG_TAG, "onTaskRemoved isPlaying=${sessionPlayer?.isPlaying == true}")
         if (sessionPlayer?.isPlaying != true) stopSelf()
     }
 
     override fun onDestroy() {
+        Log.d(PLAYER_LOG_TAG, "onDestroy isPlaying=${sessionPlayer?.isPlaying == true} track=${currentTrack?.id.orEmpty()} queueSize=${currentQueue.size} queueIndex=$currentQueueIndex")
         session?.release()
         session = null
         sessionPlayer?.release()

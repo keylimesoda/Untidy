@@ -6,14 +6,15 @@ import android.content.Context
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.datasource.cache.CacheKeyFactory
 import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
@@ -62,6 +63,7 @@ internal class DirectManifestPlaybackBackend(
     private var currentManifest: ResolvedManifest? = null
     private val manifestRequests = ConcurrentHashMap<String, Deferred<Result<ResolvedManifest>>>()
     private val player = ExoPlayer.Builder(appContext).build().also { exo ->
+        exo.setWakeMode(C.WAKE_MODE_NETWORK)
         exo.addListener(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
