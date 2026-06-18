@@ -67,9 +67,10 @@ internal class DirectManifestPlaybackBackend(
         exo.addListener(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
-                    _events.tryEmit(PlaybackBackendEvent.StateChanged(playbackState.toBackendState(exo.isPlaying)))
                     if (playbackState == Player.STATE_ENDED) {
                         currentManifest?.let { _events.tryEmit(PlaybackBackendEvent.MediaEnded(it.toDiagnosticContext(exo.duration))) }
+                    } else {
+                        _events.tryEmit(PlaybackBackendEvent.StateChanged(playbackState.toBackendState(exo.isPlaying)))
                     }
                 }
 
@@ -371,9 +372,8 @@ private fun ResolvedManifest.toDiagnosticContext(playerDurationMs: Long): Playba
 private fun Int.toBackendState(isPlaying: Boolean): PlaybackBackendState = when (this) {
     Player.STATE_BUFFERING -> PlaybackBackendState.Stalled
     Player.STATE_READY -> if (isPlaying) PlaybackBackendState.Playing else PlaybackBackendState.NotPlaying
-    Player.STATE_ENDED,
-    Player.STATE_IDLE,
-    -> PlaybackBackendState.Idle
+    Player.STATE_IDLE -> PlaybackBackendState.Idle
+    Player.STATE_ENDED -> PlaybackBackendState.NotPlaying
     else -> PlaybackBackendState.NotPlaying
 }
 

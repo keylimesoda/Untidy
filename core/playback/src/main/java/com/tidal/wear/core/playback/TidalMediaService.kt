@@ -55,6 +55,7 @@ class TidalMediaService : MediaLibraryService() {
     private var currentQueue: List<TidalTrack> = emptyList()
     private var currentQueueIndex: Int = 0
     private var currentTrackStartedAtMs: Long = 0L
+    private var serviceOwnedLoadInProgress = false
     private lateinit var apiClient: TidalApiClient
     private lateinit var authRepository: com.tidal.wear.core.auth.TidalAuthRepository
 
@@ -79,8 +80,12 @@ class TidalMediaService : MediaLibraryService() {
                     Log.d(PLAYER_LOG_TAG, "backend event: ${event::class.simpleName.orEmpty()}")
                     when (event) {
                         is PlaybackBackendEvent.StateChanged -> {
-                            Log.d(PLAYER_LOG_TAG, "backend state: ${event.state}")
-                            player.setBackendPlaybackState(event.state)
+                            Log.d(PLAYER_LOG_TAG, "backend state: ${event.state} loadInProgress=$serviceOwnedLoadInProgress")
+                            if (serviceOwnedLoadInProgress && event.state != PlaybackBackendState.Playing) {
+                                Log.d(PLAYER_LOG_TAG, "suppressing transient backend state during track load: ${event.state}")
+                            } else {
+                                player.setBackendPlaybackState(event.state)
+                            }
                         }
                         is PlaybackBackendEvent.MediaTransition -> logPlaybackContext("transition", event.context)
                         is PlaybackBackendEvent.MediaEnded -> {
@@ -252,13 +257,16 @@ class TidalMediaService : MediaLibraryService() {
             sessionPlayer?.loadTrack(track, currentQueue, currentQueueIndex)
             publishOngoingActivity(track, isPlaying = true)
             runCatching {
+                serviceOwnedLoadInProgress = true
                 Log.d(PLAYER_LOG_TAG, "backend load start id=$id")
                 playbackBackend?.loadTrack(id)
                 Log.d(PLAYER_LOG_TAG, "backend load completed id=$id")
                 Log.d(PLAYER_LOG_TAG, "backend play start")
                 playbackBackend?.play()
                 Log.d(PLAYER_LOG_TAG, "backend play completed")
+                serviceOwnedLoadInProgress = false
             }.onFailure {
+                serviceOwnedLoadInProgress = false
                 Log.e(PLAYER_LOG_TAG, "backend load/play failed", it)
                 sessionPlayer?.setPlaybackError("Playback failed: ${it.message ?: it::class.java.simpleName}")
             }
