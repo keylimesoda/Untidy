@@ -1158,7 +1158,7 @@
     "id": "UNTIDY-038",
     "title": "Add watch-local Recent shelf for explicit play history",
     "type": "feature",
-    "status": "todo",
+    "status": "in-progress",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
@@ -1168,9 +1168,10 @@
       "navigation",
       "play-history"
     ],
-    "spec": "docs/work-items/BOARD.md",
+    "spec": "docs/specs/recent-shelf.md",
     "evidence": [
-      "Ric approved Recent shelf concept but corrected tap behavior: tap opens metadata/detail page, not autoplay. Artists excluded because there is no Play Artist action."
+      "Ric approved Recent shelf concept but corrected tap behavior: tap opens metadata/detail page, not autoplay. Artists excluded because there is no Play Artist action.",
+      "Spec drafted at docs/specs/recent-shelf.md with Ric correction: tap opens metadata/detail, no artists, no auto-advance writes."
     ],
     "acceptance": [
       "Home includes Recent.",
@@ -1181,7 +1182,7 @@
       "History persists across app restart.",
       "Compile and emulator smoke pass."
     ],
-    "next": "Design/implement local Recent store and screen; resolve track detail/context fallback before coding track tap behavior.",
+    "next": "Spec drafted; run focused UX/dev review, then implement with stage updates as gates pass.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/39",
     "githubNumber": 39
   }
