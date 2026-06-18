@@ -4,7 +4,34 @@ _Generated from `work-items.json`._
 
 ## in-progress
 
-_None._
+### UNTIDY-032 — Real Wear OS release validation
+
+- Priority: P0
+- Type: test
+- Area: qa
+- Owner: Tommy
+- Labels: real-watch, release, qa, wear-os
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/33
+- Next: Physical watch validation started; new findings filed as #35/#36/#37. Resolve P0 playback persistence before release.
+- Acceptance:
+  - Real watch model and Wear OS version are recorded.
+  - APK/build variant and commit under test are recorded.
+  - Core navigation and playback results are documented with artifact notes.
+  - Rotary/input/media-session/Bluetooth behavior is explicitly pass/fail/deferred.
+  - Offline/download real-watch result is either passed or explicitly deferred for non-public beta.
+  - Findings are linked back to #15 release decision record.
+
+### UNTIDY-036 — P0 playback must continue after app background/screen-off
+
+- Priority: P0
+- Type: bug
+- Area: playback
+- Owner: Tommy
+- Labels: playback, foreground-service, media3, release-blocker
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/37
+- Next: Swarm immediately: reproduce or collect logs, identify service/queue/background failure, fix playback continuation across app background/screen-off/multiple songs.
 
 ## review
 
@@ -17,7 +44,7 @@ _None._
 - Labels: release, ship-readiness, qa, docs
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/15
-- Next: Release gate passed on emulator/build/docs. Remains open only for #33 physical Wear OS validation or explicit non-public-beta deferral.
+- Next: Physical watch validation found new blockers #35/#37; release gate remains open until they are resolved and #33 is updated.
 - Acceptance:
   - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
   - Final build/test/lint evidence is posted.
@@ -27,23 +54,27 @@ _None._
 
 ## todo
 
-### UNTIDY-032 — Real Wear OS release validation
+### UNTIDY-034 — Now Playing needs a clear route back to app Home
 
-- Priority: P0
-- Type: test
-- Area: qa
+- Priority: P1
+- Type: bug
+- Area: ui
 - Owner: Tommy
-- Labels: real-watch, release, qa, wear-os
+- Labels: now-playing, navigation, wear-os, ux
 - Spec: `docs/release-readiness-checklist.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/33
-- Next: Only remaining release blocker: run physical Wear OS validation before public/beta release, or record explicit non-public-beta deferral in #15.
-- Acceptance:
-  - Real watch model and Wear OS version are recorded.
-  - APK/build variant and commit under test are recorded.
-  - Core navigation and playback results are documented with artifact notes.
-  - Rotary/input/media-session/Bluetooth behavior is explicitly pass/fail/deferred.
-  - Offline/download real-watch result is either passed or explicitly deferred for non-public beta.
-  - Findings are linked back to #15 release decision record.
+- GitHub: https://github.com/keylimesoda/Untidy/issues/35
+- Next: Reason through and implement a Wear-appropriate route from Now Playing back to Untidy Home/Search/Library without making Back obnoxious.
+
+### UNTIDY-035 — Review and tune TIDAL-appropriate typography
+
+- Priority: P2
+- Type: cleanup
+- Area: ui
+- Owner: Tommy
+- Labels: typography, brand, wear-os, polish
+- Spec: `docs/release-readiness-checklist.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/36
+- Next: Audit current typography and recommend/implement legally safe, Wear-readable, TIDAL-appropriate styling.
 
 ## blocked
 

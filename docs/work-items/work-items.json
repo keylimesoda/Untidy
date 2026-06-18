@@ -437,7 +437,7 @@
       "Debug-only code cannot leak into production release surfaces.",
       "Known limitations are documented in README/specs."
     ],
-    "next": "Release gate passed on emulator/build/docs. Remains open only for #33 physical Wear OS validation or explicit non-public-beta deferral.",
+    "next": "Physical watch validation found new blockers #35/#37; release gate remains open until they are resolved and #33 is updated.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/15",
     "githubNumber": 15
   },
@@ -1021,7 +1021,7 @@
     "id": "UNTIDY-032",
     "title": "Real Wear OS release validation",
     "type": "test",
-    "status": "todo",
+    "status": "in-progress",
     "priority": "P0",
     "area": "qa",
     "owner": "Tommy",
@@ -1043,7 +1043,7 @@
       "Offline/download real-watch result is either passed or explicitly deferred for non-public beta.",
       "Findings are linked back to #15 release decision record."
     ],
-    "next": "Only remaining release blocker: run physical Wear OS validation before public/beta release, or record explicit non-public-beta deferral in #15.",
+    "next": "Physical watch validation started; new findings filed as #35/#36/#37. Resolve P0 playback persistence before release.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/33",
     "githubNumber": 33
   },
@@ -1077,5 +1077,74 @@
     "next": "Closed: Settings legal/attribution placeholders replaced and README current limitations/offline scope refreshed.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/34",
     "githubNumber": 34
+  },
+  {
+    "id": "UNTIDY-034",
+    "title": "Now Playing needs a clear route back to app Home",
+    "type": "bug",
+    "status": "todo",
+    "priority": "P1",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "now-playing",
+      "navigation",
+      "wear-os",
+      "ux"
+    ],
+    "spec": "docs/release-readiness-checklist.md",
+    "evidence": [
+      "Created from Ric physical-watch validation feedback on 2026-06-17."
+    ],
+    "acceptance": [],
+    "next": "Reason through and implement a Wear-appropriate route from Now Playing back to Untidy Home/Search/Library without making Back obnoxious.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/35",
+    "githubNumber": 35
+  },
+  {
+    "id": "UNTIDY-035",
+    "title": "Review and tune TIDAL-appropriate typography",
+    "type": "cleanup",
+    "status": "todo",
+    "priority": "P2",
+    "area": "ui",
+    "owner": "Tommy",
+    "labels": [
+      "typography",
+      "brand",
+      "wear-os",
+      "polish"
+    ],
+    "spec": "docs/release-readiness-checklist.md",
+    "evidence": [
+      "Created from Ric physical-watch validation feedback on 2026-06-17."
+    ],
+    "acceptance": [],
+    "next": "Audit current typography and recommend/implement legally safe, Wear-readable, TIDAL-appropriate styling.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/36",
+    "githubNumber": 36
+  },
+  {
+    "id": "UNTIDY-036",
+    "title": "P0 playback must continue after app background/screen-off",
+    "type": "bug",
+    "status": "in-progress",
+    "priority": "P0",
+    "area": "playback",
+    "owner": "Tommy",
+    "labels": [
+      "playback",
+      "foreground-service",
+      "media3",
+      "release-blocker"
+    ],
+    "spec": "docs/release-readiness-checklist.md",
+    "evidence": [
+      "Created from Ric physical-watch validation feedback on 2026-06-17."
+    ],
+    "acceptance": [],
+    "next": "Swarm immediately: reproduce or collect logs, identify service/queue/background failure, fix playback continuation across app background/screen-off/multiple songs.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/37",
+    "githubNumber": 37
   }
 ]
