@@ -751,7 +751,7 @@
     "id": "UNTIDY-025",
     "title": "Wire offline download/replay into end-user UX",
     "type": "feature",
-    "status": "review",
+    "status": "done",
     "priority": "P0",
     "area": "offline",
     "owner": "Tommy",
@@ -781,7 +781,11 @@
       "Finish validation artifact: reports/offline-ux-2026-06-17-1444-finish-him/.",
       "Artifact summary: download_marker_persisted=True, download_manifest_used=True, offline_cache_route_used=True, backend_load_completed=True, backend_play_completed=True, no_android_runtime_error=True.",
       "Log evidence shows source=openapi-trackManifests-DOWNLOAD and using offline cache for downloaded track id=5120026.",
-      "Caveat: literal app action-sheet screenshot remains flaky on emulator due notification shade gesture; real-watch/manual tap validation remains release-readiness item."
+      "Caveat: literal app action-sheet screenshot remains flaky on emulator due notification shade gesture; real-watch/manual tap validation remains release-readiness item.",
+      "Closeout review accepted finish validation artifact reports/offline-ux-2026-06-17-1444-finish-him/: downloaded marker persisted, DOWNLOAD manifest used, offline cache route used, backend load/play completed, no AndroidRuntime error.",
+      "Reviewed DirectManifestPlaybackBackend route: marked downloaded tracks request usage=DOWNLOAD manifest first and use app-private SimpleCache plus canonical cache keys.",
+      "Reviewed app-private offline-downloads marker artifact: only track id/title/artist/timestamp stored; no URL/token/license/key material.",
+      "Literal tap-through/real-watch validation remains a release-readiness checklist item, not a blocker for this debug-gated single-track MVP closeout."
     ],
     "acceptance": [
       "A user-accessible or explicitly debug-gated UI path can download one track.",
@@ -790,10 +794,10 @@
       "Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.",
       "Narrow Gradle gate passes."
     ],
-    "next": "Review app-authored offline UX validation. Release checklist still needs real-watch/manual literal tap-through validation because emulator gesture capture hit notification shade.",
+    "next": "Done. Single-track offline MVP route is validated through app-authored playback; release checklist retains real-watch/manual tap-through validation.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/26",
     "githubNumber": 26,
-    "phase": "implement"
+    "phase": "review"
   },
   {
     "id": "UNTIDY-026",

@@ -8,23 +8,6 @@ _None._
 
 ## review
 
-### UNTIDY-025 — Wire offline download/replay into end-user UX
-
-- Priority: P0
-- Type: feature
-- Area: offline
-- Owner: Tommy
-- Labels: offline, downloads, ux, single-track-mvp
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/26
-- Next: Review app-authored offline UX validation. Release checklist still needs real-watch/manual literal tap-through validation because emulator gesture capture hit notification shade.
-- Acceptance:
-  - A user-accessible or explicitly debug-gated UI path can download one track.
-  - Downloaded state persists across app/service restart.
-  - Network-disabled playback of that downloaded track succeeds from app UI.
-  - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
-  - Narrow Gradle gate passes.
-
 ### UNTIDY-014 — Release readiness / ship checklist
 
 - Priority: P1
@@ -300,6 +283,23 @@ _None._
   - Back from View Album/View Artist does not start onboarding
   - Authenticated state persists
   - Emulator regression passes
+
+### UNTIDY-025 — Wire offline download/replay into end-user UX
+
+- Priority: P0
+- Type: feature
+- Area: offline
+- Owner: Tommy
+- Labels: offline, downloads, ux, single-track-mvp
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/26
+- Next: Done. Single-track offline MVP route is validated through app-authored playback; release checklist retains real-watch/manual tap-through validation.
+- Acceptance:
+  - A user-accessible or explicitly debug-gated UI path can download one track.
+  - Downloaded state persists across app/service restart.
+  - Network-disabled playback of that downloaded track succeeds from app UI.
+  - Runtime artifact proves local replay with no PLAYBACK/STREAM manifest use.
+  - Narrow Gradle gate passes.
 
 ### UNTIDY-026 — Design full offline/download lifecycle UX
 
