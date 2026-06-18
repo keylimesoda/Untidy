@@ -90,7 +90,7 @@ Required before blocking:
 
 Example:
 
-- Downloads/offline is not permission-blocked in principle: Ric confirmed TIDAL already supports/allows offline/download in first- and third-party clients. Treat #11 as sanctioned SDK/API implementation proof. Product download implementation must still not proceed from `PLAYBACK`/`STREAM` manifests; it needs the official offline/download provisioning path.
+- Downloads/offline is not permission-blocked in principle: Ric confirmed TIDAL already supports/allows offline/download in first- and third-party clients. #11 is closed as the completed capability spike; product work should build from the accepted #25/#26 `usage=DOWNLOAD` proof/MVP artifacts. Product download implementation must still not proceed from `PLAYBACK`/`STREAM` manifests; it needs the official offline/download provisioning path.
 
 ### `status:done`
 

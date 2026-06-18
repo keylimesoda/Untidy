@@ -10,7 +10,7 @@ Do **not** implement user-visible downloads by caching the current streaming man
 
 Untidy should keep user-visible downloads/offline playback disabled until it implements the TIDAL-sanctioned offline/download path that includes entitlement, storage, offline license/expiry, and playback reporting semantics. Ric confirmed TIDAL already supports/allows offline/download in first- and third-party clients; the current app gap is implementation/provisioning proof, not a categorical permission blocker. The current app path is a streaming-only direct-manifest bridge and is not enough to safely store playable offline audio.
 
-Immediate product action taken in this spike: the Now Playing action sheet no longer cycles through fake download states. It now renders an honest offline proof/unavailable state while #11 proves the official provisioning path.
+Immediate product action taken in this spike: the Now Playing action sheet stopped cycling through fake download states and rendered an honest offline proof/unavailable state while #11 proved the official provisioning path. Later follow-ups replaced that proof-only posture with the accepted single-track MVP route.
 
 ## Evidence from current app
 
@@ -110,16 +110,14 @@ Even with app-private storage and encryption, a custom downloader must still use
   - Hard-wired current state to `DownloadState.Unavailable` until a real repository/backend exists.
   - Retained a defensive toast callback, though the row is disabled.
 - `SettingsScreen.kt`
-  - Updated Downloads section copy to avoid fake availability while #11 proves the official offline provisioning path.
+  - Updated Downloads section copy to avoid fake availability while #11 proved the official offline provisioning path.
 
-## Recommended next action
+## Follow-up outcome
 
-Open a narrow follow-up spike: **TIDAL sanctioned offline SDK proof**.
+This spike is complete and #11 is closed. The proof line moved into follow-up implementation issues instead of keeping #11 open:
 
-Scope:
+1. #25 / `UNTIDY-024` accepted the canonical cache-key replay proof using `usage=DOWNLOAD`, app-private Media3 cache, and network-disabled replay.
+2. #26 / `UNTIDY-025` accepted the single-track MVP app-authored route: persisted download marker, `usage=DOWNLOAD` manifest selection for marked tracks, and app-private offline cache playback path.
+3. #27-#32 split the remaining product lifecycle into Wear OS UX design, Downloads shelf, local remove-download UX, offline fallback behavior, Settings download controls, and collection download UX.
 
-1. Inspect official TIDAL SDK docs/source/test app for `OfflinePlayProvider`, `OfflinePlaybackInfoProvider`, `OfflineCacheProvider`, `Downloads`, and `OfflineTasks` usage.
-2. Build a debug-only proof that requests `usage=DOWNLOAD` / `PlaybackMode.OFFLINE` through official SDK APIs, never by raw stream URL caching.
-3. Only after that succeeds, design Phase 1 state repository and Phase 2 single-track MVP.
-
-Recommended issue status: keep #11 open as **in-progress sanctioned offline implementation proof**, with fake UI neutralized until the provisioning source is proven.
+The corrected ongoing rule is: keep the guardrail against `PLAYBACK` / `STREAM` manifest caching, but do not reopen #11 or frame TIDAL offline/download as categorically permission-blocked. Future work should build on the accepted `usage=DOWNLOAD` proof and the user-facing lifecycle issues.

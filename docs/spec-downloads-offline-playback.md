@@ -400,7 +400,7 @@ For debug builds only:
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Sanctioned provisioning source remains undiscovered | Feature cannot ship as imagined | Keep #11 as proof work; remove or neutralize user-visible offline affordance until resolved |
+| Sanctioned provisioning path changes or regresses | Feature cannot ship as imagined | Keep the #25/#26 `usage=DOWNLOAD` proof artifacts as the baseline; remove, neutralize, or defer user-visible offline affordances if the sanctioned path no longer verifies |
 | Cached streaming URLs expire or bypass the offline contract | Broken playback/supportability issue | Do not implement raw `PLAYBACK`/`STREAM` URL caching |
 | Widevine offline license unsupported or fragile on Wear OS | Offline playback fails in real use | Prototype one licensed track on real device before building UX breadth |
 | Storage pressure on watches | App instability / user frustration | Conservative defaults, hard cap, atomic temp files, cleanup |

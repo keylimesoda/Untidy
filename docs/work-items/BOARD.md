@@ -17,7 +17,7 @@ _None._
 - Labels: release, ship-readiness, qa, docs
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/15
-- Next: Review release-readiness checklist and use it as the final ship gate after #11 and release-polish dispositions.
+- Next: Review release-readiness checklist and use it as the final ship gate after the remaining release-polish dispositions.
 - Acceptance:
   - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
   - Final build/test/lint evidence is posted.
@@ -56,22 +56,6 @@ _None._
   - Controller access policy tests still pass.
   - Media controls/playback service still function in emulator and preferably real Wear OS validation.
   - Security posture is documented in code or docs.
-
-### UNTIDY-017 — Normalize offline/download docs to corrected #11 framing
-
-- Priority: P2
-- Type: cleanup
-- Area: offline
-- Owner: Tommy
-- Labels: docs, offline, downloads, tidal
-- Spec: `docs/spec-downloads-offline-playback.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/18
-- Next: Review normalized offline/download docs; stale permission-blocked language replaced with sanctioned SDK/API provisioning proof framing while retaining no-STREAM-manifest guardrail.
-- Acceptance:
-  - Docs no longer imply TIDAL offline/download is categorically permission-blocked for this class of client.
-  - Docs consistently say #11 is an implementation-proof/orchestration task using sanctioned SDK/API surfaces.
-  - Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.
-  - git diff --check passes.
 
 ### UNTIDY-023 — Add watch-friendly retry/error recovery
 
@@ -443,6 +427,22 @@ _None._
   - Prove the exact TIDAL offline provisioning path for this app
   - If viable, define single-track MVP implementation plan
   - If not viable, remove/neutralize fake download affordances
+
+### UNTIDY-017 — Normalize offline/download docs to corrected #11 framing
+
+- Priority: P2
+- Type: cleanup
+- Area: offline
+- Owner: Tommy
+- Labels: docs, offline, downloads, tidal
+- Spec: `docs/spec-downloads-offline-playback.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/18
+- Next: Done: offline/download docs now use corrected sanctioned-download framing, preserve the no-PLAYBACK/STREAM guardrail, and no longer describe #11 as active/open.
+- Acceptance:
+  - Docs no longer imply TIDAL offline/download is categorically permission-blocked for this class of client.
+  - Docs consistently say #11 is closed as the capability spike and follow-up proof/MVP work lives in sanctioned SDK/API surfaces tracked by #25/#26/#27-#32.
+  - Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.
+  - git diff --check passes.
 
 ### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
 

@@ -417,7 +417,8 @@
     "evidence": [
       "Created from chat-history audit: Ric wants the app polished/professional/ready to ship.",
       "Release-readiness checklist drafted at docs/release-readiness-checklist.md.",
-      "Checklist captures current #11 offline decision gate, debug/proof-only audit, lint warning disposition, emulator and real-watch validation, UX readiness, docs readiness, and release decision record."
+      "Checklist captures current #11 offline decision gate, debug/proof-only audit, lint warning disposition, emulator and real-watch validation, UX readiness, docs readiness, and release decision record.",
+      "2026-06-17 release checklist refreshed: #11 is now recorded as closed, and offline release scope is single-track MVP acceptance vs collection/real-watch deferral."
     ],
     "acceptance": [
       "A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.",
@@ -426,7 +427,7 @@
       "Debug-only code cannot leak into production release surfaces.",
       "Known limitations are documented in README/specs."
     ],
-    "next": "Review release-readiness checklist and use it as the final ship gate after #11 and release-polish dispositions.",
+    "next": "Review release-readiness checklist and use it as the final ship gate after the remaining release-polish dispositions.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/15",
     "githubNumber": 15
   },
@@ -497,7 +498,7 @@
     "id": "UNTIDY-017",
     "title": "Normalize offline/download docs to corrected #11 framing",
     "type": "cleanup",
-    "status": "review",
+    "status": "done",
     "priority": "P2",
     "area": "offline",
     "owner": "Tommy",
@@ -513,15 +514,18 @@
       "docs/spec-downloads-offline-playback.md normalized to sanctioned provisioning proof framing.",
       "docs/spike-downloads-offline-playback-2026-06-17.md normalized to in-progress implementation proof framing.",
       "docs/work-items/WORKFLOW.md updated: #11 is not permission-blocked in principle; blocked means implementation/provisioning proof remains.",
-      "Guardrail preserved: do not implement offline/download by caching PLAYBACK/STREAM manifests."
+      "Guardrail preserved: do not implement offline/download by caching PLAYBACK/STREAM manifests.",
+      "2026-06-17 closeout pass updated stale release/spike text: #11 is closed and follow-up proof/MVP work now lives in #25/#26/#27-#32.",
+      "docs/release-readiness-checklist.md now records the #11 release decision as complete and narrows remaining offline release choice to single-track MVP acceptance vs collection/real-watch deferral.",
+      "docs/spec-downloads-offline-playback.md and docs/work-items/WORKFLOW.md no longer instruct agents to keep #11 open; they point at accepted #25/#26 proof/MVP artifacts."
     ],
     "acceptance": [
       "Docs no longer imply TIDAL offline/download is categorically permission-blocked for this class of client.",
-      "Docs consistently say #11 is an implementation-proof/orchestration task using sanctioned SDK/API surfaces.",
+      "Docs consistently say #11 is closed as the capability spike and follow-up proof/MVP work lives in sanctioned SDK/API surfaces tracked by #25/#26/#27-#32.",
       "Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.",
       "git diff --check passes."
     ],
-    "next": "Review normalized offline/download docs; stale permission-blocked language replaced with sanctioned SDK/API provisioning proof framing while retaining no-STREAM-manifest guardrail.",
+    "next": "Done: offline/download docs now use corrected sanctioned-download framing, preserve the no-PLAYBACK/STREAM guardrail, and no longer describe #11 as active/open.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/18",
     "githubNumber": 18
   },

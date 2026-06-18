@@ -19,13 +19,11 @@ Release readiness means:
 
 **Status:** Not release-ready yet.
 
-**Primary active blocker:** #11 / UNTIDY-011 downloads/offline playback proof. Ralph is actively proving the sanctioned TIDAL offline/download path. The release decision must either:
+**Offline/download release decision:** #11 / UNTIDY-011 is closed as a completed capability spike, and the sanctioned `usage=DOWNLOAD` proof line has advanced through the single-track offline MVP. Offline/download is no longer a categorical permission blocker. The remaining release decision is narrower: whether the current single-track Downloads shelf/remove/fallback/settings implementation is accepted for beta, or whether album/playlist collection downloads and real-watch offline validation are deferred.
 
-1. ship with offline/download scoped out and clearly neutralized/documented, or
-2. ship after a one-track offline MVP is proven and gated appropriately.
+**P1/P2 UX and documentation items already disposed:**
 
-**P1 UX items already disposed:**
-
+- #18 / UNTIDY-017 — Offline/download docs normalization uses the corrected sanctioned-download framing and preserves the no-`PLAYBACK`/`STREAM` guardrail.
 - #20 / UNTIDY-019 — Search entry no longer presents a blank black screen; visible Wear prompt landed.
 - #21 / UNTIDY-020 — Round-screen safe-area padding landed.
 - #22 / UNTIDY-021 — New test playlist creation is gated to debug builds and closed done.
@@ -34,7 +32,6 @@ Release readiness means:
 
 - #16 / UNTIDY-015 — WearRecents/task-affinity lint warnings.
 - #17 / UNTIDY-016 — ExportedService lint warning/security posture.
-- #18 / UNTIDY-017 — Offline/download docs normalization.
 - #23 / UNTIDY-022 — Now Playing actions discoverability and rotary behavior.
 - #24 / UNTIDY-023 — Watch-friendly retry/error recovery.
 
@@ -49,7 +46,7 @@ Release readiness means:
   - [ ] explicit release blocker,
   - [ ] accepted release deferral,
   - [ ] post-release backlog.
-- [ ] #11 has a release decision: offline shipped, debug-only proof retained, or offline scoped out.
+- [x] #11 has a release decision: capability spike closed; current release choice is single-track offline MVP acceptance vs collection-download/real-watch deferral.
 - [ ] #15 is updated with final evidence/comment before closing.
 
 ### 2. Build, lint, and tests
@@ -117,7 +114,7 @@ Required emulator smoke paths:
 - [ ] View Album and View Artist routes from Now Playing remain authenticated and do not fall into onboarding.
 - [ ] Add to Playlist existing-playlist path works against an approved test playlist or is explicitly deferred.
 - [ ] Debug-only `New test playlist` row is absent in release-equivalent build and present only in debug if intentionally retained.
-- [ ] Offline/download proof-in-progress or shipped state matches the #11 release decision.
+- [x] Offline/download shipped/proof state matches the #11 release decision: #11 is closed, #25/#26 carry the accepted `usage=DOWNLOAD` proof/MVP evidence, and remaining UX scope is tracked separately.
 - [ ] Settings/account/playback/download sections render and back behavior works.
 - [ ] Error/empty states do not create dead ends; #24 disposition recorded.
 
@@ -179,7 +176,7 @@ Before closing #15, add a GitHub comment with:
 - exact Gradle command results;
 - emulator device/profile and artifact directory;
 - real watch model/OS version and artifact notes;
-- #11 offline/download decision;
+- #11 offline/download decision and any remaining offline/download deferrals;
 - remaining accepted deferrals, each linked to an issue;
 - final go/no-go recommendation.
 
@@ -198,9 +195,8 @@ Evidence reviewed:
 
 ## Current recommended next steps
 
-1. Let Ralph continue #11 until the sanctioned offline provisioning source is either found or release-scoped out with evidence.
-2. Resolve #18 docs normalization soon; it is low-risk and prevents stale framing from leaking into the release docs.
-3. Dispose #16/#17 lint warnings before the final full `lintDebug` gate.
-4. Review/close #20–#22 if the current implementation evidence is accepted.
-5. Run #23 real-watch/rotary validation before public beta.
-6. Implement or explicitly defer #24 retry/error recovery.
+1. Close/review the remaining release-polish items already in review: #16, #17, and #24.
+2. Run #23 real-watch/rotary validation before public beta, or record it as a non-public-beta deferral.
+3. Use the completed #25/#26/#28-#31 offline artifacts to decide whether single-track offline MVP ships now, with #32 collection downloads deferred if needed.
+4. Run the final Gradle gate and release-readiness emulator sweep against the selected release scope.
+5. Update #15 with the final go/no-go comment and close only after GitHub Issues and the local board agree.
