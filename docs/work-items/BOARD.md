@@ -22,23 +22,6 @@ _Generated from `work-items.json`._
   - Offline/download real-watch result is either passed or explicitly deferred for non-public beta.
   - Findings are linked back to #15 release decision record.
 
-### UNTIDY-040 — Refresh GitHub README with source-backed Wear OS/TIDAL positioning
-
-- Priority: P1
-- Type: task
-- Area: cleanup
-- Owner: Tommy
-- Labels: documentation, readme, tidal, wear-os, repo-hygiene
-- Spec: `README.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/41
-- Next: In progress with README subagent; parent must review source-backed wording, verify markdown, commit, and push.
-- Acceptance:
-  - README accurately describes current capabilities and limitations.
-  - Official TIDAL platform/support claims are source-backed or conservatively phrased.
-  - Known-good release/tag is linked.
-  - Build/test/install instructions are current.
-  - Markdown sanity checks pass.
-
 ## review
 
 ### UNTIDY-014 — Release readiness / ship checklist
@@ -50,7 +33,7 @@ _Generated from `work-items.json`._
 - Labels: release, ship-readiness, qa, docs
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/15
-- Next: Only #33 formal real-watch validation and #41 README refresh remain before closing release-readiness.
+- Next: Only #33 formal real-watch validation remains before closing release-readiness. #42 full-fidelity quality is tracked as a follow-up unless explicitly promoted to release-blocker.
 - Acceptance:
   - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
   - Final build/test/lint evidence is posted.
@@ -60,7 +43,23 @@ _Generated from `work-items.json`._
 
 ## todo
 
-_None._
+### UNTIDY-041 — Add and validate true full-fidelity streaming quality option
+
+- Priority: P1
+- Type: feature
+- Area: playback
+- Owner: Tommy
+- Labels: quality, tidal, playback, settings, watch-ux
+- Spec: `GitHub issue #42`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/42
+- Next: Audit current TIDAL quality tiers and decide whether High should remain AAC-oriented or a new Full Fidelity preset should request lossless/hi-res where supported.
+- Acceptance:
+  - Audit TIDAL SDK/direct-manifest quality capabilities for LOW/HIGH/LOSSLESS/HI_RES or equivalent current tiers.
+  - Decide user-facing labels that map honestly to available backend behavior.
+  - If supported, implement a true Full Fidelity/lossless-style preset where available with fallback copy when unavailable.
+  - Preserve Battery Saver as the default watch-friendly option.
+  - Document battery/storage/network implications.
+  - Verify selected quality is reflected in playback context/log diagnostics without exposing private manifest URLs.
 
 ## blocked
 
@@ -470,6 +469,23 @@ _None._
   - Search entry no longer flashes the full fallback prompt before keyboard handoff.
   - Built-in local output is labeled Watch speaker.
   - Compile/lint/test gate passes.
+
+### UNTIDY-040 — Refresh GitHub README with source-backed Wear OS/TIDAL positioning
+
+- Priority: P1
+- Type: task
+- Area: cleanup
+- Owner: Tommy
+- Labels: documentation, readme, tidal, wear-os, repo-hygiene
+- Spec: `README.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/41
+- Next: Closed after README refresh with source-backed official TIDAL platform wording, known-good release link, current capabilities/limitations, and conservative quality-positioning copy.
+- Acceptance:
+  - README accurately describes current capabilities and limitations.
+  - Official TIDAL platform/support claims are source-backed or conservatively phrased.
+  - Known-good release/tag is linked.
+  - Build/test/install instructions are current.
+  - Markdown sanity checks pass.
 
 ### UNTIDY-010 — Implement Add to Playlist workflow
 

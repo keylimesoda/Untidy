@@ -437,7 +437,7 @@
       "Debug-only code cannot leak into production release surfaces.",
       "Known limitations are documented in README/specs."
     ],
-    "next": "Only #33 formal real-watch validation and #41 README refresh remain before closing release-readiness.",
+    "next": "Only #33 formal real-watch validation remains before closing release-readiness. #42 full-fidelity quality is tracked as a follow-up unless explicitly promoted to release-blocker.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/15",
     "githubNumber": 15
   },
@@ -1257,7 +1257,7 @@
     "id": "UNTIDY-040",
     "title": "Refresh GitHub README with source-backed Wear OS/TIDAL positioning",
     "type": "task",
-    "status": "in-progress",
+    "status": "done",
     "priority": "P1",
     "area": "cleanup",
     "owner": "Tommy",
@@ -1271,7 +1271,10 @@
     "spec": "README.md",
     "evidence": [
       "Issue created after Ric corrected that there is no first-party TIDAL Wear OS experience",
-      "README PM subagent is drafting with source-backed research requirement"
+      "README PM subagent is drafting with source-backed research requirement",
+      "README links known-good watch prerelease v0.1.0-known-good-watch-2026-06-18.",
+      "TIDAL support docs verified Apple Watch and Android TV support pages; Get Started/Smart TVs & Devices lists Apple Watch and Android TV but not an equivalent Wear OS support page in the checked official surfaces.",
+      "README documents Battery Saver / Balanced / High presets without promising true lossless/full-fidelity until #42 is implemented/validated."
     ],
     "acceptance": [
       "README accurately describes current capabilities and limitations.",
@@ -1280,8 +1283,40 @@
       "Build/test/install instructions are current.",
       "Markdown sanity checks pass."
     ],
-    "next": "In progress with README subagent; parent must review source-backed wording, verify markdown, commit, and push.",
+    "next": "Closed after README refresh with source-backed official TIDAL platform wording, known-good release link, current capabilities/limitations, and conservative quality-positioning copy.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/41",
     "githubNumber": 41
+  },
+  {
+    "id": "UNTIDY-041",
+    "title": "Add and validate true full-fidelity streaming quality option",
+    "type": "feature",
+    "status": "todo",
+    "priority": "P1",
+    "area": "playback",
+    "owner": "Tommy",
+    "labels": [
+      "quality",
+      "tidal",
+      "playback",
+      "settings",
+      "watch-ux"
+    ],
+    "spec": "GitHub issue #42",
+    "evidence": [
+      "Ric called out that quality is central to TIDAL positioning.",
+      "Current Settings expose Battery Saver, Balanced, and High, but current direct-manifest path is conservative AAC-oriented and does not yet promise true full-fidelity/lossless."
+    ],
+    "acceptance": [
+      "Audit TIDAL SDK/direct-manifest quality capabilities for LOW/HIGH/LOSSLESS/HI_RES or equivalent current tiers.",
+      "Decide user-facing labels that map honestly to available backend behavior.",
+      "If supported, implement a true Full Fidelity/lossless-style preset where available with fallback copy when unavailable.",
+      "Preserve Battery Saver as the default watch-friendly option.",
+      "Document battery/storage/network implications.",
+      "Verify selected quality is reflected in playback context/log diagnostics without exposing private manifest URLs."
+    ],
+    "next": "Audit current TIDAL quality tiers and decide whether High should remain AAC-oriented or a new Full Fidelity preset should request lossless/hi-res where supported.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/42",
+    "githubNumber": 42
   }
 ]
