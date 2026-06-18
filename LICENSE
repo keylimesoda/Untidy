@@ -1,0 +1,57 @@
+Untidy Source-Available License
+
+Copyright (c) 2026 Ric Lewis. All rights reserved.
+
+Untidy is source-visible, but it is not open-source software.
+
+1. Permission granted
+
+You may view, clone, and inspect this repository solely for personal review,
+evaluation, security review, and for preparing bug reports or proposed
+contributions to the original upstream repository.
+
+2. Restrictions
+
+Unless Ric Lewis grants prior written permission, you may not:
+
+- use this software or substantial portions of it in another application,
+  service, product, or commercial project;
+- copy, modify, merge, publish, distribute, sublicense, sell, lease, host, or
+  otherwise provide this software or derivative works to any third party;
+- redistribute binaries, APKs, forks, modified builds, or derivative works;
+- remove or alter copyright, license, trademark, or attribution notices;
+- use the Untidy name, branding, screenshots, package identity, or project
+  identity to imply endorsement or affiliation.
+
+3. Contributions
+
+By submitting a pull request, patch, issue attachment, or other contribution to
+the original upstream repository, you grant Ric Lewis a perpetual, worldwide,
+non-exclusive, royalty-free license to use, reproduce, modify, distribute,
+sublicense, and relicense your contribution as part of Untidy and related
+products or services. You represent that you have the right to grant that
+license.
+
+4. Third-party components
+
+Third-party libraries, SDKs, tools, trademarks, and services used by Untidy are
+owned by their respective rights holders and remain subject to their own
+licenses and terms. This license applies only to Ric Lewis's original Untidy
+source code and project materials.
+
+5. TIDAL and platform terms
+
+Untidy is an unofficial, independent client. This license does not grant any
+rights to TIDAL, Google, Samsung, Wear OS, Android, or any other third-party
+service, API, SDK, trademark, catalog content, audio, or account data. Users and
+developers are responsible for complying with applicable third-party terms.
+
+6. No warranty
+
+THE SOFTWARE IS PROVIDED FOR REVIEW AND EVALUATION "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

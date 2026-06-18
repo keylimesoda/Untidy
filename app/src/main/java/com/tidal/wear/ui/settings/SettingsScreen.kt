@@ -232,7 +232,7 @@ fun SettingsScreen(
                 }
 
                 item { SectionHeader("Legal") }
-                item { DisabledSettingChip("Open-source licenses", "Kotlin · Compose · Media3 · TIDAL SDK") }
+                item { DisabledSettingChip("Third-party licenses", "Kotlin · Compose · Media3 · TIDAL SDK") }
                 item { DisabledSettingChip("Privacy", "Tokens are local and erasable") }
                 item { DisabledSettingChip("TIDAL attribution", "Unofficial client · TIDAL marks belong to TIDAL") }
                 item {

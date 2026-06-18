@@ -1318,5 +1318,36 @@
     "next": "Audit current TIDAL quality tiers and decide whether High should remain AAC-oriented or a new Full Fidelity preset should request lossless/hi-res where supported.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/42",
     "githubNumber": 42
+  },
+  {
+    "id": "UNTIDY-042",
+    "title": "Commercial distribution and legal readiness review",
+    "type": "decision",
+    "status": "todo",
+    "priority": "P0",
+    "area": "cleanup",
+    "owner": "Tommy",
+    "labels": [
+      "commercial",
+      "legal",
+      "license",
+      "tidal",
+      "google-play"
+    ],
+    "spec": "GitHub issue #43",
+    "evidence": [
+      "Ric wants the option to eventually charge money for Untidy.",
+      "Repo now uses a source-available license posture reserving redistribution/commercial rights."
+    ],
+    "acceptance": [
+      "Written recommendation exists before any paid/public store launch.",
+      "TIDAL SDK/API terms are reviewed and blockers documented.",
+      "Trademark/app-name/package-name risk is resolved or accepted with rationale.",
+      "Distribution model is selected.",
+      "Third-party license/NOTICE obligations are implemented in app/repo."
+    ],
+    "next": "Review TIDAL terms, trademark/package risk, Google Play policy, and distribution model before any paid/public launch.",
+    "githubUrl": "https://github.com/keylimesoda/Untidy/issues/43",
+    "githubNumber": 43
   }
 ]

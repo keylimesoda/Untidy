@@ -43,6 +43,23 @@ _Generated from `work-items.json`._
 
 ## todo
 
+### UNTIDY-042 — Commercial distribution and legal readiness review
+
+- Priority: P0
+- Type: decision
+- Area: cleanup
+- Owner: Tommy
+- Labels: commercial, legal, license, tidal, google-play
+- Spec: `GitHub issue #43`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/43
+- Next: Review TIDAL terms, trademark/package risk, Google Play policy, and distribution model before any paid/public launch.
+- Acceptance:
+  - Written recommendation exists before any paid/public store launch.
+  - TIDAL SDK/API terms are reviewed and blockers documented.
+  - Trademark/app-name/package-name risk is resolved or accepted with rationale.
+  - Distribution model is selected.
+  - Third-party license/NOTICE obligations are implemented in app/repo.
+
 ### UNTIDY-041 — Add and validate true full-fidelity streaming quality option
 
 - Priority: P1

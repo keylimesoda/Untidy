@@ -218,6 +218,12 @@ Helpful contributions include:
 
 Please do not include private tokens, TIDAL credentials, license data, manifest URLs, or non-public account/library details in issues or pull requests.
 
+## License
+
+Untidy is currently **source-available, not open-source**. The code is public for review, issue filing, and upstream contributions, but commercial use, redistribution, forks, modified APKs, and derivative products are not permitted without written permission. See [`LICENSE`](LICENSE).
+
+This posture is intentional while the product, paid distribution model, and third-party platform/API requirements are still being validated. Third-party dependencies remain under their own licenses.
+
 ## Legal and responsible use
 
 Untidy is an **unofficial, independent** Wear OS client for the TIDAL music service. It is not affiliated with, endorsed by, or sponsored by TIDAL, Samsung, Google, or their subsidiaries. All trademarks belong to their respective owners.
