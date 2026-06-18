@@ -97,14 +97,16 @@ fun SearchScreen(
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var requestKeyboardTick by remember { mutableIntStateOf(1) }
+    var keyboardOpening by remember { mutableStateOf(true) }
     val networkAvailable = rememberNetworkAvailable()
 
     LaunchedEffect(requestKeyboardTick, inputView) {
         if (requestKeyboardTick > 0) {
-            delay(120)
             inputView?.let { editText ->
                 editText.requestFocus()
                 editText.showKeyboard()
+                delay(650)
+                keyboardOpening = false
             }
         }
     }
@@ -153,6 +155,7 @@ fun SearchScreen(
         submittedQuery = ""
         result = null
         error = null
+        keyboardOpening = true
         requestKeyboardTick += 1
     }
 
@@ -160,6 +163,7 @@ fun SearchScreen(
         query = submittedQuery
         submittedQuery = ""
         error = null
+        keyboardOpening = true
         requestKeyboardTick += 1
     }
 
@@ -168,12 +172,19 @@ fun SearchScreen(
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         if (submittedQuery.isBlank()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                SearchEntryPrompt(
-                    query = query,
-                    onKeyboardRequested = { requestKeyboardTick += 1 },
-                    onSearch = ::searchNow,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                )
+                if (keyboardOpening && query.isBlank()) {
+                    OpeningKeyboardHint(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp))
+                } else {
+                    SearchEntryPrompt(
+                        query = query,
+                        onKeyboardRequested = {
+                            keyboardOpening = true
+                            requestKeyboardTick += 1
+                        },
+                        onSearch = ::searchNow,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    )
+                }
                 SearchInput(
                     query = query,
                     onQueryChange = { query = it },
@@ -276,6 +287,24 @@ private fun <T> androidx.wear.compose.foundation.lazy.ScalingLazyListScope.secti
     if (items.isEmpty()) return
     item { SectionHeader(title) }
     items.forEach { element -> item { itemContent(element) } }
+}
+
+@Composable
+private fun OpeningKeyboardHint(modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
+        Box(
+            Modifier
+                .size(7.dp)
+                .background(TidalColors.Cyan.copy(alpha = 0.8f), CircleShape),
+        )
+        Text(
+            text = "Opening keyboard…",
+            color = TidalColors.OnSurfaceMuted,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        )
+    }
 }
 
 @Composable

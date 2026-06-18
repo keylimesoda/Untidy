@@ -387,34 +387,51 @@ private fun TidalPlayerNonAmbient(
                 ),
         )
 
-        Text(
-            text = state.track?.title ?: "Nothing playing",
-            style = MaterialTheme.typography.title3,
-            color = TidalColors.White,
-            fontWeight = FontWeight.Black,
-            fontSize = (18 * scale).sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 86.dp * scale)
-                .width(140.dp * scale),
-        )
-        Text(
-            text = state.track?.artist?.ifBlank { "Untidy" } ?: "Tap Start listening",
-            style = MaterialTheme.typography.caption1,
-            color = TidalColors.OnSurfaceMuted,
-            fontWeight = FontWeight.Normal,
-            fontSize = (14 * scale).sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 108.dp * scale)
-                .width(140.dp * scale),
-        )
+        if (state.track != null) {
+            Text(
+                text = state.track.title,
+                style = MaterialTheme.typography.title3,
+                color = TidalColors.White,
+                fontWeight = FontWeight.Black,
+                fontSize = (18 * scale).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = 86.dp * scale)
+                    .width(140.dp * scale),
+            )
+            Text(
+                text = state.track.artist.ifBlank { state.track.album.ifBlank { "Untidy" } },
+                style = MaterialTheme.typography.caption1,
+                color = TidalColors.OnSurfaceMuted,
+                fontWeight = FontWeight.Normal,
+                fontSize = (14 * scale).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = 108.dp * scale)
+                    .width(140.dp * scale),
+            )
+        } else {
+            Text(
+                text = if (state.isPlaying) "Starting…" else "Loading track…",
+                style = MaterialTheme.typography.caption1,
+                color = TidalColors.OnSurfaceMuted,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = (13 * scale).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = 98.dp * scale)
+                    .width(140.dp * scale),
+            )
+        }
 
         Row(
             modifier = Modifier
@@ -802,7 +819,16 @@ private fun AudioDeviceInfo.outputLabel(): String {
         AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Watch speaker"
         else -> "Output"
     }
-    return product?.takeUnless { it.equals(typeLabel, ignoreCase = true) } ?: typeLabel
+    return when (type) {
+        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> typeLabel
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+        AudioDeviceInfo.TYPE_USB_HEADSET,
+        -> product?.takeUnless { it.equals(typeLabel, ignoreCase = true) } ?: typeLabel
+        else -> typeLabel
+    }
 }
 
 @Composable
