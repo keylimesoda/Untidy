@@ -2,6 +2,7 @@
 
 package com.tidal.wear.core.playback
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -236,7 +237,9 @@ class TidalMediaService : MediaLibraryService() {
 
     private fun playTrack(trackId: String, knownTrack: TidalTrack? = null) {
         val id = trackId.ifBlank { return }
+        serviceOwnedLoadInProgress = true
         if (!canStartLiveOrDownloadedPlayback(id)) {
+            serviceOwnedLoadInProgress = false
             Log.w(PLAYER_LOG_TAG, "playTrack offline fallback: not downloaded id=$id")
             sessionPlayer?.setPlaybackError("Not downloaded · connect to stream this track")
             knownTrack?.let { publishOngoingActivity(it, isPlaying = false) }
