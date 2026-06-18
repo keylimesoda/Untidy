@@ -25,22 +25,6 @@ _None._
   - Debug-only code cannot leak into production release surfaces.
   - Known limitations are documented in README/specs.
 
-### UNTIDY-018 — Senior Wear OS UX path walkthrough
-
-- Priority: P1
-- Type: test
-- Area: ui
-- Owner: Tommy
-- Labels: ux, wear-os, review, qa
-- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/19
-- Next: Review senior Wear OS UX walkthrough report; top findings converted to follow-up issues #20-#24.
-- Acceptance:
-  - A UX walkthrough report exists under docs/ux/ or reports/ux/.
-  - Report includes path-by-path observations, screenshots/artifact references where available, severity, and recommendations.
-  - Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.
-  - No generic, non-Wear-specific advice without source/evidence.
-
 ### UNTIDY-015 — Resolve WearRecents/task-affinity lint warnings
 
 - Priority: P2
@@ -320,6 +304,22 @@ _None._
   - Queue screen shows current track and upcoming tracks
   - Empty queue state is safe
   - Compile/lint passes
+
+### UNTIDY-018 — Senior Wear OS UX path walkthrough
+
+- Priority: P1
+- Type: test
+- Area: ui
+- Owner: Tommy
+- Labels: ux, wear-os, review, qa
+- Spec: `docs/ux/wear-os-ux-walkthrough-2026-06-17.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/19
+- Next: Review senior Wear OS UX walkthrough report; top findings converted to follow-up issues #20-#24.
+- Acceptance:
+  - A UX walkthrough report exists under docs/ux/ or reports/ux/.
+  - Report includes path-by-path observations, screenshots/artifact references where available, severity, and recommendations.
+  - Top P0/P1 UX issues are converted into GitHub issues or explicitly accepted/deferred.
+  - No generic, non-Wear-specific advice without source/evidence.
 
 ### UNTIDY-019 — Fix Wear search entry blank-screen UX
 

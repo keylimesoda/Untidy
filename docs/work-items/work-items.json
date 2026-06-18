@@ -529,7 +529,7 @@
     "id": "UNTIDY-018",
     "title": "Senior Wear OS UX path walkthrough",
     "type": "test",
-    "status": "review",
+    "status": "done",
     "priority": "P1",
     "area": "ui",
     "owner": "Tommy",
