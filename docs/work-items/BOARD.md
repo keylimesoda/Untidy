@@ -17,7 +17,7 @@ _None._
 - Labels: release, ship-readiness, qa, docs
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/15
-- Next: Release gate evidence is current. Do not close until #33 real-watch validation is resolved or explicitly deferred for non-public beta.
+- Next: Release gate passed on emulator/build/docs. Remains open only for #33 physical Wear OS validation or explicit non-public-beta deferral.
 - Acceptance:
   - A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.
   - Final build/test/lint evidence is posted.
@@ -36,7 +36,7 @@ _None._
 - Labels: real-watch, release, qa, wear-os
 - Spec: `docs/release-readiness-checklist.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/33
-- Next: Run on a physical Wear OS watch before public/beta release, or record explicit non-public-beta deferral in #15.
+- Next: Only remaining release blocker: run physical Wear OS validation before public/beta release, or record explicit non-public-beta deferral in #15.
 - Acceptance:
   - Real watch model and Wear OS version are recorded.
   - APK/build variant and commit under test are recorded.

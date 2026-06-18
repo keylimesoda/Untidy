@@ -423,7 +423,12 @@
       "2026-06-17 final gate: self-healing emulator installed/launched debug APK on emulator-5554 (Wear Android 15, 454x454) and route XML captured for Home, Search, Downloads, Settings.",
       "2026-06-17 static audit found and fixed remaining production Now Playing proof-copy toast; compile/full gate re-ran green.",
       "2026-06-17 final gate split remaining ship blockers into #33 real-watch validation and #34 release legal/attribution/docs placeholders.",
-      "2026-06-17 #34 release legal/attribution/docs placeholders closed done; only #33 real-watch validation remains open."
+      "2026-06-17 #34 release legal/attribution/docs placeholders closed done; only #33 real-watch validation remains open.",
+      "Final full gate passed after release polish: lintDebug assembleDebug testDebugUnitTest and git diff --check; artifact reports/release-readiness-2026-06-17/full-gradle-gate-final-2.txt.",
+      "Release compile/debug-proof audit passed: :app:compileReleaseKotlin, debug proof components remain debug-source-set scoped, production proof copy fixed.",
+      "Final lint has no errors; remaining non-info findings are GradleDependency update warnings only, accepted as non-blocking for this release gate.",
+      "Final emulator smoke passed on emulator-5554 Android 15 / 454x454 with Home, Search, Downloads, Settings XML/screenshots under reports/release-readiness-2026-06-17-final/.",
+      "Release remains blocked only on #33 real Wear OS validation or explicit non-public-beta deferral."
     ],
     "acceptance": [
       "A release-readiness checklist exists and is checked off or explicitly deferred item-by-item.",
@@ -432,7 +437,7 @@
       "Debug-only code cannot leak into production release surfaces.",
       "Known limitations are documented in README/specs."
     ],
-    "next": "Release gate evidence is current. Do not close until #33 real-watch validation is resolved or explicitly deferred for non-public beta.",
+    "next": "Release gate passed on emulator/build/docs. Remains open only for #33 physical Wear OS validation or explicit non-public-beta deferral.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/15",
     "githubNumber": 15
   },
@@ -1038,7 +1043,7 @@
       "Offline/download real-watch result is either passed or explicitly deferred for non-public beta.",
       "Findings are linked back to #15 release decision record."
     ],
-    "next": "Run on a physical Wear OS watch before public/beta release, or record explicit non-public-beta deferral in #15.",
+    "next": "Only remaining release blocker: run physical Wear OS validation before public/beta release, or record explicit non-public-beta deferral in #15.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/33",
     "githubNumber": 33
   },
