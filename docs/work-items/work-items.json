@@ -1176,7 +1176,9 @@
       "Home now includes a Recent chip; Recent screen opens album/playlist detail routes and track taps open a minimal Track Context screen without autoplay.",
       "Explicit UI play writes are wired for track play, album Play Album, and playlist Play all; service/backend transitions remain untouched, so auto-advance is not recorded.",
       "Sign-out clear hook added via Settings onSignedOut path.",
-      "Verification passed: :app:lintDebug :app:testDebugUnitTest :app:compileDebugKotlin plus git diff --check."
+      "Verification passed: :app:lintDebug :app:testDebugUnitTest :app:compileDebugKotlin plus git diff --check.",
+      "Recent shelf implemented in 7503c27 with local watch-only store, no artist entry type, explicit-play writes only, and track context screen with no autoplay.",
+      "Parent emulator smoke passed: reports/recent-shelf-smoke-2026-06-18-0050-retry2/ shows Recent, track, album, playlist, and no Artist row."
     ],
     "acceptance": [
       "Home includes Recent.",
@@ -1187,7 +1189,7 @@
       "History persists across app restart.",
       "Compile and emulator smoke pass."
     ],
-    "next": "Review implemented Recent shelf and run emulator/physical watch smoke for Home \u2192 Recent with a populated history item before final done.",
+    "next": "Review Recent shelf implementation and emulator smoke. Physical watch validation remains optional/final release check.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/39",
     "githubNumber": 39
   }

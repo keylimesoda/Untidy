@@ -72,7 +72,7 @@ _Generated from `work-items.json`._
 - Labels: recent, watch-ux, navigation, play-history
 - Spec: `docs/specs/recent-shelf.md`
 - GitHub: https://github.com/keylimesoda/Untidy/issues/39
-- Next: Review implemented Recent shelf and run emulator/physical watch smoke for Home → Recent with a populated history item before final done.
+- Next: Review Recent shelf implementation and emulator smoke. Physical watch validation remains optional/final release check.
 - Acceptance:
   - Home includes Recent.
   - Recent screen shows explicit play-history items only.
