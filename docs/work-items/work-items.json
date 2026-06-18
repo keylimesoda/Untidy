@@ -654,7 +654,7 @@
     "id": "UNTIDY-022",
     "title": "Validate Now Playing actions discoverability and rotary behavior",
     "type": "test",
-    "status": "review",
+    "status": "done",
     "priority": "P2",
     "area": "ui",
     "owner": "Tommy",
@@ -670,7 +670,8 @@
       "docs/test-plan-now-playing-actions-rotary.md defines the discoverability and rotary/bezel validation matrix; no live TIDAL library mutation required.",
       "Implemented a visible tappable Actions affordance on Now Playing instead of the prior unlabeled bottom handle.",
       "Wired ActionsSheet TransformingLazyColumn to explicit rotaryScrollableWithFocus state for crown/bezel scrolling consistency.",
-      "Emulator evidence captured under reports/now-playing-actions-rotary-2026-06-17-1631/: page0.xml shows visible Actions hint; page1.xml shows action rows; compileDebugKotlin and git diff --check passed. Real-watch rotary remains a release-checklist validation item."
+      "Emulator evidence captured under reports/now-playing-actions-rotary-2026-06-17-1631/: page0.xml shows visible Actions hint; page1.xml shows action rows; compileDebugKotlin and git diff --check passed. Real-watch rotary remains a release-checklist validation item.",
+      "Closed after review with evidence in reports/now-playing-actions-rotary-2026-06-17-1631/ and GitHub issue #23 final comment; no live TIDAL mutation performed."
     ],
     "acceptance": [
       "Users can discover player actions without prior knowledge.",
@@ -678,7 +679,7 @@
       "Any added affordance stays watch-glanceable and does not clutter Now Playing.",
       "Relevant compile/lint gate passes."
     ],
-    "next": "Review Now Playing Actions affordance and emulator rotary evidence. Final public release still needs real-watch crown/bezel validation per release checklist.",
+    "next": "Done: Now Playing exposes a visible Actions affordance; action sheet uses explicit rotary focus/scroll wiring; emulator artifacts and compile gate are sufficient for this issue. Real-watch crown/bezel validation remains in release readiness #15.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/23",
     "githubNumber": 23
   },

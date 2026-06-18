@@ -122,22 +122,6 @@ _None._
   - Guardrail against raw STREAM/PLAYBACK manifest caching remains prominent.
   - git diff --check passes.
 
-### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
-
-- Priority: P2
-- Type: test
-- Area: ui
-- Owner: Tommy
-- Labels: now-playing, rotary, wear-os, ux
-- Spec: `docs/test-plan-now-playing-actions-rotary.md`
-- GitHub: https://github.com/keylimesoda/Untidy/issues/23
-- Next: Review Now Playing Actions affordance and emulator rotary evidence. Final public release still needs real-watch crown/bezel validation per release checklist.
-- Acceptance:
-  - Users can discover player actions without prior knowledge.
-  - Action sheet scroll/rotary behavior is validated on emulator and real watch if possible.
-  - Any added affordance stays watch-glanceable and does not clutter Now Playing.
-  - Relevant compile/lint gate passes.
-
 ### UNTIDY-023 — Add watch-friendly retry/error recovery
 
 - Priority: P2
@@ -459,6 +443,22 @@ _None._
   - Prove the exact TIDAL offline provisioning path for this app
   - If viable, define single-track MVP implementation plan
   - If not viable, remove/neutralize fake download affordances
+
+### UNTIDY-022 — Validate Now Playing actions discoverability and rotary behavior
+
+- Priority: P2
+- Type: test
+- Area: ui
+- Owner: Tommy
+- Labels: now-playing, rotary, wear-os, ux
+- Spec: `docs/test-plan-now-playing-actions-rotary.md`
+- GitHub: https://github.com/keylimesoda/Untidy/issues/23
+- Next: Done: Now Playing exposes a visible Actions affordance; action sheet uses explicit rotary focus/scroll wiring; emulator artifacts and compile gate are sufficient for this issue. Real-watch crown/bezel validation remains in release readiness #15.
+- Acceptance:
+  - Users can discover player actions without prior knowledge.
+  - Action sheet scroll/rotary behavior is validated on emulator and real watch if possible.
+  - Any added affordance stays watch-glanceable and does not clutter Now Playing.
+  - Relevant compile/lint gate passes.
 
 ### UNTIDY-030 — Enable minimal Settings Downloads controls
 
