@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/readme/hero-strip.png" alt="Untidy Wear OS screenshots: Home, Search, Now Playing, and Results" width="900">
+  <img src="docs/assets/readme/hero-strip.png" alt="Untidy Wear OS screenshots: Home, Search results, Now Playing, and Recent" width="900">
 </p>
 
 ## Current snapshot
