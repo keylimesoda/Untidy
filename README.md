@@ -72,9 +72,9 @@ Untidy is useful now, but it is still under active validation:
 
 ## Install the prerelease APK
 
-The lowest-friction path is to install the current known-good APK directly on a Wear OS watch. You do **not** install this on your phone.
+The lowest-friction path is to install the current known-good APK directly on a Wear OS watch. You do **not** install this on your phone. A GitHub APK download will not automatically sync from the phone to the watch; that only becomes a normal user flow once Untidy is distributed through a proper Wear OS/Google Play channel or a companion-app packaging path.
 
-1. Download the latest known-good APK:
+1. Download the latest known-good APK to your computer:
    - [`app-release.apk`](https://github.com/keylimesoda/Untidy/releases/download/v0.1.0-known-good-watch-2026-06-18/app-release.apk)
    - Release page: [`v0.1.0-known-good-watch-2026-06-18`](https://github.com/keylimesoda/Untidy/releases/tag/v0.1.0-known-good-watch-2026-06-18)
 2. Install Android platform tools on your computer so the `adb` command is available.
@@ -97,6 +97,10 @@ adb install -r app-release.apk
 ```
 
 If `adb devices` shows the watch as `unauthorized`, accept the debugging prompt on the watch. If pairing expires, turn Wireless debugging off/on and try again with the new ports.
+
+### Why not install it on the phone?
+
+This prerelease is a Wear OS app APK published from GitHub, not a Play Store listing. Installing or downloading it on a phone does not push it to the watch. For now, install it directly to the watch with ADB. A future Play Store/internal-testing release would make watch installation much easier from the normal Google Play device picker.
 
 Untidy targets **Wear OS 4+ / API 33+** and declares itself as a standalone Wear app.
 
