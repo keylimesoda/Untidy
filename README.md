@@ -11,6 +11,10 @@
   <img alt="Status" src="https://img.shields.io/badge/status-known--good%20prerelease-F59F00?style=flat-square">
 </p>
 
+<p align="center">
+  <img src="docs/assets/readme/hero-strip.png" alt="Untidy Wear OS screenshots: Home, Search, Now Playing, and Results" width="900">
+</p>
+
 ## Current snapshot
 
 The current baseline is a **known-good physical-watch prerelease snapshot**:
@@ -66,20 +70,33 @@ Untidy is useful now, but it is still under active validation:
 - **Quality selection is present, but still being refined.** Settings exposes Battery Saver / Balanced / High. The current playback path requests conservative AAC-oriented stream qualities for watch reliability; true lossless/full-fidelity behavior should be validated separately before being promised as a release feature.
 - **Unofficial client.** Untidy is independent from TIDAL, Google, and Samsung; users are responsible for complying with applicable terms.
 
-## Install / download
+## Install the prerelease APK
 
-For the current known-good build, use the GitHub release/tag:
+The lowest-friction path is to install the current known-good APK directly on a Wear OS watch. You do **not** install this on your phone.
 
-- [`v0.1.0-known-good-watch-2026-06-18`](https://github.com/keylimesoda/Untidy/releases/tag/v0.1.0-known-good-watch-2026-06-18)
-
-If a release APK asset is attached, sideload that APK to a Wear OS 4+ watch. If not, build the APK locally from the tagged source.
-
-General sideload flow:
+1. Download the latest known-good APK:
+   - [`app-release.apk`](https://github.com/keylimesoda/Untidy/releases/download/v0.1.0-known-good-watch-2026-06-18/app-release.apk)
+   - Release page: [`v0.1.0-known-good-watch-2026-06-18`](https://github.com/keylimesoda/Untidy/releases/tag/v0.1.0-known-good-watch-2026-06-18)
+2. Install Android platform tools on your computer so the `adb` command is available.
+   - Android Studio includes it, or install the standalone SDK Platform Tools from Google.
+3. On the watch, enable **Developer options**.
+   - Usually: Settings → About watch → Software info → tap Build number several times.
+4. On the watch, enable **Wireless debugging**.
+   - Keep the watch on Wi-Fi and on the same network as your computer.
+5. Pair and connect from your computer:
 
 ```bash
-adb devices
-adb install -r app/build/outputs/apk/release/app-release.apk
+adb pair WATCH_IP:PAIRING_PORT
+adb connect WATCH_IP:ADB_PORT
 ```
+
+6. Install the APK:
+
+```bash
+adb install -r app-release.apk
+```
+
+If `adb devices` shows the watch as `unauthorized`, accept the debugging prompt on the watch. If pairing expires, turn Wireless debugging off/on and try again with the new ports.
 
 Untidy targets **Wear OS 4+ / API 33+** and declares itself as a standalone Wear app.
 
