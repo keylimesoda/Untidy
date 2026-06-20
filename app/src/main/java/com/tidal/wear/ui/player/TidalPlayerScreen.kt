@@ -809,9 +809,9 @@ private fun debugDownloadActivityName(context: Context): String = listOf(
 ).joinToString(separator = ".")
 
 private fun Context.initialDownloadState(track: TidalTrack?): DownloadState = when {
-    !BuildConfig.DEBUG -> DownloadState.Unavailable
-    track?.isDownloadProofEligible() != true -> DownloadState.Unavailable
+    track == null || track.isDownloadProofEligible() != true -> DownloadState.Unavailable
     isOfflineTrackDownloaded(track.id) -> DownloadState.Downloaded
+    !BuildConfig.DEBUG -> DownloadState.Unavailable
     else -> DownloadState.NotDownloaded
 }
 

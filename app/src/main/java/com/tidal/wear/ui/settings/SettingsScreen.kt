@@ -180,9 +180,9 @@ fun SettingsScreen(
                         colors = tidalSecondaryChipColors(),
                     )
                 }
-                item { DisabledSettingChip("Download quality", "Battery Saver · track MVP") }
-                item { DisabledSettingChip("Download over LTE", "Wi-Fi recommended · deferred") }
-                item { DisabledSettingChip("Storage limit", "Manual cleanup for MVP") }
+                item { DisabledSettingChip("Download quality", "Fixed for this release") }
+                item { DisabledSettingChip("Download over LTE", "Wi‑Fi only for now") }
+                item { DisabledSettingChip("Storage limit", "Manual cleanup for now") }
                 if (downloadedTracks.isNotEmpty()) {
                     item {
                         Chip(

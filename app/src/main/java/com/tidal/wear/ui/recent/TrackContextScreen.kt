@@ -166,19 +166,17 @@ private fun TrackContextContent(
                     )
                 }
             }
-            item { ContextActionChip("Play", "Start this track", Icons.Filled.PlayArrow, TidalColors.Cyan, onPlayTrack) }
-            item { ContextActionChip("View album", if (track.albumId.isBlank()) "Album unavailable" else track.album.ifBlank { "Open album" }, Icons.Filled.Album, TidalColors.White, onOpenAlbum) }
-            item { ContextActionChip("View artist", if (track.artistId.isBlank()) "Artist unavailable" else track.artist.ifBlank { "Open artist" }, Icons.Filled.Person, TidalColors.White, onOpenArtist) }
-            item { ContextActionChip("Add to playlist", "Choose a playlist", Icons.AutoMirrored.Filled.PlaylistAdd, TidalColors.White, onAddToPlaylist) }
+            item { ContextActionChip("Play", "Start this track", Icons.Filled.PlayArrow, TidalColors.Cyan, onClick = onPlayTrack) }
+            item { ContextActionChip("View album", if (track.albumId.isBlank()) "Album unavailable" else track.album.ifBlank { "Open album" }, Icons.Filled.Album, TidalColors.White, onClick = onOpenAlbum) }
+            item { ContextActionChip("View artist", if (track.artistId.isBlank()) "Artist unavailable" else track.artist.ifBlank { "Open artist" }, Icons.Filled.Person, TidalColors.White, onClick = onOpenArtist) }
+            item { ContextActionChip("Add to playlist", "Choose a playlist", Icons.AutoMirrored.Filled.PlaylistAdd, TidalColors.White, onClick = onAddToPlaylist) }
             item {
                 ContextActionChip(
-                    label = when {
-                        downloaded -> "Downloaded"
-                        else -> "Download"
-                    },
-                    secondary = if (downloaded) "On watch" else "Offline unavailable in release",
+                    label = if (downloaded) "Downloaded" else "Download unavailable",
+                    secondary = if (downloaded) "On watch" else "Not in this release",
                     icon = Icons.Filled.Download,
-                    iconTint = if (downloaded) TidalColors.Cyan else TidalColors.White,
+                    iconTint = if (downloaded) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
+                    enabled = downloaded,
                     onClick = onDownload,
                 )
             }
@@ -192,6 +190,7 @@ private fun ContextActionChip(
     secondary: String,
     icon: ImageVector,
     iconTint: Color,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
@@ -200,15 +199,15 @@ private fun ContextActionChip(
             .heightIn(min = 46.dp)
             .padding(horizontal = 12.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(TidalColors.SurfaceHigh)
-            .clickable(onClick = onClick)
+            .background(if (enabled) TidalColors.SurfaceHigh else TidalColors.Surface)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, color = TidalColors.White, fontWeight = FontWeight.Black, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, color = if (enabled) TidalColors.White else TidalColors.OnSurfaceMuted, fontWeight = FontWeight.Black, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(secondary, color = TidalColors.OnSurfaceMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }

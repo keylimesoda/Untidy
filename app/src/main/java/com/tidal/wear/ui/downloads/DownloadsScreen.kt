@@ -162,8 +162,8 @@ private fun EmptyDownloadsChip() {
     Chip(
         onClick = {},
         enabled = false,
-        label = { Text("No downloads yet") },
-        secondaryLabel = { Text("Download from Now Playing") },
+        label = { Text("No downloads on this watch") },
+        secondaryLabel = { Text("Downloads are unavailable in this release") },
         colors = ChipDefaults.secondaryChipColors(
             backgroundColor = TidalColors.Surface,
             contentColor = TidalColors.White,

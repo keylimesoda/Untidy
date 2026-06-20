@@ -258,7 +258,7 @@ private fun ActionStatusLine(text: String) {
 }
 
 private fun downloadLabel(state: DownloadState): String = when (state) {
-    DownloadState.Unavailable -> "Offline unavailable"
+    DownloadState.Unavailable -> "Download unavailable"
     DownloadState.NotDownloaded -> "Download"
     is DownloadState.Downloading -> "Downloading ${(state.progress * 100).toInt()}%"
     DownloadState.Downloaded -> "Downloaded"

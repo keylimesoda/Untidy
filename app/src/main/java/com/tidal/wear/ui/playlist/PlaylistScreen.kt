@@ -300,7 +300,7 @@ private fun CollectionDownloadChip(
 private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.actionLabel(defaultLabel: String): String = when {
     playableCount <= 0 -> "Offline unavailable"
     hasFailures() -> "$failedCount failed"
-    downloadedCount <= 0 -> defaultLabel
+    downloadedCount <= 0 -> "Download unavailable"
     isFullyDownloaded() -> "Downloaded $downloadedCount/$playableCount"
     else -> "Partial $downloadedCount/$playableCount"
 }
@@ -309,17 +309,17 @@ private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.detai
     playableCount <= 0 -> "$kind has no playable tracks"
     hasFailures() && downloadedCount > 0 -> "Partial $downloadedCount/$playableCount · tap to retry later"
     hasFailures() -> "Tap to retry later"
-    downloadedCount <= 0 -> "Tracks save one at a time for now"
-    isFullyDownloaded() -> "All playable tracks on watch"
-    else -> "Local-valid subset plays offline"
+    downloadedCount <= 0 -> "Not in this release"
+    isFullyDownloaded() -> "All local copies on watch"
+    else -> "Local copies on watch"
 }
 
 private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.toastLabel(defaultPrefix: String): String = when {
     playableCount <= 0 -> "Offline unavailable"
     hasFailures() -> "Failed tracks can retry in downloads"
-    downloadedCount <= 0 -> "$defaultPrefix is coming after track MVP"
-    isFullyDownloaded() -> "Downloaded tracks play offline"
-    else -> "Partial download plays offline subset"
+    downloadedCount <= 0 -> "Downloads unavailable in this release"
+    isFullyDownloaded() -> "Downloaded tracks are on watch"
+    else -> "Partial local copies on watch"
 }
 
 @Composable
