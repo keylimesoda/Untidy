@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.offline.OfflineUnit
 import com.tidal.wear.core.playback.offline.collectionDownloadSummary
+import com.tidal.wear.core.playback.offline.OfflineTrackDownloader
 import com.tidal.wear.core.playback.offline.offlineUnitPresentation
 import com.tidal.wear.ui.art.rememberArtworkPalette
 import com.tidal.wear.ui.components.PlaylistArtwork
@@ -51,11 +53,13 @@ import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 fun PlaylistScreen(
     apiClient: TidalApiClient,
+    offlineDownloader: OfflineTrackDownloader,
     playlistId: String,
     initialPlaylist: TidalPlaylist?,
     onPlayPlaylist: (TidalPlaylist, List<TidalTrack>) -> Unit,
@@ -66,6 +70,9 @@ fun PlaylistScreen(
     var loading by remember(playlistId) { mutableStateOf(true) }
     var error by remember(playlistId) { mutableStateOf<String?>(null) }
     var retryTick by remember(playlistId) { mutableIntStateOf(0) }
+    var offlineRefreshTick by remember(playlistId) { mutableIntStateOf(0) }
+    var downloadingOffline by remember(playlistId) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(playlistId, retryTick) {
         loading = true
@@ -109,9 +116,9 @@ fun PlaylistScreen(
         tracks.mapNotNull { it.artworkUrl?.takeIf(String::isNotBlank) }
     }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val collectionDownloadSummary = remember(tracks) { context.collectionDownloadSummary(tracks) }
+    val collectionDownloadSummary = remember(tracks, offlineRefreshTick) { context.collectionDownloadSummary(tracks) }
     val offlinePresentation = remember(collectionDownloadSummary) {
-        collectionDownloadSummary.offlineUnitPresentation(OfflineUnit.Playlist)
+        collectionDownloadSummary.offlineUnitPresentation(OfflineUnit.Playlist, downloadsAvailable = true)
     }
     val art = rememberArtworkPalette(playlistArtworkUrl ?: trackArtworkUrls.firstOrNull(), Size(160, 160))
     val accent = art.palette.accentColor()
@@ -159,11 +166,22 @@ fun PlaylistScreen(
                         secondary = offlinePresentation.detail,
                         accent = accent,
                         onClick = {
-                            Toast.makeText(
-                                context,
-                                offlinePresentation.message,
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            if (downloadingOffline) return@CollectionDownloadChip
+                            downloadingOffline = true
+                            scope.launch {
+                                val result = offlineDownloader.downloadTracks(tracks)
+                                offlineRefreshTick++
+                                downloadingOffline = false
+                                Toast.makeText(
+                                    context,
+                                    when {
+                                        result.downloaded > 0 && result.failed == 0 -> "Playlist saved on watch"
+                                        result.downloaded > 0 -> "Playlist partially saved"
+                                        else -> "Playlist download failed"
+                                    },
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
                         },
                     )
                 }

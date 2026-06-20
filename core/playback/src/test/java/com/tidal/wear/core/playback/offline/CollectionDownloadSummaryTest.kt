@@ -38,6 +38,18 @@ class CollectionDownloadSummaryTest {
         assertEquals(true, summary.hasFailures())
     }
 
+    @Test
+    fun `offline records drop blank ids and de-dupe playable tracks`() {
+        val records = listOf(
+            track("1"),
+            track("1"),
+            track(""),
+            track("2"),
+        ).toOfflineDownloadRecords()
+
+        assertEquals(listOf("1", "2"), records.map { it.id })
+    }
+
     private fun track(id: String): TidalTrack = TidalTrack(
         id = id,
         title = "Track $id",

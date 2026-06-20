@@ -76,6 +76,7 @@ import com.tidal.wear.core.playback.PlaybackActions
 import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
 import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
+import com.tidal.wear.core.playback.offline.OfflineTrackDownloader
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.playback.NowPlayingStateHolder
 import com.tidal.wear.recent.RecentItemType
@@ -179,6 +180,7 @@ private fun TidalWearApp(
             val recentRepository = remember(context) { RecentRepository(context.applicationContext) }
             val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
             val appContext = remember(context) { context.applicationContext }
+            val offlineDownloader = remember(authRepository, appContext) { OfflineTrackDownloader(appContext, authRepository) }
             val nowPlayingScope = rememberCoroutineScope()
             val nowPlayingHolder = remember(appContext) {
                 NowPlayingStateHolder(appContext, nowPlayingScope, pollPosition = false)
@@ -318,6 +320,7 @@ private fun TidalWearApp(
                     val trackId = entry.arguments?.getString("trackId")?.let(Uri::decode).orEmpty()
                     TrackContextScreen(
                         apiClient = apiClient,
+                        offlineDownloader = offlineDownloader,
                         initialRecent = recentItems.firstOrNull { it.type == RecentItemType.Track && it.id == trackId },
                         trackId = trackId,
                         onPlayTrack = ::playTrack,
@@ -355,6 +358,7 @@ private fun TidalWearApp(
                     val albumId = entry.arguments?.getString("albumId")?.let(Uri::decode).orEmpty()
                     AlbumScreen(
                         apiClient = apiClient,
+                        offlineDownloader = offlineDownloader,
                         albumId = albumId,
                         initialAlbum = null,
                         onPlayAlbum = ::playAlbum,
@@ -365,6 +369,7 @@ private fun TidalWearApp(
                     val playlistId = entry.arguments?.getString("playlistId")?.let(Uri::decode).orEmpty()
                     PlaylistScreen(
                         apiClient = apiClient,
+                        offlineDownloader = offlineDownloader,
                         playlistId = playlistId,
                         initialPlaylist = null,
                         onPlayPlaylist = ::playPlaylist,

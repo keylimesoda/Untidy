@@ -1,7 +1,5 @@
 package com.tidal.wear.ui.recent
 
-import android.content.Context
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,8 +23,10 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,9 +44,10 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.Text
 import coil.size.Size
-import com.tidal.wear.BuildConfig
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.playback.offline.OfflineDownloadResult
+import com.tidal.wear.core.playback.offline.OfflineTrackDownloader
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.recent.RecentItem
 import com.tidal.wear.recent.toTrack
@@ -58,11 +59,13 @@ import com.tidal.wear.ui.player.AddToPlaylistSheet
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 fun TrackContextScreen(
     apiClient: TidalApiClient,
+    offlineDownloader: OfflineTrackDownloader,
     initialRecent: RecentItem?,
     trackId: String,
     onPlayTrack: (TidalTrack) -> Unit,
@@ -72,6 +75,9 @@ fun TrackContextScreen(
     var track by remember(trackId, initialRecent) { mutableStateOf(initialRecent?.toTrack() ?: placeholderTrack(trackId)) }
     var loading by remember(trackId) { mutableStateOf(true) }
     var showAddToPlaylist by remember(trackId) { mutableStateOf(false) }
+    var downloadedRefreshTick by remember(trackId) { mutableIntStateOf(0) }
+    var downloading by remember(trackId) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     LaunchedEffect(trackId) {
@@ -94,7 +100,8 @@ fun TrackContextScreen(
     TrackContextContent(
         track = track,
         loading = loading,
-        downloaded = context.isOfflineTrackDownloaded(track.id),
+        downloaded = remember(track.id, downloadedRefreshTick) { context.isOfflineTrackDownloaded(track.id) },
+        downloading = downloading,
         onPlayTrack = { onPlayTrack(track) },
         onOpenAlbum = {
             track.albumId.takeIf { it.isNotBlank() }?.let(onOpenAlbum)
@@ -105,7 +112,21 @@ fun TrackContextScreen(
                 ?: Toast.makeText(context, "Artist unavailable", Toast.LENGTH_SHORT).show()
         },
         onAddToPlaylist = { showAddToPlaylist = true },
-        onDownload = { context.startDebugDownload(track) },
+        onDownload = {
+            if (downloading) return@TrackContextContent
+            downloading = true
+            scope.launch {
+                when (offlineDownloader.downloadTrack(track)) {
+                    OfflineDownloadResult.Downloaded -> {
+                        downloadedRefreshTick++
+                        Toast.makeText(context, "Track saved on watch", Toast.LENGTH_SHORT).show()
+                    }
+                    is OfflineDownloadResult.Failed -> Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
+                    OfflineDownloadResult.Skipped -> Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
+                }
+                downloading = false
+            }
+        },
     )
 }
 
@@ -114,6 +135,7 @@ private fun TrackContextContent(
     track: TidalTrack,
     loading: Boolean,
     downloaded: Boolean,
+    downloading: Boolean,
     onPlayTrack: () -> Unit,
     onOpenAlbum: () -> Unit,
     onOpenArtist: () -> Unit,
@@ -172,11 +194,15 @@ private fun TrackContextContent(
             item { ContextActionChip("Add to playlist", "Choose a playlist", Icons.AutoMirrored.Filled.PlaylistAdd, TidalColors.White, onClick = onAddToPlaylist) }
             item {
                 ContextActionChip(
-                    label = if (downloaded) "Downloaded" else "Download unavailable",
-                    secondary = if (downloaded) "On watch" else "Not in this release",
+                    label = when {
+                        downloading -> "Downloading…"
+                        downloaded -> "Downloaded"
+                        else -> "Download"
+                    },
+                    secondary = if (downloaded) "On watch" else "Save on watch",
                     icon = Icons.Filled.Download,
-                    iconTint = if (downloaded) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
-                    enabled = downloaded,
+                    iconTint = if (downloaded || downloading) TidalColors.Cyan else TidalColors.White,
+                    enabled = !downloaded && !downloading,
                     onClick = onDownload,
                 )
             }
@@ -228,18 +254,3 @@ private fun TidalTrack.mergeLoaded(loaded: TidalTrack): TidalTrack = loaded.copy
     albumId = loaded.albumId.ifBlank { albumId },
     artistId = loaded.artistId.ifBlank { artistId },
 )
-
-private fun Context.startDebugDownload(track: TidalTrack) {
-    when {
-        !BuildConfig.DEBUG -> Toast.makeText(this, "Offline downloads are not available in this build", Toast.LENGTH_LONG).show()
-        track.id.isBlank() -> Toast.makeText(this, "Track unavailable", Toast.LENGTH_SHORT).show()
-        else -> runCatching {
-            val intent = Intent().setClassName(packageName, "$packageName.debug.OfflineProofActivity")
-                .putExtra("trackId", track.id)
-                .putExtra("countryCode", "US")
-            startActivity(intent)
-        }.onFailure {
-            Toast.makeText(this, "Offline download unavailable", Toast.LENGTH_SHORT).show()
-        }
-    }
-}

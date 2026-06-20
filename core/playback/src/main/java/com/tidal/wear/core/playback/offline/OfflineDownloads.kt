@@ -65,14 +65,50 @@ fun Context.readOfflineDownloadedTracks(): List<DownloadedTrackSummary> {
 }
 
 fun Context.markOfflineTrackDownloaded(track: TidalTrack) {
+    val record = track.toOfflineDownloadRecord() ?: return
     getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
         .edit()
-        .putBoolean("$DOWNLOADED_PREFIX${track.id}", true)
-        .remove("$FAILED_PREFIX${track.id}")
-        .putString("title:${track.id}", track.title)
-        .putString("artist:${track.id}", track.artist)
-        .putLong("downloadedAt:${track.id}", System.currentTimeMillis())
+        .putBoolean("$DOWNLOADED_PREFIX${record.id}", true)
+        .remove("$FAILED_PREFIX${record.id}")
+        .putString("title:${record.id}", record.title)
+        .putString("artist:${record.id}", record.artist)
+        .putLong("downloadedAt:${record.id}", System.currentTimeMillis())
         .apply()
+}
+
+fun Context.markOfflineTracksDownloaded(tracks: List<TidalTrack>): Int {
+    val records = tracks.toOfflineDownloadRecords()
+    if (records.isEmpty()) return 0
+    val now = System.currentTimeMillis()
+    val editor = getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE).edit()
+    records.forEach { record ->
+        editor
+            .putBoolean("$DOWNLOADED_PREFIX${record.id}", true)
+            .remove("$FAILED_PREFIX${record.id}")
+            .putString("title:${record.id}", record.title)
+            .putString("artist:${record.id}", record.artist)
+            .putLong("downloadedAt:${record.id}", now)
+    }
+    editor.apply()
+    return records.size
+}
+
+internal data class OfflineDownloadRecord(
+    val id: String,
+    val title: String,
+    val artist: String,
+)
+
+internal fun List<TidalTrack>.toOfflineDownloadRecords(): List<OfflineDownloadRecord> =
+    mapNotNull { it.toOfflineDownloadRecord() }.distinctBy { it.id }
+
+private fun TidalTrack.toOfflineDownloadRecord(): OfflineDownloadRecord? {
+    val playableId = id.takeIf(String::isNotBlank) ?: return null
+    return OfflineDownloadRecord(
+        id = playableId,
+        title = title.ifBlank { "Downloaded track" },
+        artist = artist,
+    )
 }
 
 fun Context.markOfflineTrackDownloadFailed(trackId: String) {

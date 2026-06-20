@@ -82,7 +82,8 @@ import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
-import com.tidal.wear.core.playback.offline.markOfflineTrackDownloaded
+import com.tidal.wear.core.playback.offline.OfflineDownloadResult
+import com.tidal.wear.core.playback.offline.OfflineTrackDownloader
 import com.tidal.wear.core.playback.offline.removeOfflineTrackDownload
 import com.tidal.wear.playback.NowPlayingUiState
 import com.tidal.wear.playback.NowPlayingViewModel
@@ -96,8 +97,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.File
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -124,42 +123,31 @@ fun TidalPlayerScreen(
     var downloadState by remember(currentTrack?.id) {
         mutableStateOf(context.initialDownloadState(currentTrack))
     }
-    var downloadProofRun by remember(currentTrack?.id) { mutableIntStateOf(0) }
+    val offlineDownloader = remember(authRepository) { OfflineTrackDownloader(context.applicationContext, authRepository) }
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(downloadProofRun, currentTrack?.id) {
-        val track = currentTrack
-        if (downloadProofRun <= 0 || track?.isDownloadProofEligible() != true) return@LaunchedEffect
-        downloadState = DownloadState.Downloading(0.02f)
-        repeat(36) { attempt ->
-            delay(1_000)
-            val proof = withContext(Dispatchers.IO) { context.latestOfflineDownloadProofFor(track.id) }
-            if (proof == true) {
-                withContext(Dispatchers.IO) { context.markOfflineTrackDownloaded(track) }
-                downloadState = DownloadState.Downloaded
-                return@LaunchedEffect
-            }
-            downloadState = DownloadState.Downloading(((attempt + 1).toFloat() / 36f).coerceIn(0.02f, 0.95f))
-        }
-        downloadState = DownloadState.NotDownloaded
-        Toast.makeText(context, "Offline download did not finish", Toast.LENGTH_SHORT).show()
-    }
-
-    fun startDebugDownload() {
+    fun startTrackDownload() {
         val track = currentTrack
         when {
-            !BuildConfig.DEBUG -> Toast.makeText(context, "Offline downloads are not available in this build", Toast.LENGTH_LONG).show()
             track?.isDownloadProofEligible() != true -> Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
             downloadState is DownloadState.Downloading -> Unit
             else -> {
-                runCatching {
-                    context.startActivity(
-                        Intent().setClassName(context.packageName, debugDownloadActivityName(context))
-                            .putExtra("trackId", track.id)
-                            .putExtra("countryCode", "US"),
-                    )
-                    downloadProofRun += 1
-                }.onFailure {
-                    Toast.makeText(context, "Offline download unavailable", Toast.LENGTH_SHORT).show()
+                downloadState = DownloadState.Downloading(0.05f)
+                scope.launch {
+                    when (offlineDownloader.downloadTrack(track)) {
+                        OfflineDownloadResult.Downloaded -> {
+                            downloadState = DownloadState.Downloaded
+                            Toast.makeText(context, "Track saved on watch", Toast.LENGTH_SHORT).show()
+                        }
+                        is OfflineDownloadResult.Failed -> {
+                            downloadState = DownloadState.NotDownloaded
+                            Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
+                        }
+                        OfflineDownloadResult.Skipped -> {
+                            downloadState = DownloadState.Unavailable
+                            Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
             }
         }
@@ -194,7 +182,7 @@ fun TidalPlayerScreen(
             viewModel = viewModel,
             apiClient = apiClient,
             downloadState = downloadState,
-            onDownload = ::startDebugDownload,
+            onDownload = ::startTrackDownload,
             onRemoveDownload = ::removeCurrentDownload,
             onOpenHome = onOpenHome,
             onOpenAlbum = onOpenAlbum,
@@ -800,41 +788,15 @@ private fun TransportButton(
 }
 
 
-private fun debugDownloadActivityName(context: Context): String = listOf(
-    context.packageName,
-    "debug",
-    "Offline",
-    "Proof",
-    "Activity",
-).joinToString(separator = ".")
-
 private fun Context.initialDownloadState(track: TidalTrack?): DownloadState = when {
     track == null || track.isDownloadProofEligible() != true -> DownloadState.Unavailable
     isOfflineTrackDownloaded(track.id) -> DownloadState.Downloaded
-    !BuildConfig.DEBUG -> DownloadState.Unavailable
     else -> DownloadState.NotDownloaded
 }
 
 private fun TidalTrack.isDownloadProofEligible(): Boolean = id.isNotBlank() &&
     id != "tidal-current" &&
     !id.startsWith("fixture", ignoreCase = true)
-
-private fun Context.latestOfflineDownloadProofFor(trackId: String): Boolean? = runCatching {
-    val latest = File(filesDir, "offline-proof/latest.json")
-    if (!latest.isFile) return@runCatching null
-    val root = JSONObject(latest.readText())
-    if (root.optString("trackId") != trackId) return@runCatching null
-    val events = root.optJSONArray("events") ?: return@runCatching null
-    for (index in events.length() - 1 downTo 0) {
-        val event = events.optJSONObject(index) ?: continue
-        if (event.optString("name") != "downloadManifestNetworkDisabledReplay") continue
-        val fields = event.optJSONObject("fields") ?: continue
-        return@runCatching fields.optBoolean("playbackClaimed", false) &&
-            fields.optBoolean("reachedReady", false) &&
-            !fields.optBoolean("offlineUpstreamAttempted", true)
-    }
-    null
-}.getOrNull()
 
 @Composable
 private fun TidalPlayerAmbient(
