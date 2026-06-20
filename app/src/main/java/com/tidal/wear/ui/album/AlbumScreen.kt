@@ -42,9 +42,9 @@ import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalAlbum
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.playback.offline.OfflineUnit
 import com.tidal.wear.core.playback.offline.collectionDownloadSummary
-import com.tidal.wear.core.playback.offline.hasFailures
-import com.tidal.wear.core.playback.offline.isFullyDownloaded
+import com.tidal.wear.core.playback.offline.offlineUnitPresentation
 import com.tidal.wear.ui.art.rememberArtworkPalette
 import com.tidal.wear.ui.components.RetryStatusChip
 import com.tidal.wear.ui.components.WearListPadding
@@ -113,6 +113,9 @@ fun AlbumScreen(
     val artworkUrl = album?.artworkUrl ?: tracks.firstOrNull { !it.artworkUrl.isNullOrBlank() }?.artworkUrl
     val context = androidx.compose.ui.platform.LocalContext.current
     val collectionDownloadSummary = remember(tracks) { context.collectionDownloadSummary(tracks) }
+    val offlinePresentation = remember(collectionDownloadSummary) {
+        collectionDownloadSummary.offlineUnitPresentation(OfflineUnit.Album)
+    }
     val art = rememberArtworkPalette(artworkUrl, Size(160, 160))
     val accent = art.palette.accentColor()
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -153,13 +156,13 @@ fun AlbumScreen(
                 }
                 item {
                     CollectionDownloadChip(
-                        label = collectionDownloadSummary.actionLabel("Download album"),
-                        secondary = collectionDownloadSummary.detailLabel("Album"),
+                        label = offlinePresentation.label,
+                        secondary = offlinePresentation.detail,
                         accent = accent,
                         onClick = {
                             Toast.makeText(
                                 context,
-                                collectionDownloadSummary.toastLabel("Album download"),
+                                offlinePresentation.message,
                                 Toast.LENGTH_SHORT,
                             ).show()
                         },
@@ -280,31 +283,6 @@ private fun CollectionDownloadChip(
             )
         }
     }
-}
-
-private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.actionLabel(defaultLabel: String): String = when {
-    playableCount <= 0 -> "Offline unavailable"
-    hasFailures() -> "$failedCount failed"
-    downloadedCount <= 0 -> "Download unavailable"
-    isFullyDownloaded() -> "Downloaded $downloadedCount/$playableCount"
-    else -> "Partial $downloadedCount/$playableCount"
-}
-
-private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.detailLabel(kind: String): String = when {
-    playableCount <= 0 -> "$kind has no playable tracks"
-    hasFailures() && downloadedCount > 0 -> "Partial $downloadedCount/$playableCount · tap to retry later"
-    hasFailures() -> "Tap to retry later"
-    downloadedCount <= 0 -> "Not in this release"
-    isFullyDownloaded() -> "All local copies on watch"
-    else -> "Local copies on watch"
-}
-
-private fun com.tidal.wear.core.playback.offline.CollectionDownloadSummary.toastLabel(defaultPrefix: String): String = when {
-    playableCount <= 0 -> "Offline unavailable"
-    hasFailures() -> "Failed tracks can retry in downloads"
-    downloadedCount <= 0 -> "Downloads unavailable in this release"
-    isFullyDownloaded() -> "Downloaded tracks are on watch"
-    else -> "Partial local copies on watch"
 }
 
 @Composable
