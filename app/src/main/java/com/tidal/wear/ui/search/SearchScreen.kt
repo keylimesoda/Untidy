@@ -1,14 +1,13 @@
 package com.tidal.wear.ui.search
 
-import android.graphics.Color as AndroidColor
-import android.text.Editable
-import android.text.InputType
-import android.text.TextWatcher
-import android.view.KeyEvent
+import android.app.Activity.RESULT_OK
+import android.app.RemoteInput
+import android.content.Intent
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
-import android.widget.EditText
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -33,15 +32,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -50,13 +46,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.input.RemoteInputIntentHelper
+import androidx.wear.input.wearableExtender
 import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.TidalAlbum
@@ -72,11 +69,10 @@ import com.tidal.wear.ui.offline.rememberNetworkAvailable
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val KeyboardInputHostAlpha = 0.02f
+private const val SearchInputKey = "tidal_search_input"
 
 @Composable
 fun SearchScreen(
@@ -90,52 +86,28 @@ fun SearchScreen(
 ) {
     val scope = rememberCoroutineScope()
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    var inputView by remember { mutableStateOf<EditText?>(null) }
     var query by remember { mutableStateOf("") }
     var submittedQuery by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<TidalSearchResult?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var requestKeyboardTick by remember { mutableIntStateOf(1) }
-    var keyboardOpening by remember { mutableStateOf(true) }
+    var inputPending by remember { mutableStateOf(true) }
     val networkAvailable = rememberNetworkAvailable()
 
-    LaunchedEffect(requestKeyboardTick, inputView) {
-        if (requestKeyboardTick > 0) {
-            inputView?.let { editText ->
-                editText.requestFocus()
-                editText.showKeyboard()
-                delay(650)
-                keyboardOpening = false
-            }
-        }
-    }
-
-    LaunchedEffect(submittedQuery, loading, networkAvailable) {
-        if (submittedQuery.isNotBlank() && !loading) listState.scrollToItem(0)
-    }
-
-    fun searchNow() {
-        val q = query.trim()
+    fun searchFor(rawQuery: String) {
+        val q = rawQuery.trim()
         if (q.isBlank() || loading) return
+        query = q
         if (!networkAvailable) {
             submittedQuery = q
             result = null
             error = "Connect to search TIDAL"
-            inputView?.let { editText ->
-                editText.clearFocus()
-                editText.hideKeyboard()
-            }
             return
         }
         submittedQuery = q
         result = null
         error = null
         loading = true
-        inputView?.let { editText ->
-            editText.clearFocus()
-            editText.hideKeyboard()
-        }
         scope.launch {
             try {
                 result = withContext(Dispatchers.IO) { apiClient.search(q) }
@@ -150,21 +122,57 @@ fun SearchScreen(
         }
     }
 
+    val searchInputLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { activityResult: ActivityResult ->
+        inputPending = false
+        if (activityResult.resultCode != RESULT_OK) return@rememberLauncherForActivityResult
+        val input = activityResult.data
+            ?.let { data -> RemoteInput.getResultsFromIntent(data) }
+            ?.getCharSequence(SearchInputKey)
+            ?.toString()
+            .orEmpty()
+        searchFor(input)
+    }
+
+    fun launchSearchInput() {
+        inputPending = true
+        val remoteInputs = listOf(
+            RemoteInput.Builder(SearchInputKey)
+                .setLabel("Search TIDAL")
+                .setAllowFreeFormInput(true)
+                .wearableExtender {
+                    setEmojisAllowed(false)
+                    setInputActionType(EditorInfo.IME_ACTION_SEARCH)
+                }
+                .build(),
+        )
+        val intent: Intent = RemoteInputIntentHelper.createActionRemoteInputIntent()
+        RemoteInputIntentHelper.putRemoteInputsExtra(intent, remoteInputs)
+        searchInputLauncher.launch(intent)
+    }
+
+    LaunchedEffect(Unit) {
+        launchSearchInput()
+    }
+
+    LaunchedEffect(submittedQuery, loading, networkAvailable) {
+        if (submittedQuery.isNotBlank() && !loading) listState.scrollToItem(0)
+    }
+
     fun resetSearch() {
         query = ""
         submittedQuery = ""
         result = null
         error = null
-        keyboardOpening = true
-        requestKeyboardTick += 1
+        launchSearchInput()
     }
 
     fun editSearch() {
         query = submittedQuery
         submittedQuery = ""
         error = null
-        keyboardOpening = true
-        requestKeyboardTick += 1
+        launchSearchInput()
     }
 
     BackHandler(enabled = submittedQuery.isBlank()) { onCancel() }
@@ -172,26 +180,16 @@ fun SearchScreen(
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         if (submittedQuery.isBlank()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (keyboardOpening && query.isBlank()) {
-                    OpeningKeyboardHint(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp))
+                if (inputPending) {
+                    MinimalSearchInputHint(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp))
                 } else {
                     SearchEntryPrompt(
                         query = query,
-                        onKeyboardRequested = {
-                            keyboardOpening = true
-                            requestKeyboardTick += 1
-                        },
-                        onSearch = ::searchNow,
+                        onKeyboardRequested = ::launchSearchInput,
+                        onSearch = { searchFor(query) },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
                     )
                 }
-                SearchInput(
-                    query = query,
-                    onQueryChange = { query = it },
-                    onSearch = ::searchNow,
-                    onInputReady = { inputView = it },
-                    modifier = Modifier.size(1.dp).alpha(KeyboardInputHostAlpha),
-                )
             }
         } else {
             ScalingLazyColumn(
@@ -290,19 +288,19 @@ private fun <T> androidx.wear.compose.foundation.lazy.ScalingLazyListScope.secti
 }
 
 @Composable
-private fun OpeningKeyboardHint(modifier: Modifier = Modifier) {
+private fun MinimalSearchInputHint(modifier: Modifier = Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
         Box(
             Modifier
-                .size(7.dp)
-                .background(TidalColors.Cyan.copy(alpha = 0.8f), CircleShape),
+                .size(5.dp)
+                .background(TidalColors.Cyan.copy(alpha = 0.65f), CircleShape),
         )
         Text(
-            text = "Opening keyboard…",
-            color = TidalColors.OnSurfaceMuted,
-            fontSize = 12.sp,
+            text = "Search",
+            color = TidalColors.OnSurfaceDim,
+            fontSize = 10.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
         )
     }
 }
@@ -486,75 +484,6 @@ private fun SearchingIndicator() {
             modifier = Modifier.padding(top = 6.dp),
         )
     }
-}
-
-@Composable
-private fun SearchInput(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
-    modifier: Modifier = Modifier,
-    onInputReady: (EditText) -> Unit,
-) {
-    val currentOnQueryChange by rememberUpdatedState(onQueryChange)
-    val currentOnSearch by rememberUpdatedState(onSearch)
-
-    AndroidView(
-        modifier = modifier,
-        factory = { context ->
-            EditText(context).apply {
-                isSingleLine = true
-                isFocusableInTouchMode = true
-                imeOptions = EditorInfo.IME_ACTION_SEARCH
-                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-                setBackgroundColor(AndroidColor.TRANSPARENT)
-                setTextColor(AndroidColor.TRANSPARENT)
-                setHintTextColor(AndroidColor.TRANSPARENT)
-                isCursorVisible = false
-                setPadding(0, 0, 0, 0)
-                setOnEditorActionListener { _, actionId, event ->
-                    val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH
-                    val isEnterKey = event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP
-                    if (isSearchAction || isEnterKey) {
-                        currentOnSearch()
-                        true
-                    } else {
-                        false
-                    }
-                }
-                addTextChangedListener(
-                    object : TextWatcher {
-                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-                        override fun afterTextChanged(s: Editable?) {
-                            currentOnQueryChange(s?.toString().orEmpty())
-                        }
-                    },
-                )
-                onInputReady(this)
-            }
-        },
-        update = { editText ->
-            onInputReady(editText)
-            if (editText.text.toString() != query) {
-                editText.setText(query)
-                editText.setSelection(query.length)
-            }
-        },
-    )
-}
-
-private fun EditText.showKeyboard() {
-    post {
-        requestFocus()
-        context.getSystemService(InputMethodManager::class.java)
-            ?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
-    }
-}
-
-private fun EditText.hideKeyboard() {
-    context.getSystemService(InputMethodManager::class.java)
-        ?.hideSoftInputFromWindow(windowToken, 0)
 }
 
 @Composable

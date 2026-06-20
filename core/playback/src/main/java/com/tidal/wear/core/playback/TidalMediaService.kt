@@ -198,29 +198,35 @@ class TidalMediaService : MediaLibraryService() {
             Log.w(PLAYER_LOG_TAG, "Not downloaded · connect to stream this track")
             return
         }
+        val requestStartedAt = SystemClock.elapsedRealtime()
         Log.d(PLAYER_LOG_TAG, "playTrack entry id=$id knownTrack.title=${knownTrack?.title.orEmpty()}")
         serviceScope.launch {
+            val qualityStartedAt = SystemClock.elapsedRealtime()
             configureQuality()
+            Log.d(PLAYER_LOG_TAG, "playTrack timing qualityMs=${SystemClock.elapsedRealtime() - qualityStartedAt} totalMs=${SystemClock.elapsedRealtime() - requestStartedAt}")
+            val resolveStartedAt = SystemClock.elapsedRealtime()
             val track = knownTrack ?: withContext(Dispatchers.IO) { runCatching { apiClient.track(id) }.getOrNull() }
                 ?: TidalTrack(id = id, title = "TIDAL", artist = "", album = "")
             Log.d(
                 PLAYER_LOG_TAG,
-                "resolved track id=${track.id} title=${track.title} artist=${track.artist} durationMs=${track.durationMs}",
+                "resolved track id=${track.id} title=${track.title} artist=${track.artist} durationMs=${track.durationMs} resolveMs=${SystemClock.elapsedRealtime() - resolveStartedAt} totalMs=${SystemClock.elapsedRealtime() - requestStartedAt}",
             )
             currentTrack = track
             currentTrackStartedAtMs = SystemClock.elapsedRealtime()
             prefetchNextInQueue()
             runCatching {
-                Log.d(PLAYER_LOG_TAG, "backend load start id=$id")
+                val loadStartedAt = SystemClock.elapsedRealtime()
+                Log.d(PLAYER_LOG_TAG, "backend load start id=$id queueSize=${currentQueue.size} queueIndex=$currentQueueIndex totalMs=${loadStartedAt - requestStartedAt}")
                 if (currentQueue.isNotEmpty()) {
                     playbackBackend?.loadQueue(currentQueue, currentQueueIndex)
                 } else {
                     playbackBackend?.loadTrack(track)
                 }
-                Log.d(PLAYER_LOG_TAG, "backend load completed id=$id")
-                Log.d(PLAYER_LOG_TAG, "backend play start")
+                Log.d(PLAYER_LOG_TAG, "backend load completed id=$id loadMs=${SystemClock.elapsedRealtime() - loadStartedAt} totalMs=${SystemClock.elapsedRealtime() - requestStartedAt}")
+                val playStartedAt = SystemClock.elapsedRealtime()
+                Log.d(PLAYER_LOG_TAG, "backend play start totalMs=${playStartedAt - requestStartedAt}")
                 playbackBackend?.play()
-                Log.d(PLAYER_LOG_TAG, "backend play completed")
+                Log.d(PLAYER_LOG_TAG, "backend play completed playMs=${SystemClock.elapsedRealtime() - playStartedAt} totalMs=${SystemClock.elapsedRealtime() - requestStartedAt}")
             }.onFailure {
                 Log.e(PLAYER_LOG_TAG, "backend load/play failed", it)
                 Log.e(PLAYER_LOG_TAG, "Playback failed: ${it.message ?: it::class.java.simpleName}")

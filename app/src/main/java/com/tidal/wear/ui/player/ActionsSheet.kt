@@ -2,6 +2,7 @@ package com.tidal.wear.ui.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,12 +35,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.view.HapticFeedbackConstants
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material.Icon
@@ -67,33 +71,74 @@ fun ActionsSheet(
     onViewAlbum: () -> String?,
     onViewArtist: () -> String?,
     modifier: Modifier = Modifier,
+    forceHandleArmed: Boolean = false,
+    onHandleDragStart: (() -> Unit)? = null,
+    onHandleDrag: ((Float) -> Unit)? = null,
+    onHandleDragEnd: ((Float) -> Unit)? = null,
 ) {
     var outputExpanded by remember { mutableStateOf(false) }
     var confirmRemoveDownload by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     val preferredOutput = outputOptions.firstOrNull { it.preferred } ?: outputOptions.firstOrNull()
     val listState = rememberTransformingLazyColumnState()
+    val view = LocalView.current
+    var handleArmed by remember { mutableStateOf(false) }
+    var handleDragPx by remember { mutableStateOf(0f) }
     fun runAction(action: () -> String?) {
         actionMessage = action()
     }
     Column(
-        modifier = modifier.fillMaxSize().background(TidalColors.Black),
+        modifier = modifier.fillMaxSize().background(Color(0xFF171717)),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
-                .padding(top = 8.dp)
-                .size(width = 24.dp, height = 3.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(Color(0x4DFFFFFF)),
-        )
+                .fillMaxWidth()
+                .padding(top = 5.dp)
+                .height(28.dp)
+                .pointerInput(onHandleDragStart, onHandleDrag, onHandleDragEnd) {
+                    if (onHandleDragStart == null || onHandleDrag == null || onHandleDragEnd == null) return@pointerInput
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            handleArmed = true
+                            handleDragPx = 0f
+                            onHandleDragStart()
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        },
+                        onDragCancel = {
+                            handleArmed = false
+                            handleDragPx = 0f
+                            onHandleDragEnd(0f)
+                        },
+                        onDragEnd = {
+                            handleArmed = false
+                            onHandleDragEnd(handleDragPx)
+                            handleDragPx = 0f
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            handleDragPx = (handleDragPx + dragAmount.y).coerceAtLeast(0f)
+                            onHandleDrag(handleDragPx)
+                        },
+                    )
+                },
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .size(width = (if (handleArmed || forceHandleArmed) 78 else 34).dp, height = 4.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(Color(0xFF8A8A8A).copy(alpha = if (handleArmed || forceHandleArmed) 1f else 0.72f)),
+            )
+        }
         TransformingLazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 8.dp)
+                .padding(top = 2.dp)
                 .rotaryScrollableWithFocus(listState),
-            contentPadding = PaddingValues(top = 24.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {

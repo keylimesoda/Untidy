@@ -14,10 +14,11 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +30,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.VerticalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,7 +38,6 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.runtime.Composable
@@ -56,14 +54,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.rotary.onPreRotaryScrollEvent
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import android.util.Log
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -100,6 +101,7 @@ import java.io.File
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import kotlin.math.abs
 
 @Composable
 fun TidalPlayerScreen(
@@ -114,7 +116,7 @@ fun TidalPlayerScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val albumArt = if (isAmbient) null else rememberAlbumArt(state.track)
-    val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.Cyan
+    val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.OnSurfaceMuted
     val context = LocalContext.current
     val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
     val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
@@ -201,7 +203,6 @@ fun TidalPlayerScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TidalPlayerNonAmbient(
     state: NowPlayingUiState,
@@ -227,13 +228,23 @@ private fun TidalPlayerNonAmbient(
     var likeLoading by remember(state.track?.id) { mutableStateOf(false) }
     var likeError by remember(state.track?.id) { mutableStateOf<String?>(null) }
     var showQueue by remember { mutableStateOf(false) }
+    var showActionsSheet by remember { mutableStateOf(false) }
+    var actionsSheetDragPx by remember { mutableStateOf(0f) }
+    var actionsGripArmed by remember { mutableStateOf(false) }
     var addToPlaylistTrack by remember { mutableStateOf<TidalTrack?>(null) }
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
+    val loadedTrack = state.track
+    val configuration = LocalConfiguration.current
+    val actionsSheetTravelPx = with(density) { (configuration.screenHeightDp.dp - 18.dp).toPx().coerceAtLeast(1f) }
 
-    LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage == 0) focusRequester.requestFocus()
+    LaunchedEffect(loadedTrack?.id, showActionsSheet) {
+        if (!showActionsSheet) runCatching { focusRequester.requestFocus() }
+    }
+    BackHandler(enabled = showActionsSheet) {
+        showActionsSheet = false
+        actionsSheetDragPx = 0f
+        actionsGripArmed = false
     }
     LaunchedEffect(volumeChangePulse) {
         if (volumeChangePulse > 0) {
@@ -255,6 +266,7 @@ private fun TidalPlayerNonAmbient(
             .onFailure { likeError = "Like unavailable" }
         likeLoading = false
     }
+
     addToPlaylistTrack?.let { trackSnapshot ->
         AddToPlaylistSheet(
             track = trackSnapshot,
@@ -271,221 +283,215 @@ private fun TidalPlayerNonAmbient(
             onJumpToIndex = { index ->
                 viewModel.jumpToQueueIndex(index)
                 showQueue = false
-                scope.launch { pagerState.animateScrollToPage(0) }
             },
             onBack = { showQueue = false },
         )
         return
     }
 
-    VerticalPager(
-        state = pagerState,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(TidalColors.Black),
-    ) { page ->
-        when (page) {
-            0 -> ScreenScaffold(timeText = {}) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(TidalColors.Black)
-                        .focusRequester(focusRequester)
-                        .focusable()
-                        .onRotaryScrollEvent { event ->
-                            val maxVolume = state.maxVolume.coerceAtLeast(1)
-                            val step = if (event.verticalScrollPixels > 0f) 1 else -1
-                            val nextVolume = (state.volume + step).coerceIn(0, maxVolume)
-                            if (nextVolume != state.volume) {
-                                viewModel.setVolumeFraction(nextVolume.toFloat() / maxVolume.toFloat())
-                                showVolume = true
-                                volumeChangePulse += 1
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                            }
-                            true
-                        },
-                ) {
-        CircularPerimeterProgress(
-            progress = progress,
-            modifier = Modifier.fillMaxSize().padding(3.dp * scale),
-            progressColor = accent,
-            strokeWidth = 2.dp * scale,
-        )
-
-        AlbumArtCard(
-            bitmap = albumArt?.bitmap,
-            accent = accent,
-            sizeDp = (68 * scale).roundToInt(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 12.dp * scale)
-                .clickable(onClick = viewModel::togglePlayPause),
-            cornerRadius = 6.dp,
-        )
-
-        LikeIconAt(
-            liked = liked,
-            enabled = state.track != null && !likeLoading,
-            description = when {
-                likeLoading -> "Loading like state"
-                liked -> "Unlike"
-                else -> "Like"
-            },
-            x = 10,
-            y = 36,
-            scale = scale,
-            onClick = {
-                val trackId = state.track?.id ?: return@LikeIconAt
-                if (likeLoading) return@LikeIconAt
-                if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
-                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                }
-                val target = !liked
-                liked = target
-                likeLoading = true
-                likeError = null
-                scope.launch {
-                    runCatching { apiClient.setFavoriteTrack(trackId, target) }
-                        .onSuccess { persisted -> liked = persisted }
-                        .onFailure {
-                            liked = !target
-                            likeError = "Like failed"
-                            Toast.makeText(context, "Couldn't update like", Toast.LENGTH_SHORT).show()
-                        }
-                    likeLoading = false
-                }
-            },
-        )
-        SecondaryIconAt(
-            icon = Icons.AutoMirrored.Filled.QueueMusic,
-            description = "Queue",
-            x = 134,
-            y = 36,
-            scale = scale,
-            onClick = { showQueue = true },
-        )
-
+    ScreenScaffold(timeText = {}) {
         Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 82.dp * scale)
-                .fillMaxWidth()
-                .height(60.dp * scale)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.55f),
-                            Color.Black.copy(alpha = 0f),
-                        ),
-                        radius = with(density) { (120.dp * scale).toPx() },
-                    ),
-                ),
-        )
-
-        if (state.track != null) {
-            Text(
-                text = state.track.title,
-                style = MaterialTheme.typography.title3,
-                color = TidalColors.White,
-                fontWeight = FontWeight.Black,
-                fontSize = (18 * scale).sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = 86.dp * scale)
-                    .width(140.dp * scale),
-            )
-            Text(
-                text = state.track.artist.ifBlank { state.track.album.ifBlank { "Untidy" } },
-                style = MaterialTheme.typography.caption1,
-                color = TidalColors.OnSurfaceMuted,
-                fontWeight = FontWeight.Normal,
-                fontSize = (14 * scale).sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = 108.dp * scale)
-                    .width(140.dp * scale),
-            )
-        } else {
-            Text(
-                text = if (state.isPlaying) "Starting…" else "Loading track…",
-                style = MaterialTheme.typography.caption1,
-                color = TidalColors.OnSurfaceMuted,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = (13 * scale).sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = 98.dp * scale)
-                    .width(140.dp * scale),
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 123.dp * scale),
-            horizontalArrangement = Arrangement.spacedBy(4.dp * scale),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TransportButton(Icons.Filled.SkipPrevious, "Previous", visualSize = 28, iconSize = 16, scale = scale, onClick = viewModel::seekToPrevious)
-            TransportButton(
-                if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                if (state.isPlaying) "Pause" else "Play",
-                visualSize = 36,
-                iconSize = 20,
-                scale = scale,
-                onClick = viewModel::togglePlayPause,
-                isPlayPause = true,
-                playPauseColor = accent,
-            )
-            TransportButton(Icons.Filled.SkipNext, "Next", visualSize = 28, iconSize = 16, scale = scale, onClick = viewModel::seekToNext)
-        }
-
-        (state.error ?: likeError)?.takeIf { it.isNotBlank() }?.let { error ->
-            Text(
-                text = error,
-                color = Color(0xFFFF8A80),
-                fontSize = (10 * scale).sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 20.dp * scale)
-                    .offset(y = (-20).dp * scale),
-            )
-        }
-
-        ActionsHint(
-            scale = scale,
-            accent = accent,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = (-8).dp * scale),
-            onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
-        )
-
-        VolumeOverlay(
-            visible = showVolume,
-            volume = state.volume,
-            maxVolume = state.maxVolume,
-            accent = accent,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
-        )
+                .fillMaxSize()
+                .background(TidalColors.Black)
+                .focusRequester(focusRequester)
+                .onFocusChanged { if (BuildConfig.DEBUG) Log.d("UntidyRotaryVolume", "nowPlayingFocus=${it.isFocused} track=${loadedTrack?.id.orEmpty()}") }
+                .onPreRotaryScrollEvent { event ->
+                    if (showActionsSheet) return@onPreRotaryScrollEvent false
+                    if (BuildConfig.DEBUG) Log.d("UntidyRotaryVolume", "rotary pixels=${event.verticalScrollPixels} volume=${state.volume}/${state.maxVolume}")
+                    val maxVolume = state.maxVolume.coerceAtLeast(1)
+                    val step = if (event.verticalScrollPixels > 0f) 1 else -1
+                    val nextVolume = (state.volume + step).coerceIn(0, maxVolume)
+                    if (nextVolume != state.volume) {
+                        viewModel.setVolumeFraction(nextVolume.toFloat() / maxVolume.toFloat())
+                        showVolume = true
+                        volumeChangePulse += 1
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    }
+                    true
                 }
+                .focusable(),
+        ) {
+            if (loadedTrack != null) {
+                CircularPerimeterProgress(
+                    progress = progress,
+                    modifier = Modifier.fillMaxSize().padding(3.dp * scale),
+                    progressColor = accent,
+                    strokeWidth = 2.dp * scale,
+                )
+
+                AlbumArtCard(
+                    bitmap = albumArt?.bitmap,
+                    accent = accent,
+                    sizeDp = (68 * scale).roundToInt(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = 12.dp * scale)
+                        .clickable(onClick = viewModel::togglePlayPause),
+                    cornerRadius = 6.dp,
+                )
+
+                LikeIconAt(
+                    liked = liked,
+                    enabled = !likeLoading,
+                    description = when {
+                        likeLoading -> "Loading like state"
+                        liked -> "Unlike"
+                        else -> "Like"
+                    },
+                    x = 10,
+                    y = 36,
+                    scale = scale,
+                    onClick = {
+                        val trackId = state.track?.id ?: return@LikeIconAt
+                        if (likeLoading) return@LikeIconAt
+                        if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        }
+                        val target = !liked
+                        liked = target
+                        likeLoading = true
+                        likeError = null
+                        scope.launch {
+                            runCatching { apiClient.setFavoriteTrack(trackId, target) }
+                                .onSuccess { persisted -> liked = persisted }
+                                .onFailure {
+                                    liked = !target
+                                    likeError = "Like failed"
+                                    Toast.makeText(context, "Couldn't update like", Toast.LENGTH_SHORT).show()
+                                }
+                            likeLoading = false
+                        }
+                    },
+                )
+                SecondaryIconAt(
+                    icon = Icons.AutoMirrored.Filled.QueueMusic,
+                    description = "Queue",
+                    x = 134,
+                    y = 36,
+                    scale = scale,
+                    onClick = { showQueue = true },
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = 82.dp * scale)
+                        .fillMaxWidth()
+                        .height(60.dp * scale)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.55f),
+                                    Color.Black.copy(alpha = 0f),
+                                ),
+                                radius = with(density) { (120.dp * scale).toPx() },
+                            ),
+                        ),
+                )
+
+                Text(
+                    text = loadedTrack.title,
+                    style = MaterialTheme.typography.title3,
+                    color = TidalColors.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = (18 * scale).sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = 86.dp * scale)
+                        .width(140.dp * scale),
+                )
+                Text(
+                    text = loadedTrack.artist.ifBlank { loadedTrack.album.ifBlank { "Untidy" } },
+                    style = MaterialTheme.typography.caption1,
+                    color = TidalColors.OnSurfaceMuted,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = (14 * scale).sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = 108.dp * scale)
+                        .width(140.dp * scale),
+                )
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = 123.dp * scale),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp * scale),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TransportButton(Icons.Filled.SkipPrevious, "Previous", visualSize = 28, iconSize = 16, scale = scale, onClick = viewModel::seekToPrevious)
+                    TransportButton(
+                        if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        if (state.isPlaying) "Pause" else "Play",
+                        visualSize = 36,
+                        iconSize = 20,
+                        scale = scale,
+                        onClick = viewModel::togglePlayPause,
+                        isPlayPause = true,
+                        playPauseColor = accent,
+                    )
+                    TransportButton(Icons.Filled.SkipNext, "Next", visualSize = 28, iconSize = 16, scale = scale, onClick = viewModel::seekToNext)
+                }
+
+                (state.error ?: likeError)?.takeIf { it.isNotBlank() }?.let { error ->
+                    Text(
+                        text = error,
+                        color = Color(0xFFFF8A80),
+                        fontSize = (10 * scale).sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(horizontal = 20.dp * scale)
+                            .offset(y = (-20).dp * scale),
+                    )
+                }
+
+
+                BottomGripPullOverHandle(
+                    scale = scale,
+                    armed = actionsGripArmed,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    onArmedChange = { actionsGripArmed = it },
+                    onDragProgress = { dragPx -> actionsSheetDragPx = dragPx.coerceIn(0f, actionsSheetTravelPx) },
+                    onRelease = { dragPx ->
+                        val shouldOpen = dragPx > actionsSheetTravelPx * 0.28f
+                        showActionsSheet = shouldOpen
+                        actionsSheetDragPx = if (shouldOpen) actionsSheetTravelPx else 0f
+                        actionsGripArmed = false
+                    },
+                )
+
+                VolumeOverlay(
+                    visible = showVolume,
+                    volume = state.volume,
+                    maxVolume = state.maxVolume,
+                    accent = accent,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
+                )
+            } else {
+                PlayerLoadingState(scale = scale, accent = accent, isPlaying = state.isPlaying)
             }
-            1 -> ScreenScaffold(timeText = {}) {
-                ActionsSheet(
+            if (showActionsSheet || actionsSheetDragPx > 0f || actionsGripArmed) {
+                ActionsPullOverOverlay(
+                    progressPx = if (showActionsSheet) actionsSheetTravelPx else actionsSheetDragPx,
+                    travelPx = actionsSheetTravelPx,
+                    armed = actionsGripArmed,
                     downloadState = downloadState,
                     outputOptions = rememberAudioOutputOptions(),
+                    onClose = {
+                        showActionsSheet = false
+                        actionsSheetDragPx = 0f
+                        actionsGripArmed = false
+                    },
                     onDownload = onDownload,
                     onRemoveDownload = onRemoveDownload,
                     onHome = onOpenHome,
@@ -529,6 +535,164 @@ private fun TidalPlayerNonAmbient(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun BottomGripPullOverHandle(
+    scale: Float,
+    armed: Boolean,
+    modifier: Modifier = Modifier,
+    onArmedChange: (Boolean) -> Unit,
+    onDragProgress: (Float) -> Unit,
+    onRelease: (Float) -> Unit,
+) {
+    val view = LocalView.current
+    var draggedUpPx by remember { mutableStateOf(0f) }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(44.dp * scale)
+            .pointerInput(Unit) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        draggedUpPx = 0f
+                        onDragProgress(0f)
+                        onArmedChange(true)
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    },
+                    onDragEnd = {
+                        onRelease(draggedUpPx)
+                        draggedUpPx = 0f
+                    },
+                    onDragCancel = {
+                        draggedUpPx = 0f
+                        onDragProgress(0f)
+                        onArmedChange(false)
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        draggedUpPx = (draggedUpPx - dragAmount.y).coerceAtLeast(0f)
+                        onDragProgress(draggedUpPx)
+                    },
+                )
+            },
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp * scale)
+                .align(Alignment.BottomCenter)
+                .clip(RoundedCornerShape(topStart = 28.dp * scale, topEnd = 28.dp * scale))
+                .background(Color(0xFF171717).copy(alpha = if (armed) 0.94f else 0f)),
+        )
+        Box(
+            modifier = Modifier
+                .padding(bottom = 7.dp * scale)
+                .size(width = (if (armed) 78 else 34).dp * scale, height = 4.dp * scale)
+                .clip(CircleShape)
+                .background(Color(0xFF8A8A8A).copy(alpha = if (armed) 1f else 0.72f)),
+        )
+    }
+}
+
+@Composable
+private fun ActionsPullOverOverlay(
+    progressPx: Float,
+    travelPx: Float,
+    armed: Boolean,
+    downloadState: DownloadState,
+    outputOptions: List<AudioOutputOption>,
+    onClose: () -> Unit,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> String?,
+    onHome: () -> Unit,
+    onQueue: () -> Unit,
+    onOutputSettings: () -> Unit,
+    onAddToPlaylist: () -> String?,
+    onViewAlbum: () -> String?,
+    onViewArtist: () -> String?,
+) {
+    var closeDragPx by remember { mutableStateOf(0f) }
+    val fraction = (progressPx / travelPx).coerceIn(0f, 1f)
+    val sheetOffsetPx = (travelPx - progressPx + closeDragPx).coerceIn(0f, travelPx)
+    val materialColor = Color(0xFF171717)
+    val dimAlpha = 0.22f * fraction
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = dimAlpha)),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 18.dp)
+                .graphicsLayer { translationY = sheetOffsetPx }
+                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                .background(materialColor),
+        ) {
+            ActionsSheet(
+                downloadState = downloadState,
+                outputOptions = outputOptions,
+                onDownload = onDownload,
+                onRemoveDownload = onRemoveDownload,
+                onHome = onHome,
+                onQueue = onQueue,
+                onOutputSettings = onOutputSettings,
+                onAddToPlaylist = onAddToPlaylist,
+                onViewAlbum = onViewAlbum,
+                onViewArtist = onViewArtist,
+                forceHandleArmed = armed,
+                onHandleDragStart = { closeDragPx = 0f },
+                onHandleDrag = { dragPx -> closeDragPx = dragPx.coerceAtLeast(0f) },
+                onHandleDragEnd = { dragPx ->
+                    if (dragPx > travelPx * 0.22f) onClose()
+                    closeDragPx = 0f
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerLoadingState(
+    scale: Float,
+    accent: Color,
+    isPlaying: Boolean,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp * scale),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp * scale)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp * scale)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = 0.72f)),
+            )
+        }
+        Text(
+            text = if (isPlaying) "Starting playback…" else "Loading track…",
+            color = TidalColors.OnSurfaceMuted,
+            fontSize = (13 * scale).sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp * scale),
+        )
     }
 }
 
@@ -597,39 +761,6 @@ private fun SecondaryIconAt(
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(24.dp * scale))
-    }
-}
-
-@Composable
-private fun ActionsHint(
-    scale: Float,
-    accent: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(percent = 50))
-            .background(Color.Black.copy(alpha = 0.62f))
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = "Actions" }
-            .padding(horizontal = 8.dp * scale, vertical = 3.dp * scale),
-        horizontalArrangement = Arrangement.spacedBy(2.dp * scale),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "Actions",
-            color = TidalColors.White,
-            fontSize = (9 * scale).sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-        )
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowDown,
-            contentDescription = null,
-            tint = accent,
-            modifier = Modifier.size(12.dp * scale),
-        )
     }
 }
 

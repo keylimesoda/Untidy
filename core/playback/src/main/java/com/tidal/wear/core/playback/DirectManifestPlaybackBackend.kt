@@ -5,6 +5,7 @@ package com.tidal.wear.core.playback
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Base64
 import android.util.Log
 import androidx.media3.common.AudioAttributes
@@ -132,10 +133,12 @@ internal class DirectManifestPlaybackBackend(
     }
 
     override suspend fun loadQueue(tracks: List<TidalTrack>, startIndex: Int) {
+        val queueStartedAt = SystemClock.elapsedRealtime()
         val playableTracks = tracks.filter { it.id.isNotBlank() }
         if (playableTracks.isEmpty()) return
         val boundedStartIndex = startIndex.coerceIn(0, playableTracks.lastIndex)
         runCatching {
+            Log.d(DIRECT_LOG_TAG, "loadQueue start size=${playableTracks.size} start=$boundedStartIndex tail=${playableTracks.size - boundedStartIndex}")
             val resolvedQueue = playableTracks
                 .drop(boundedStartIndex)
                 .mapIndexed { offset, track -> resolveMediaSource(track, playableTracks, boundedStartIndex + offset) }
@@ -144,6 +147,7 @@ internal class DirectManifestPlaybackBackend(
             player.setWakeMode(if (first.offline) C.WAKE_MODE_LOCAL else C.WAKE_MODE_NETWORK)
             player.setMediaSources(resolvedQueue.map { it.source }, 0, C.TIME_UNSET)
             player.prepare()
+            Log.d(DIRECT_LOG_TAG, "loadQueue prepared size=${resolvedQueue.size} elapsedMs=${SystemClock.elapsedRealtime() - queueStartedAt}")
             _events.emit(PlaybackBackendEvent.MediaTransition(first.manifest.toDiagnosticContext(player.duration)))
             _events.emit(PlaybackBackendEvent.QualityChanged(first.manifest.toDiagnosticContext(player.duration)))
             playableTracks.getOrNull(boundedStartIndex + 1)?.id?.let(::prefetchTrack)
@@ -172,10 +176,12 @@ internal class DirectManifestPlaybackBackend(
         queue: List<TidalTrack> = listOf(track),
         queueIndex: Int = 0,
     ): ResolvedMediaSource {
+        val startedAt = SystemClock.elapsedRealtime()
         val trackId = track.id
         val manifest = manifestRequest(trackId).await().getOrThrow()
+        val manifestMs = SystemClock.elapsedRealtime() - startedAt
         manifestRequests.remove(trackId)
-        Log.d(DIRECT_LOG_TAG, "manifest loaded id=$trackId source=${manifest.source} presentation=${manifest.presentation} previewReason=${manifest.previewReason.orEmpty()} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
+        Log.d(DIRECT_LOG_TAG, "manifest loaded id=$trackId queueIndex=$queueIndex manifestMs=$manifestMs source=${manifest.source} presentation=${manifest.presentation} previewReason=${manifest.previewReason.orEmpty()} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
         val offlineCache = downloadedTrackCache(trackId)
         val source = when (manifest.kind) {
             ManifestKind.Dash -> {
@@ -239,21 +245,28 @@ internal class DirectManifestPlaybackBackend(
     private fun isMarkedDownloaded(trackId: String): Boolean = appContext.isOfflineTrackDownloaded(trackId)
 
     private fun fetchPlaybackManifest(trackId: String): ResolvedManifest {
+        val startedAt = SystemClock.elapsedRealtime()
+        val tokenStartedAt = SystemClock.elapsedRealtime()
         val token = kotlinx.coroutines.runBlocking { authRepository.getAccessToken() }
             ?: throw IOException("No TIDAL access token")
         val clientId = kotlinx.coroutines.runBlocking { authRepository.getClientIdForApi() }
+        Log.d(DIRECT_LOG_TAG, "manifest auth ready id=$trackId authMs=${SystemClock.elapsedRealtime() - tokenStartedAt} totalMs=${SystemClock.elapsedRealtime() - startedAt}")
         if (isMarkedDownloaded(trackId)) {
             runCatching { fetchTrackManifest(trackId, token, clientId, usage = "DOWNLOAD") }
                 .onFailure { Log.w(DIRECT_LOG_TAG, "download manifest failed id=$trackId reason=${it::class.java.simpleName}: ${it.message}") }
                 .getOrNull()
                 ?.let { return it }
         }
+        val desktopStartedAt = SystemClock.elapsedRealtime()
         runCatching { fetchDesktopPlaybackInfo(trackId, token, clientId) }
-            .onFailure { Log.w(DIRECT_LOG_TAG, "desktop playbackinfo failed id=$trackId reason=${it::class.java.simpleName}: ${it.message}") }
+            .onSuccess { Log.d(DIRECT_LOG_TAG, "desktop playbackinfo ok id=$trackId elapsedMs=${SystemClock.elapsedRealtime() - desktopStartedAt} totalMs=${SystemClock.elapsedRealtime() - startedAt}") }
+            .onFailure { Log.w(DIRECT_LOG_TAG, "desktop playbackinfo failed id=$trackId elapsedMs=${SystemClock.elapsedRealtime() - desktopStartedAt} reason=${it::class.java.simpleName}: ${it.message}") }
             .getOrNull()
             ?.let { return it }
 
+        val openApiStartedAt = SystemClock.elapsedRealtime()
         return fetchTrackManifest(trackId, token, clientId, usage = "PLAYBACK")
+            .also { Log.d(DIRECT_LOG_TAG, "openapi playback manifest ok id=$trackId elapsedMs=${SystemClock.elapsedRealtime() - openApiStartedAt} totalMs=${SystemClock.elapsedRealtime() - startedAt}") }
     }
 
     private fun fetchTrackManifest(trackId: String, token: String, clientId: String, usage: String): ResolvedManifest {
