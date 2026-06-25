@@ -67,7 +67,7 @@ class OfflineTrackDownloader(
                     .setMediaId(record.id)
                     .setUri(manifestUri)
                     .setMimeType(MimeTypes.APPLICATION_MPD)
-                    .setCustomCacheKey("untidy-download-proof-${record.id}-${sha256Short(manifestUri)}")
+                    .setCustomCacheKey("untidy-download-${record.id}-${sha256Short(manifestUri)}")
                     .build()
                 DashDownloader(mediaItem, dataSourceFactory).download { _, _, _ -> }
                 if (cache.cacheSpace <= 0L || cache.keys.isEmpty()) {
@@ -142,7 +142,7 @@ data class OfflineBatchDownloadResult(
 )
 
 private fun canonicalDownloadCacheKeyFactory(trackId: String): CacheKeyFactory = CacheKeyFactory { dataSpec: DataSpec ->
-    dataSpec.key ?: "untidy-download-proof-$trackId-${sha256Short(dataSpec.uri.toString())}"
+    dataSpec.key ?: "untidy-download-$trackId-${sha256Short(dataSpec.uri.toString())}"
 }
 
 private fun TidalTrack.toOfflineDownloadRecordForDownloader(): OfflineDownloadRecord? =

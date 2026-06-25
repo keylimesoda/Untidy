@@ -239,7 +239,7 @@ internal class DirectManifestPlaybackBackend(
     }
 
     private fun canonicalDownloadCacheKeyFactory(trackId: String): CacheKeyFactory = CacheKeyFactory { dataSpec: DataSpec ->
-        dataSpec.key ?: "untidy-download-proof-$trackId-${sha256Short(dataSpec.uri.toString())}"
+        dataSpec.key ?: "untidy-download-$trackId-${sha256Short(dataSpec.uri.toString())}"
     }
 
     private fun isMarkedDownloaded(trackId: String): Boolean = appContext.isOfflineTrackDownloaded(trackId)

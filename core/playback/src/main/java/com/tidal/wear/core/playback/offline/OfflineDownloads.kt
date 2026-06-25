@@ -168,7 +168,7 @@ fun Context.offlineDownloadsStorageBytes(): Long =
         .sumOf { offlineTrackCacheDir(it.id).directorySizeBytes() }
 
 fun Context.offlineTrackCacheDir(trackId: String): File =
-    File(filesDir, "offline-proof-cachefill/cache-$trackId")
+    File(filesDir, "offline-downloads/cache-$trackId")
 
 private fun File.directorySizeBytes(): Long {
     if (!exists()) return 0L

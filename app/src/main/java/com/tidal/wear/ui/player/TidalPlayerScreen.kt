@@ -129,7 +129,7 @@ fun TidalPlayerScreen(
     fun startTrackDownload() {
         val track = currentTrack
         when {
-            track?.isDownloadProofEligible() != true -> Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
+            track?.isDownloadEligible() != true -> Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
             downloadState is DownloadState.Downloading -> Unit
             else -> {
                 downloadState = DownloadState.Downloading(0.05f)
@@ -789,12 +789,12 @@ private fun TransportButton(
 
 
 private fun Context.initialDownloadState(track: TidalTrack?): DownloadState = when {
-    track == null || track.isDownloadProofEligible() != true -> DownloadState.Unavailable
+    track == null || track.isDownloadEligible() != true -> DownloadState.Unavailable
     isOfflineTrackDownloaded(track.id) -> DownloadState.Downloaded
     else -> DownloadState.NotDownloaded
 }
 
-private fun TidalTrack.isDownloadProofEligible(): Boolean = id.isNotBlank() &&
+private fun TidalTrack.isDownloadEligible(): Boolean = id.isNotBlank() &&
     id != "tidal-current" &&
     !id.startsWith("fixture", ignoreCase = true)
 
