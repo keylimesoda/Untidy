@@ -3,6 +3,7 @@ package com.tidal.wear.ui.search
 import android.app.Activity.RESULT_OK
 import android.app.RemoteInput
 import android.content.Intent
+import android.util.Log
 import android.view.inputmethod.EditorInfo
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -113,7 +114,10 @@ fun SearchScreen(
                 result = withContext(Dispatchers.IO) { apiClient.search(q) }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Throwable) {
+            } catch (failure: Throwable) {
+                // Keep diagnostics useful on a physical watch without logging
+                // the query, token, or any response body.
+                Log.d("Untidy/Search", "search request failed type=${failure::class.java.simpleName}")
                 result = null
                 error = "Search unavailable"
             } finally {
@@ -216,7 +220,43 @@ fun SearchScreen(
                     result.isNullOrEmpty() -> item { StatusText("No results found") }
                     else -> {
                         val safeResult = result ?: TidalSearchResult()
-                        section("Songs", safeResult.tracks.take(6)) { track ->
+                        val topResults = topSearchResults(safeResult, submittedQuery)
+                        val topResultIds = topResults.mapTo(mutableSetOf(), SearchResultItem::id)
+                        section("Top results", topResults) { topResult ->
+                            when (topResult) {
+                                is SearchResultItem.Track -> SearchResultChip(
+                                    label = topResult.value.title,
+                                    secondaryLabel = listOf(topResult.value.artist, topResult.value.album)
+                                        .filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Song" },
+                                    artworkUrl = topResult.value.artworkUrl,
+                                    fallback = "♪",
+                                    onClick = { onPlayTrack(topResult.value) },
+                                )
+                                is SearchResultItem.Album -> SearchResultChip(
+                                    label = topResult.value.title,
+                                    secondaryLabel = topResult.value.artist.ifBlank { "Album" },
+                                    artworkUrl = topResult.value.artworkUrl,
+                                    fallback = "▣",
+                                    onClick = { onOpenAlbum(topResult.value) },
+                                )
+                                is SearchResultItem.Artist -> SearchResultChip(
+                                    label = topResult.value.name,
+                                    secondaryLabel = "Artist",
+                                    artworkUrl = topResult.value.artworkUrl,
+                                    fallback = "★",
+                                    onClick = { onOpenArtist(topResult.value) },
+                                )
+                                is SearchResultItem.Playlist -> SearchResultChip(
+                                    label = topResult.value.title,
+                                    secondaryLabel = topResult.value.creator.ifBlank { "Playlist" },
+                                    artworkUrl = topResult.value.artworkUrl,
+                                    fallback = "≡",
+                                    onClick = { onOpenPlaylist(topResult.value) },
+                                )
+                            }
+                        }
+                        section("Songs", safeResult.tracks.distinctBy { it.id }
+                            .filterNot { "track:${it.id}" in topResultIds }.take(6)) { track ->
                             SearchResultChip(
                                 label = track.title,
                                 secondaryLabel = listOf(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" · "),
@@ -225,7 +265,8 @@ fun SearchScreen(
                                 onClick = { onPlayTrack(track) },
                             )
                         }
-                        section("Albums", safeResult.albums.take(4)) { album ->
+                        section("Albums", safeResult.albums.distinctBy { it.id }
+                            .filterNot { "album:${it.id}" in topResultIds }.take(4)) { album ->
                             SearchResultChip(
                                 label = album.title,
                                 secondaryLabel = album.artist.ifBlank { "Album" },
@@ -234,7 +275,8 @@ fun SearchScreen(
                                 onClick = { onOpenAlbum(album) },
                             )
                         }
-                        section("Artists", safeResult.artists.take(4)) { artist ->
+                        section("Artists", safeResult.artists.distinctBy { it.id }
+                            .filterNot { "artist:${it.id}" in topResultIds }.take(4)) { artist ->
                             SearchResultChip(
                                 label = artist.name,
                                 secondaryLabel = "Artist",
@@ -243,7 +285,8 @@ fun SearchScreen(
                                 onClick = { onOpenArtist(artist) },
                             )
                         }
-                        section("Playlists", safeResult.playlists.take(4)) { playlist ->
+                        section("Playlists", safeResult.playlists.distinctBy { it.id }
+                            .filterNot { "playlist:${it.id}" in topResultIds }.take(4)) { playlist ->
                             SearchResultChip(
                                 label = playlist.title,
                                 secondaryLabel = playlist.creator.ifBlank { "Playlist" },
@@ -373,11 +416,10 @@ private fun SearchResultsTopBar(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Search results",
+                text = "Results",
                 color = TidalColors.Cyan,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = 0.8.sp,
                 maxLines = 1,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),

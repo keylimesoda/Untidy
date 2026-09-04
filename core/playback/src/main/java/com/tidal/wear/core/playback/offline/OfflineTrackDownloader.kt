@@ -15,8 +15,11 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.dash.offline.DashDownloader
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.playback.settings.downloadOverLteEnabled
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -40,12 +43,24 @@ class OfflineTrackDownloader(
     suspend fun downloadTrack(track: TidalTrack): OfflineDownloadResult = withContext(Dispatchers.IO) {
         val record = track.toOfflineDownloadRecordForDownloader()
             ?: return@withContext OfflineDownloadResult.Skipped
-        runCatching {
+        if (appContext.isOfflineTrackDownloadRemovalRequested(record.id)) {
+            return@withContext OfflineDownloadResult.Skipped
+        }
+        val downloadOverLteEnabled = appContext.downloadOverLteEnabled.first()
+        if (!appContext.hasAllowedOfflineDownloadNetwork(downloadOverLteEnabled)) {
+            // Keep direct, user-initiated downloads subject to the same policy
+            // as collection downloads. The durable queue will retry when the
+            // required network becomes available.
+            OfflineDownloadScheduler(appContext).enqueue(listOf(track))
+            return@withContext OfflineDownloadResult.WaitingForNetwork
+        }
+        try {
             val token = authRepository.getAccessToken() ?: throw IOException("No TIDAL access token")
             val clientId = authRepository.getClientIdForApi()
             val manifestUri = fetchDownloadManifest(record.id, token, clientId)
             val cacheDir = appContext.offlineTrackCacheDir(record.id).apply { mkdirs() }
             val cache = SimpleCache(cacheDir, NoOpCacheEvictor(), StandaloneDatabaseProvider(appContext))
+            var discardCache = false
             try {
                 val dataSourceFactory = CacheDataSource.Factory()
                     .setCache(cache)
@@ -73,16 +88,33 @@ class OfflineTrackDownloader(
                 if (cache.cacheSpace <= 0L || cache.keys.isEmpty()) {
                     throw IOException("Download produced no local cache")
                 }
+                if (appContext.isOfflineTrackDownloadRemovalRequested(record.id)) {
+                    discardCache = true
+                    return@withContext OfflineDownloadResult.Skipped
+                }
                 appContext.markOfflineTrackDownloaded(track)
                 OfflineDownloadResult.Downloaded
             } finally {
                 runCatching { cache.release() }
+                if (discardCache) runCatching { cacheDir.deleteRecursively() }
             }
-        }.getOrElse { error ->
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
             appContext.markOfflineTrackDownloadFailed(record.id)
             OfflineDownloadResult.Failed(error::class.java.simpleName)
         }
     }
+
+    /**
+     * Schedules collection downloads in WorkManager. This survives navigation and process death;
+     * direct [downloadTrack] remains for the existing single-track action sheet flow.
+     */
+    fun enqueueTracks(tracks: List<TidalTrack>): OfflineBatchScheduleResult =
+        OfflineDownloadScheduler(appContext).enqueue(tracks)
+
+    fun observeCollectionSummary(tracks: List<TidalTrack>) =
+        OfflineDownloadScheduler(appContext).observeSummary(tracks)
 
     suspend fun downloadTracks(tracks: List<TidalTrack>): OfflineBatchDownloadResult {
         var downloaded = 0
@@ -94,6 +126,7 @@ class OfflineTrackDownloader(
                 OfflineDownloadResult.Downloaded -> downloaded++
                 is OfflineDownloadResult.Failed -> failed++
                 OfflineDownloadResult.Skipped -> skipped++
+                OfflineDownloadResult.WaitingForNetwork -> skipped++
             }
         }
         return OfflineBatchDownloadResult(downloaded = downloaded, failed = failed, skipped = skipped)
@@ -133,6 +166,8 @@ sealed interface OfflineDownloadResult {
     data object Downloaded : OfflineDownloadResult
     data class Failed(val reason: String) : OfflineDownloadResult
     data object Skipped : OfflineDownloadResult
+    /** The request was persisted and is waiting for Wi-Fi or an allowed connected network. */
+    data object WaitingForNetwork : OfflineDownloadResult
 }
 
 data class OfflineBatchDownloadResult(

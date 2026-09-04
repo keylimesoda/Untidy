@@ -32,4 +32,31 @@ class AudioTierResolverTest {
         assertEquals(AudioPreset.BatterySaver, tier.preset)
         assertEquals(96, tier.targetBitrateKbps)
     }
+
+    @Test
+    fun fullFidelityPrefersHardwareFlac() {
+        val tier = resolver.resolve(
+            preset = AudioPreset.FullFidelity,
+            decoders = listOf(
+                DecoderCapability("vendor.flac", "audio/flac", hardwareAccelerated = true, softwareOnly = false),
+                DecoderCapability("vendor.aac", "audio/mp4a-latm", hardwareAccelerated = true, softwareOnly = false),
+            ),
+        )
+
+        assertEquals(AudioPreset.FullFidelity, tier.preset)
+        assertEquals("audio/flac", tier.mimeType)
+    }
+
+    @Test
+    fun fullFidelityFallsBackToHardwareAacWhenFlacUnavailable() {
+        val tier = resolver.resolve(
+            preset = AudioPreset.FullFidelity,
+            decoders = listOf(
+                DecoderCapability("vendor.aac", "audio/mp4a-latm", hardwareAccelerated = true, softwareOnly = false),
+            ),
+        )
+
+        assertEquals("audio/mp4a-latm", tier.mimeType)
+        assertEquals(256, tier.targetBitrateKbps)
+    }
 }

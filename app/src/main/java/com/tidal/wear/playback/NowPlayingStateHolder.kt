@@ -10,13 +10,17 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.PlaybackActions
 import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
+import com.tidal.wear.core.playback.DeliveredAudioFormat
+import com.tidal.wear.core.playback.PreferredAudioOutputPreference
 import com.tidal.wear.core.playback.TidalMediaService
+import com.tidal.wear.core.playback.selectedDeliveredAudioFormat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +50,8 @@ data class NowPlayingUiState(
     val maxVolume: Int = 1,
     val error: String? = null,
     val queue: PlaybackQueueSnapshot = PlaybackQueueSnapshot(),
+    val preferredAudioOutputDeviceId: Int? = null,
+    val deliveredAudioFormat: DeliveredAudioFormat? = null,
 )
 
 class NowPlayingViewModel(application: Application) : AndroidViewModel(application) {
@@ -58,6 +64,8 @@ class NowPlayingViewModel(application: Application) : AndroidViewModel(applicati
     fun jumpToQueueIndex(index: Int) = holder.jumpToQueueIndex(index)
     fun seekTo(ms: Long) = holder.seekTo(ms)
     fun setVolumeFraction(f: Float) = holder.setVolumeFraction(f)
+    fun setPreferredAudioOutput(deviceId: Int?) = holder.setPreferredAudioOutput(deviceId)
+    fun setUiVisibility(visible: Boolean, ambient: Boolean = false) = holder.setUiVisibility(visible, ambient)
 
     override fun onCleared() {
         holder.release()
@@ -74,6 +82,7 @@ class NowPlayingStateHolder(
         NowPlayingUiState(
             volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC),
             maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1),
+            preferredAudioOutputDeviceId = PreferredAudioOutputPreference.get(context),
         ),
     )
     val state: StateFlow<NowPlayingUiState> = _state.asStateFlow()
@@ -82,6 +91,13 @@ class NowPlayingStateHolder(
     private var controllerFuture: ListenableFuture<MediaController>
     private var controller: MediaController? = null
     private var positionJob: Job? = null
+    /**
+     * Position is only useful while the player screen is visible and interactive.
+     * Keep this separate from the controller's playback state so background audio
+     * can continue without waking the UI every 500 ms.
+     */
+    @Volatile private var uiVisible = false
+    @Volatile private var uiAmbient = false
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = updateFromPlayer(player)
@@ -91,6 +107,13 @@ class NowPlayingStateHolder(
         }
         override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
             controller?.let(::updateFromPlayer)
+        }
+        override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+            _state.value = _state.value.copy(deliveredAudioFormat = null)
+            controller?.let(::updateFromPlayer)
+        }
+        override fun onTracksChanged(tracks: Tracks) {
+            updateDeliveredAudioFormat(tracks)
         }
         override fun onPlayerError(error: PlaybackException) {
             _state.value = _state.value.copy(error = error.message ?: error.errorCodeName)
@@ -106,6 +129,7 @@ class NowPlayingStateHolder(
                     controller = controllerFuture.get().also {
                         it.addListener(listener)
                         updateFromPlayer(it)
+                        updateDeliveredAudioFormat(it.currentTracks)
                         restartPositionPolling(it.isPlaying)
                     }
                 }.onFailure { error ->
@@ -144,6 +168,33 @@ class NowPlayingStateHolder(
         val volume = (f.coerceIn(0f, 1f) * max).toInt().coerceIn(0, max)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, 0)
         _state.value = _state.value.copy(volume = volume, maxVolume = max)
+    }
+
+    /**
+     * Asks the playback service to route Untidy's own AudioTrack to this output. This does not
+     * open, pair, disconnect, or otherwise modify Bluetooth devices at the system level.
+     */
+    fun setPreferredAudioOutput(deviceId: Int?) {
+        PreferredAudioOutputPreference.set(context, deviceId)
+        _state.value = _state.value.copy(preferredAudioOutputDeviceId = deviceId)
+        sendServiceAction(
+            PlaybackActions.ACTION_SET_PREFERRED_AUDIO_OUTPUT,
+            android.os.Bundle().apply {
+                if (deviceId != null) putInt(PlaybackActions.EXTRA_AUDIO_DEVICE_ID, deviceId)
+            },
+        )
+    }
+
+    /**
+     * Updates whether the now-playing UI currently needs live position updates.
+     * Calling this when the activity enters/exits ambient mode also refreshes the
+     * state immediately, so the first interactive frame has an accurate position.
+     */
+    fun setUiVisibility(visible: Boolean, ambient: Boolean = false) {
+        uiVisible = visible
+        uiAmbient = visible && ambient
+        controller?.let(::updateFromPlayer)
+        restartPositionPolling(controller?.isPlaying == true)
     }
 
     fun release() {
@@ -196,12 +247,33 @@ class NowPlayingStateHolder(
         positionJob?.cancel()
         positionJob = null
         if (!pollPosition) return
-        if (!isPlaying) return
+        if (!isPlaying || !uiVisible || uiAmbient) return
         positionJob = scope.launch {
             while (isActive) {
-                controller?.let(::updateFromPlayer)
+                controller?.let(::updatePositionOnly)
                 delay(500)
             }
+        }
+    }
+
+    private fun updateDeliveredAudioFormat(tracks: Tracks) {
+        val format = tracks.selectedDeliveredAudioFormat()
+        val current = _state.value
+        if (current.deliveredAudioFormat != format) {
+            _state.value = current.copy(deliveredAudioFormat = format)
+        }
+    }
+
+    /**
+     * The smooth progress ring needs a frequent position update, but metadata, volume, and the
+     * serialized logical queue do not. Keep this hot path allocation-light; full state is refreshed
+     * by Media3 events and explicit visibility changes.
+     */
+    private fun updatePositionOnly(player: Player) {
+        val position = player.currentPosition.coerceAtLeast(0L)
+        val current = _state.value
+        if (current.positionMs != position) {
+            _state.value = current.copy(positionMs = position)
         }
     }
 

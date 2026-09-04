@@ -1,8 +1,8 @@
 package com.tidal.wear.ui.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +25,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,22 +34,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.view.HapticFeedbackConstants
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material.Icon
+import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
+import com.tidal.wear.core.playback.DeliveredAudioFormat
 
 sealed interface DownloadState {
     data object Unavailable : DownloadState
@@ -61,75 +62,46 @@ sealed interface DownloadState {
 @Composable
 fun ActionsSheet(
     downloadState: DownloadState,
-    outputOptions: List<AudioOutputOption>,
+    deliveredAudioFormat: DeliveredAudioFormat?,
+    requestedOutputId: Int?,
     onDownload: () -> Unit,
     onRemoveDownload: () -> String?,
     onHome: () -> Unit,
     onQueue: () -> Unit,
-    onOutputSettings: () -> Unit,
+    onOutputSelected: (Int?) -> Unit,
     onAddToPlaylist: () -> String?,
     onViewAlbum: () -> String?,
     onViewArtist: () -> String?,
     modifier: Modifier = Modifier,
     forceHandleArmed: Boolean = false,
-    onHandleDragStart: (() -> Unit)? = null,
-    onHandleDrag: ((Float) -> Unit)? = null,
-    onHandleDragEnd: ((Float) -> Unit)? = null,
+    onHandleClick: (() -> Unit)? = null,
 ) {
-    var outputExpanded by remember { mutableStateOf(false) }
     var confirmRemoveDownload by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
-    val preferredOutput = outputOptions.firstOrNull { it.preferred } ?: outputOptions.firstOrNull()
+    val outputOptions = rememberAudioOutputOptions(requestedOutputId)
+    val quality = remember(deliveredAudioFormat) { deliveredAudioFormat.toQualityGemPresentation() }
     val listState = rememberTransformingLazyColumnState()
-    val view = LocalView.current
-    var handleArmed by remember { mutableStateOf(false) }
-    var handleDragPx by remember { mutableStateOf(0f) }
     fun runAction(action: () -> String?) {
         actionMessage = action()
     }
     Column(
-        modifier = modifier.fillMaxSize().background(Color(0xFF171717)),
+        modifier = modifier.fillMaxSize().background(TidalColors.Black),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 5.dp)
-                .height(28.dp)
-                .pointerInput(onHandleDragStart, onHandleDrag, onHandleDragEnd) {
-                    if (onHandleDragStart == null || onHandleDrag == null || onHandleDragEnd == null) return@pointerInput
-                    detectDragGesturesAfterLongPress(
-                        onDragStart = {
-                            handleArmed = true
-                            handleDragPx = 0f
-                            onHandleDragStart()
-                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                        },
-                        onDragCancel = {
-                            handleArmed = false
-                            handleDragPx = 0f
-                            onHandleDragEnd(0f)
-                        },
-                        onDragEnd = {
-                            handleArmed = false
-                            onHandleDragEnd(handleDragPx)
-                            handleDragPx = 0f
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            handleDragPx = (handleDragPx + dragAmount.y).coerceAtLeast(0f)
-                            onHandleDrag(handleDragPx)
-                        },
-                    )
-                },
+                .padding(top = 8.dp)
+                .height(38.dp)
+                .clickable(enabled = onHandleClick != null) { onHandleClick?.invoke() },
             contentAlignment = Alignment.TopCenter,
         ) {
             Box(
                 modifier = Modifier
-                    .padding(top = 8.dp)
-                    .size(width = (if (handleArmed || forceHandleArmed) 78 else 34).dp, height = 4.dp)
+                    .padding(top = 5.dp)
+                    .size(width = 28.dp, height = 3.dp)
                     .clip(RoundedCornerShape(percent = 50))
-                    .background(Color(0xFF8A8A8A).copy(alpha = if (handleArmed || forceHandleArmed) 1f else 0.72f)),
+                    .background(TidalColors.White.copy(alpha = if (forceHandleArmed) 0.76f else 0.42f)),
             )
         }
         TransformingLazyColumn(
@@ -142,22 +114,34 @@ fun ActionsSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             item {
-                ActionRow(
-                    icon = Icons.Filled.Home,
-                    label = "Home",
-                    rightIndicator = null,
-                    iconTint = TidalColors.Cyan,
-                    onClick = onHome,
-                )
-            }
-            item {
-                ActionRow(
-                    icon = Icons.AutoMirrored.Filled.QueueMusic,
-                    label = "Queue",
-                    rightIndicator = null,
-                    iconTint = TidalColors.White,
-                    onClick = onQueue,
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.94f)
+                        .height(56.dp)
+                        .padding(bottom = 8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(TidalColors.Surface)
+                            .clickable(onClick = onHome),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Home,
+                            contentDescription = "Untidy home",
+                            modifier = Modifier.size(22.dp),
+                            tint = TidalColors.Cyan,
+                        )
+                    }
+                    if (quality != null) {
+                        Box(modifier = Modifier.align(Alignment.Center)) {
+                            QualityGem(quality)
+                        }
+                    }
+                }
             }
             item {
                 val downloadAvailable = downloadState != DownloadState.Unavailable
@@ -209,22 +193,39 @@ fun ActionsSheet(
             }
             item {
                 ActionRow(
-                    icon = Icons.Filled.Settings,
-                    label = "Output: ${preferredOutput?.label ?: "System"}",
+                    icon = Icons.AutoMirrored.Filled.QueueMusic,
+                    label = "Queue",
                     rightIndicator = null,
                     iconTint = TidalColors.White,
-                    onClick = { outputExpanded = !outputExpanded },
+                    onClick = onQueue,
                 )
             }
-            if (outputExpanded) {
+            item {
+                SectionLabel("Play on")
+            }
+            if (outputOptions.isEmpty()) {
+                item {
+                    ActionRow(
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                        label = "No audio outputs",
+                        rightIndicator = null,
+                        iconTint = TidalColors.OnSurfaceMuted,
+                        enabled = false,
+                        onClick = {},
+                    )
+                }
+            } else {
                 outputOptions.forEach { output ->
                     item {
                         ActionRow(
-                            icon = Icons.Filled.Settings,
+                            icon = Icons.AutoMirrored.Filled.VolumeUp,
                             label = output.label,
-                            rightIndicator = if (output.preferred) Icons.Filled.Check else null,
-                            iconTint = if (output.preferred) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
-                            onClick = onOutputSettings,
+                            rightIndicator = if (output.selected) Icons.Filled.Check else null,
+                            iconTint = if (output.selected) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
+                            selected = output.selected,
+                            onClick = {
+                                onOutputSelected(output.id)
+                            },
                         )
                     }
                 }
@@ -240,9 +241,59 @@ fun ActionsSheet(
 }
 
 data class AudioOutputOption(
+    val id: Int?,
     val label: String,
-    val preferred: Boolean,
+    /** The output Untidy has requested for its own player, not a claim about system routing. */
+    val selected: Boolean,
 )
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        color = TidalColors.OnSurfaceMuted,
+        style = MaterialTheme.typography.caption1,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.fillMaxWidth(0.82f).padding(top = 8.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
+private fun QualityGem(quality: QualityGemPresentation) {
+    val tint = when (quality.tier) {
+        DeliveredQualityTier.Low -> TidalColors.White
+        DeliveredQualityTier.High -> TidalColors.Cyan
+        DeliveredQualityTier.Max -> TidalColors.QualityMax
+        DeliveredQualityTier.Unknown -> TidalColors.OnSurfaceMuted
+    }
+    val shape = RoundedCornerShape(percent = 50)
+    Box(
+        modifier = Modifier
+            .shadow(
+                elevation = 7.dp,
+                shape = shape,
+                ambientColor = tint.copy(alpha = 0.24f),
+                spotColor = tint.copy(alpha = 0.34f),
+            )
+            .clip(shape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(TidalColors.SurfaceHigh.copy(alpha = 0.94f), TidalColors.Black),
+                ),
+            )
+            .border(1.dp, tint.copy(alpha = 0.32f), shape)
+            .padding(horizontal = 13.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = quality.label,
+            color = tint,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
+    }
+}
 
 @Composable
 private fun ActionStatusLine(text: String) {
@@ -271,13 +322,15 @@ private fun ActionRow(
     rightIndicator: ImageVector?,
     iconTint: Color,
     enabled: Boolean = true,
+    selected: Boolean = false,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth(0.94f)
-            .height(48.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .height(52.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) TidalColors.Cyan.copy(alpha = 0.20f) else TidalColors.Surface)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -287,8 +340,9 @@ private fun ActionRow(
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = label,
+            style = MaterialTheme.typography.caption1,
             fontSize = if (label.startsWith("Downloading")) 12.sp else 14.sp,
-            fontWeight = FontWeight.Normal,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             color = if (enabled) TidalColors.White else TidalColors.OnSurfaceMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

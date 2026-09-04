@@ -29,6 +29,8 @@ internal enum class PlaybackBackendState {
 
 internal data class PlaybackDiagnosticContext(
     val productId: String,
+    /** Logical queue position when the backend has one; SDK playback has no queue mapping. */
+    val queueIndex: Int? = null,
     val assetPresentation: String,
     val durationSeconds: Float,
     val previewReason: String?,
@@ -41,6 +43,11 @@ internal sealed interface PlaybackBackendEvent {
     data class MediaTransition(val context: PlaybackDiagnosticContext) : PlaybackBackendEvent
     data class MediaEnded(val context: PlaybackDiagnosticContext) : PlaybackBackendEvent
     data class QualityChanged(val context: PlaybackDiagnosticContext) : PlaybackBackendEvent
+    /** Emitted from ExoPlayer selected-track changes; null format means no selected audio yet. */
+    data class AudioFormatChanged(
+        val trackId: String?,
+        val format: DeliveredAudioFormat?,
+    ) : PlaybackBackendEvent
     data class Error(val code: String, val throwable: Throwable?) : PlaybackBackendEvent
     data class Other(val name: String) : PlaybackBackendEvent
 }
@@ -68,6 +75,11 @@ internal interface PlaybackBackend {
     val sessionPlayer: Player? get() = null
 
     fun setAudioPreset(preset: AudioPreset)
+    /**
+     * Prefer one output for this app's playback, or pass null to restore Android's default route.
+     * This is deliberately an app-level preference, not a request to alter Bluetooth pairing.
+     */
+    fun setPreferredAudioOutput(deviceId: Int?) {}
     suspend fun loadTrack(trackId: String)
     suspend fun loadTrack(track: TidalTrack) = loadTrack(track.id)
     suspend fun loadQueue(tracks: List<TidalTrack>, startIndex: Int) {
@@ -119,12 +131,7 @@ internal class TidalSdkPlaybackBackend(
     }
 
     override fun setAudioPreset(preset: AudioPreset) {
-        val quality = when (preset) {
-            AudioPreset.BatterySaver -> AudioQuality.LOW
-            AudioPreset.Balanced,
-            AudioPreset.High,
-            -> AudioQuality.HIGH
-        }
+        val quality = sdkAudioQualityForPreset(preset)
         sdkPlayer.playbackEngine.streamingWifiAudioQuality = quality
         sdkPlayer.playbackEngine.streamingCellularAudioQuality = quality
     }
@@ -150,6 +157,15 @@ internal class TidalSdkPlaybackBackend(
     }
 }
 
+/** Maps the app preset to the highest quality enum provided by the bundled TIDAL SDK. */
+internal fun sdkAudioQualityForPreset(preset: AudioPreset): AudioQuality = when (preset) {
+    AudioPreset.BatterySaver -> AudioQuality.LOW
+    AudioPreset.Balanced,
+    AudioPreset.High,
+    -> AudioQuality.HIGH
+    AudioPreset.FullFidelity -> AudioQuality.HI_RES_LOSSLESS
+}
+
 private fun Event.toBackendEvent(): PlaybackBackendEvent = when (this) {
     is Event.PlaybackStateChange -> PlaybackBackendEvent.StateChanged(playbackState.toBackendState())
     is Event.MediaProductTransition -> PlaybackBackendEvent.MediaTransition(playbackContext.toDiagnosticContext())
@@ -169,6 +185,7 @@ private fun PlaybackState.toBackendState(): PlaybackBackendState = when (this) {
 private fun PlaybackContext.toDiagnosticContext(): PlaybackDiagnosticContext = when (this) {
     is PlaybackContext.Track -> PlaybackDiagnosticContext(
         productId = productId,
+        queueIndex = null,
         assetPresentation = assetPresentation.name,
         durationSeconds = duration,
         previewReason = previewReason?.name,
@@ -177,6 +194,7 @@ private fun PlaybackContext.toDiagnosticContext(): PlaybackDiagnosticContext = w
     )
     else -> PlaybackDiagnosticContext(
         productId = productId,
+        queueIndex = null,
         assetPresentation = assetPresentation.name,
         durationSeconds = duration,
         previewReason = null,

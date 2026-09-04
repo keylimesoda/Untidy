@@ -1,25 +1,16 @@
 package com.tidal.wear.ui.discover
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -126,13 +117,23 @@ fun DiscoverScreen(
                     }
                 }
                 sections.isEmpty() -> item { EmptyDiscover() }
-                selectedSection == null -> sections.forEach { section ->
+                selectedSection == null -> sections.take(5).forEach { section ->
                     item {
-                        ShelfRow(
+                        DiscoverSectionCard(
+                            section = section,
                             title = section.title,
                             secondary = section.summaryLabel(),
-                            onClick = { selectedTitle = section.title },
+                            onPlayTrack = onPlayTrack,
+                            onPlayQueue = onPlayQueue,
+                            onOpenAlbum = onOpenAlbum,
+                            onOpenPlaylist = onOpenPlaylist,
+                            onOpenArtist = onOpenArtist,
                         )
+                    }
+                    if (section.hasMultipleItems()) {
+                        item(key = "browse-${section.title}") {
+                            BrowseSectionChip(onClick = { selectedTitle = section.title })
+                        }
                     }
                 }
                 else -> selectedSection.result.toItems().forEach { item ->
@@ -219,6 +220,9 @@ private fun TidalDiscoverSection.summaryLabel(): String = subtitle.ifBlank {
     }
 }
 
+private fun TidalDiscoverSection.hasMultipleItems(): Boolean =
+    result.tracks.size + result.albums.size + result.playlists.size + result.artists.size > 1
+
 @Composable
 private fun DiscoverTitle(title: String) {
     Text(
@@ -234,13 +238,51 @@ private fun DiscoverTitle(title: String) {
 }
 
 @Composable
-private fun ShelfRow(
+private fun DiscoverSectionCard(
+    section: TidalDiscoverSection,
     title: String,
     secondary: String,
-    onClick: () -> Unit,
+    onPlayTrack: (TidalTrack) -> Unit,
+    onPlayQueue: (List<TidalTrack>, Int) -> Unit,
+    onOpenAlbum: (TidalAlbum) -> Unit,
+    onOpenPlaylist: (TidalPlaylist) -> Unit,
+    onOpenArtist: (TidalArtist) -> Unit,
 ) {
+    val tracks = section.result.tracks
+    val onClick: () -> Unit = when {
+        tracks.isNotEmpty() -> {
+            { if (tracks.size == 1) onPlayTrack(tracks.first()) else onPlayQueue(tracks, 0) }
+        }
+        section.result.playlists.isNotEmpty() -> { { onOpenPlaylist(section.result.playlists.first()) } }
+        section.result.albums.isNotEmpty() -> { { onOpenAlbum(section.result.albums.first()) } }
+        section.result.artists.isNotEmpty() -> { { onOpenArtist(section.result.artists.first()) } }
+        else -> ({})
+    }
+    TidalResultChip(
+        label = title,
+        secondaryLabel = when {
+            tracks.isNotEmpty() -> "$secondary · Play now"
+            section.result.playlists.isNotEmpty() -> "$secondary · Open playlist"
+            section.result.albums.isNotEmpty() -> "$secondary · Open album"
+            section.result.artists.isNotEmpty() -> "$secondary · Open artist"
+            else -> secondary
+        },
+        artworkUrl = section.primaryArtworkUrl(),
+        fallback = "★",
+        onClick = onClick,
+        deferArtwork = false,
+    )
+}
+
+private fun TidalDiscoverSection.primaryArtworkUrl(): String? = result.tracks.firstOrNull()?.artworkUrl
+    ?: result.playlists.firstOrNull()?.artworkUrl
+    ?: result.albums.firstOrNull()?.artworkUrl
+    ?: result.artists.firstOrNull()?.artworkUrl
+
+@Composable
+private fun BrowseSectionChip(onClick: () -> Unit) {
     Chip(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 0.dp),
         onClick = onClick,
         colors = ChipDefaults.secondaryChipColors(
             backgroundColor = TidalColors.Surface,
@@ -248,33 +290,18 @@ private fun ShelfRow(
             secondaryContentColor = TidalColors.OnSurfaceDim,
             iconColor = TidalColors.Cyan,
         ),
-        icon = {
-            val icon = when (title) {
-                "New for You" -> Icons.Filled.Album
-                "Daily Mixes" -> Icons.Filled.LibraryMusic
-                else -> Icons.Filled.Star
-            }
-            Icon(icon, contentDescription = null)
-        },
-        label = { RowText(title) },
-        secondaryLabel = { RowText(secondary) },
-        contentPadding = PaddingValues(horizontal = 12.dp),
+        label = { RowText("Browse section") },
+        secondaryLabel = { RowText("See all items") },
     )
 }
 
 @Composable
 private fun LoadingDiscover() {
-    val pulse by rememberInfiniteTransition(label = "discoverLoading").animateFloat(
-        initialValue = 0.35f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(1200), repeatMode = RepeatMode.Reverse),
-        label = "discoverLoadingPulse",
-    )
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 10.dp)) {
         Box(
             Modifier
                 .size(7.dp)
-                .background(TidalColors.Cyan.copy(alpha = pulse), CircleShape),
+                .background(TidalColors.Cyan.copy(alpha = 0.7f), CircleShape),
         )
         Text(
             text = "Loading recommendations…",

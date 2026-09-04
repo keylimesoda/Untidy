@@ -1,7 +1,13 @@
 package com.tidal.wear.ui.album
 
 import android.util.Log
+import android.view.HapticFeedbackConstants
 import android.widget.Toast
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,8 +21,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -27,10 +37,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.Icon
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import coil.size.Size
 import com.tidal.wear.core.api.TidalApiClient
@@ -63,17 +76,17 @@ fun AlbumScreen(
     offlineDownloader: OfflineTrackDownloader,
     albumId: String,
     initialAlbum: TidalAlbum?,
-    onPlayAlbum: (TidalAlbum, List<TidalTrack>) -> Unit,
-    onPlayQueue: (List<TidalTrack>, Int) -> Unit,
+    onPlayAlbum: (TidalAlbum, List<TidalTrack>, Int) -> Unit,
 ) {
     var album by remember(albumId, initialAlbum) { mutableStateOf(initialAlbum) }
     var tracks by remember(albumId) { mutableStateOf(emptyList<TidalTrack>()) }
     var loading by remember(albumId) { mutableStateOf(true) }
     var error by remember(albumId) { mutableStateOf<String?>(null) }
     var retryTick by remember(albumId) { mutableIntStateOf(0) }
-    var offlineRefreshTick by remember(albumId) { mutableIntStateOf(0) }
-    var downloadingOffline by remember(albumId) { mutableStateOf(false) }
+    var liked by remember(albumId) { mutableStateOf(false) }
+    var likeLoading by remember(albumId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val view = LocalView.current
 
     LaunchedEffect(albumId, retryTick) {
         loading = true
@@ -119,13 +132,32 @@ fun AlbumScreen(
     val title = album?.title ?: fallbackTitle
     val artworkUrl = album?.artworkUrl ?: tracks.firstOrNull { !it.artworkUrl.isNullOrBlank() }?.artworkUrl
     val context = androidx.compose.ui.platform.LocalContext.current
-    val collectionDownloadSummary = remember(tracks, offlineRefreshTick) { context.collectionDownloadSummary(tracks) }
+    val collectionDownloadSummary by remember(offlineDownloader, tracks) {
+        offlineDownloader.observeCollectionSummary(tracks)
+    }.collectAsState(initial = context.collectionDownloadSummary(tracks))
     val offlinePresentation = remember(collectionDownloadSummary) {
         collectionDownloadSummary.offlineUnitPresentation(OfflineUnit.Album, downloadsAvailable = true)
     }
     val art = rememberArtworkPalette(artworkUrl, Size(160, 160))
     val accent = art.palette.accentColor()
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+
+    LaunchedEffect(albumId) {
+        if (albumId.isBlank()) return@LaunchedEffect
+        likeLoading = true
+        runCatching { withContext(Dispatchers.IO) { apiClient.isFavoriteAlbum(albumId) } }
+            .onSuccess { liked = it }
+            .onFailure { Log.d("Untidy/API", "favorite album state unavailable") }
+        likeLoading = false
+    }
+
+    fun recentAlbum(): TidalAlbum = album ?: TidalAlbum(
+        id = albumId,
+        title = title,
+        artist = tracks.firstOrNull()?.artist.orEmpty(),
+        artworkUrl = artworkUrl,
+        trackCount = tracks.size,
+    )
 
     LaunchedEffect(albumId, loading) {
         if (!loading) listState.scrollToItem(0)
@@ -143,22 +175,38 @@ fun AlbumScreen(
                     title = title,
                     bitmap = art.bitmap,
                     accent = accent,
+                    liked = liked,
+                    likeLoading = likeLoading,
+                    onLike = {
+                        if (likeLoading || albumId.isBlank()) return@AlbumArtworkHero
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        val target = !liked
+                        liked = target
+                        likeLoading = true
+                        scope.launch {
+                            runCatching { withContext(Dispatchers.IO) { apiClient.setFavoriteAlbum(albumId, target) } }
+                                .onSuccess { persisted ->
+                                    liked = persisted
+                                    if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
+                                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    }
+                                }
+                                .onFailure {
+                                    liked = !target
+                                    view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+                                    Toast.makeText(context, "Couldn't update album like", Toast.LENGTH_SHORT).show()
+                                }
+                            likeLoading = false
+                        }
+                    },
                 )
             }
             if (tracks.isNotEmpty()) {
                 item {
-                    PlayAlbumChip(
+                    AlbumPlaybackActions(
                         accent = accent,
-                        onClick = {
-                            val recentAlbum = album ?: TidalAlbum(
-                                id = albumId,
-                                title = title,
-                                artist = tracks.firstOrNull()?.artist.orEmpty(),
-                                artworkUrl = artworkUrl,
-                                trackCount = tracks.size,
-                            )
-                            onPlayAlbum(recentAlbum, tracks)
-                        },
+                        onPlay = { onPlayAlbum(recentAlbum(), tracks, 0) },
+                        onShuffle = { onPlayAlbum(recentAlbum(), tracks.shuffled(), 0) },
                     )
                 }
                 item {
@@ -167,22 +215,12 @@ fun AlbumScreen(
                         secondary = offlinePresentation.detail,
                         accent = accent,
                         onClick = {
-                            if (downloadingOffline) return@CollectionDownloadChip
-                            downloadingOffline = true
-                            scope.launch {
-                                val result = offlineDownloader.downloadTracks(tracks)
-                                offlineRefreshTick++
-                                downloadingOffline = false
-                                Toast.makeText(
-                                    context,
-                                    when {
-                                        result.downloaded > 0 && result.failed == 0 -> "Album saved on watch"
-                                        result.downloaded > 0 -> "Album partially saved"
-                                        else -> "Album download failed"
-                                    },
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
+                            val result = offlineDownloader.enqueueTracks(tracks)
+                            Toast.makeText(
+                                context,
+                                if (result.scheduled > 0) "Album download queued" else "Already saved on watch",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         },
                     )
                 }
@@ -197,7 +235,7 @@ fun AlbumScreen(
                             index = index + 1,
                             track = track,
                             accent = accent,
-                            onClick = { onPlayQueue(tracks, index) },
+                            onClick = { onPlayAlbum(recentAlbum(), tracks, index) },
                         )
                     }
                 }
@@ -211,6 +249,9 @@ private fun AlbumArtworkHero(
     title: String,
     bitmap: androidx.compose.ui.graphics.ImageBitmap?,
     accent: Color,
+    liked: Boolean,
+    likeLoading: Boolean,
+    onLike: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -218,6 +259,19 @@ private fun AlbumArtworkHero(
             .padding(top = 10.dp, bottom = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
+        AlbumLikeButton(
+            liked = liked,
+            enabled = !likeLoading,
+            description = when {
+                likeLoading -> "Loading album like state"
+                liked -> "Unlike album"
+                else -> "Like album"
+            },
+            onClick = onLike,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 6.dp),
+        )
         Box(
             modifier = Modifier
                 .size(92.dp)
@@ -235,23 +289,95 @@ private fun AlbumArtworkHero(
 }
 
 @Composable
-private fun PlayAlbumChip(
+private fun AlbumPlaybackActions(
     accent: Color,
-    onClick: () -> Unit,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 3.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+    ) {
+        PlaybackActionButton(
+            label = "Play",
+            accent = accent,
+            onClick = onPlay,
+            modifier = Modifier.weight(1f),
+        )
+        PlaybackActionButton(
+            label = "Shuffle",
+            accent = accent,
+            onClick = onShuffle,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun AlbumLikeButton(
+    liked: Boolean,
+    enabled: Boolean,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val iconScale by animateFloatAsState(
+        targetValue = if (liked) 1f else 0.85f,
+        animationSpec = spring(dampingRatio = 0.4f, stiffness = 400f),
+        label = "albumLikeScale",
+    )
+    val tint by animateColorAsState(
+        targetValue = if (liked) TidalColors.Cyan else TidalColors.White,
+        animationSpec = tween(200),
+        label = "albumLikeTint",
+    )
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Crossfade(
+            targetState = liked,
+            animationSpec = tween(150),
+            label = "albumLikeIcon",
+        ) { isLiked ->
+            Icon(
+                imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                contentDescription = description,
+                tint = if (enabled) tint else TidalColors.OnSurfaceMuted,
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlaybackActionButton(
+    label: String,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
             .heightIn(min = 48.dp)
-            .padding(horizontal = 20.dp, vertical = 3.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(lerp(TidalColors.SurfaceHigh, accent, 0.28f))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .semantics { contentDescription = label }
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
-        Text("Play Album", color = TidalColors.White, fontWeight = FontWeight.Black, fontSize = 14.sp, maxLines = 1)
+        Text(label, color = TidalColors.White, fontWeight = FontWeight.Black, fontSize = 13.sp, maxLines = 1)
     }
 }
 
@@ -313,7 +439,7 @@ private fun TrackChip(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 40.dp)
+            .heightIn(min = 48.dp)
             .padding(horizontal = 18.dp, vertical = 1.dp)
             .clickable(onClick = onClick)
             .semantics { contentDescription = "Play ${track.title}" }

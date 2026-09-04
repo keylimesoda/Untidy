@@ -50,7 +50,7 @@ Untidy currently supports the core standalone-watch listening loop:
 - **Add current track to playlist** flow, subject to TIDAL account/API permissions.
 - **View album / View artist** from Now Playing when route metadata is available.
 - **Output labeling** tuned for the watch; the built-in speaker appears as `Watch speaker`.
-- **Streaming quality presets** in Settings: Battery Saver, Balanced, and High, so users can choose between watch-friendly battery use and higher-quality TIDAL playback where the current backend supports it.
+- **Streaming quality presets** in Settings: Battery Saver, Balanced, High, and opt-in Full fidelity, so users can choose between watch-friendly battery use and lossless/HiRes source streams where TIDAL makes them available.
 - **Settings** for account, playback quality/preferences, downloads management, and app/legal information.
 
 Recent UX polish in the known-good line includes:
@@ -67,7 +67,7 @@ Untidy is useful now, but it is still under active validation:
 - **Real-watch QA is still open.** A known-good overnight use snapshot exists, but final release validation still needs structured coverage across watch models, Wear OS versions, input methods, Bluetooth routing, media controls, recents/back-stack behavior, and power/network edge cases.
 - **Offline/downloads are narrow.** The app contains a Downloads shelf, local cleanup surfaces, and sanctioned `usage=DOWNLOAD` proof/MVP work, but release builds do not yet promise broad user-facing album/playlist offline downloads. Do not implement offline by caching `PLAYBACK` / `STREAM` manifests.
 - **TIDAL API behavior varies by account/scopes.** Library, recommendations, playlist writes, quality tiers, and playback/download eligibility can depend on account region, subscription, scopes, catalog asset, and API availability.
-- **Quality selection is present, but still being refined.** Settings exposes Battery Saver / Balanced / High. The current playback path requests conservative AAC-oriented stream qualities for watch reliability; true lossless/full-fidelity behavior should be validated separately before being promised as a release feature.
+- **Full fidelity is intentionally opt-in.** It requests HiRes FLAC, then FLAC, with AAC fallback when the account or track cannot provide lossless audio. The player reports the format actually delivered; lossless decoding can consume substantially more data and battery on a watch.
 - **Unofficial client.** Untidy is independent from TIDAL, Google, and Samsung; users are responsible for complying with applicable terms.
 
 ## Install the prerelease APK
@@ -224,7 +224,7 @@ Current release-track priorities:
 1. Finish structured real-watch validation for the known-good line.
 2. Finish the README/source-backed repo presentation pass.
 3. Decide the beta scope for downloads/offline: keep as narrow proof/MVP surfaces or expand after more real-watch evidence.
-4. Validate and, if appropriate, add a true full-fidelity/lossless quality tier beyond the current Battery Saver / Balanced / High presets.
+4. Validate Full fidelity across more real watches, Bluetooth routes, and LTE/Wi-Fi transitions, including delivered-format and battery measurements.
 5. Keep README, release checklist, and work board aligned with shipped behavior.
 6. Only then promote from prerelease validation to a broader beta/release channel.
 

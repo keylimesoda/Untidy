@@ -10,6 +10,8 @@ object PlaybackActions {
     const val ACTION_SKIP_NEXT = "com.tidal.wear.action.SKIP_NEXT"
     const val ACTION_SKIP_PREVIOUS = "com.tidal.wear.action.SKIP_PREVIOUS"
     const val ACTION_JUMP_TO_QUEUE_INDEX = "com.tidal.wear.action.JUMP_TO_QUEUE_INDEX"
+    /** Routes Untidy's own playback track; this never changes the system Bluetooth device. */
+    const val ACTION_SET_PREFERRED_AUDIO_OUTPUT = "com.tidal.wear.action.SET_PREFERRED_AUDIO_OUTPUT"
     const val EXTRA_TRACK_ID = "com.tidal.wear.extra.TRACK_ID"
     const val EXTRA_TITLE = "com.tidal.wear.extra.TITLE"
     const val EXTRA_ARTIST = "com.tidal.wear.extra.ARTIST"
@@ -22,5 +24,6 @@ object PlaybackActions {
     const val EXTRA_QUEUE_PAYLOAD = "com.tidal.wear.extra.QUEUE_PAYLOAD"
     const val EXTRA_QUEUE_START_INDEX = "com.tidal.wear.extra.QUEUE_START_INDEX"
     const val EXTRA_QUEUE_INDEX = "com.tidal.wear.extra.QUEUE_INDEX"
+    const val EXTRA_AUDIO_DEVICE_ID = "com.tidal.wear.extra.AUDIO_DEVICE_ID"
     const val EXTRA_APP_COMMAND_TOKEN = "com.tidal.wear.extra.APP_COMMAND_TOKEN"
 }

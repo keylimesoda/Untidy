@@ -123,6 +123,11 @@ fun TrackContextScreen(
                     }
                     is OfflineDownloadResult.Failed -> Toast.makeText(context, "Download failed", Toast.LENGTH_SHORT).show()
                     OfflineDownloadResult.Skipped -> Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
+                    OfflineDownloadResult.WaitingForNetwork -> Toast.makeText(
+                        context,
+                        "Download queued · waiting for network",
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
                 downloading = false
             }

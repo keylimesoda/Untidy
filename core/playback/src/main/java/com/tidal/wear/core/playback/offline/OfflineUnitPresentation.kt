@@ -25,6 +25,13 @@ fun CollectionDownloadSummary.offlineUnitPresentation(
         canStartDownload = false,
         canRemoveLocalCopy = false,
     )
+    activeCount > 0 -> OfflineUnitPresentation(
+        label = "Saving $activeCount track${if (activeCount == 1) "" else "s"}",
+        detail = "$downloadedCount/$playableCount on watch · saving in background",
+        message = "Download queued",
+        canStartDownload = false,
+        canRemoveLocalCopy = downloadedCount > 0,
+    )
     hasFailures() -> OfflineUnitPresentation(
         label = "$failedCount failed",
         detail = if (downloadedCount > 0) "Partial $downloadedCount/$playableCount · tap to retry later" else "Tap to retry later",

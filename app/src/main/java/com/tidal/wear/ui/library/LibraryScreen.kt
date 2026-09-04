@@ -69,6 +69,7 @@ fun LibraryScreen(
     onOpenPlaylist: (TidalPlaylist) -> Unit,
     onOpenArtist: (TidalArtist) -> Unit,
     onPlayTrack: (TidalTrack) -> Unit,
+    onOpenDownloads: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current.applicationContext
@@ -82,8 +83,10 @@ fun LibraryScreen(
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 2)
 
     fun loadLibrary() {
+        scope.launch {
+            downloadedTracks = withContext(Dispatchers.IO) { context.readOfflineDownloadedTracks() }
+        }
         if (!networkAvailable) {
-            scope.launch { downloadedTracks = withContext(Dispatchers.IO) { context.readOfflineDownloadedTracks() } }
             favorites = null
             loading = false
             error = true
@@ -121,98 +124,117 @@ fun LibraryScreen(
             item {
                 LibraryTitle(selectedCategory?.label ?: "Library")
             }
-            when {
-                loading -> item { LoadingCollection() }
-                error -> {
-                    item { ErrorRow(networkAvailable = networkAvailable, onClick = { loadTick++ }) }
-                    if (!networkAvailable) {
-                        item { OfflineDownloadsHint(count = downloadedTracks.size) }
+            if (selectedCategory == null) {
+                // Keep the device-local action above the cloud-backed collection so it is
+                // useful immediately, including when the watch is offline.
+                item {
+                    OnThisWatchRow(
+                        count = downloadedTracks.size,
+                        onClick = onOpenDownloads,
+                    )
+                }
+                when {
+                    loading -> item { LoadingCollection() }
+                    error -> {
+                        item { ErrorRow(networkAvailable = networkAvailable, onClick = { loadTick++ }) }
+                        if (!networkAvailable) {
+                            item { OfflineDownloadsHint(count = downloadedTracks.size) }
+                        }
+                    }
+                    favorites.isEmpty() -> item {
+                        EmptyCollection()
+                    }
+                    else -> {
+                        val safeFavorites = favorites ?: TidalSearchResult()
+                        item {
+                            CategoryRow(
+                                label = LibraryCategory.Playlists.label,
+                                count = safeFavorites.playlists.size,
+                                icon = Icons.Filled.LibraryMusic,
+                                enabled = safeFavorites.playlists.isNotEmpty(),
+                                onClick = { selectedCategory = LibraryCategory.Playlists },
+                            )
+                        }
+                        item {
+                            CategoryRow(
+                                label = LibraryCategory.Albums.label,
+                                count = safeFavorites.albums.size,
+                                icon = Icons.Filled.Album,
+                                enabled = safeFavorites.albums.isNotEmpty(),
+                                onClick = { selectedCategory = LibraryCategory.Albums },
+                            )
+                        }
+                        item {
+                            CategoryRow(
+                                label = LibraryCategory.Artists.label,
+                                count = safeFavorites.artists.size,
+                                icon = Icons.Filled.Person,
+                                enabled = safeFavorites.artists.isNotEmpty(),
+                                onClick = { selectedCategory = LibraryCategory.Artists },
+                            )
+                        }
+                        item {
+                            CategoryRow(
+                                label = LibraryCategory.Tracks.label,
+                                count = safeFavorites.tracks.size,
+                                icon = Icons.Filled.GraphicEq,
+                                enabled = safeFavorites.tracks.isNotEmpty(),
+                                onClick = { selectedCategory = LibraryCategory.Tracks },
+                            )
+                        }
                     }
                 }
-                favorites.isEmpty() -> item {
-                    EmptyCollection()
-                }
-                selectedCategory == null -> {
-                    val safeFavorites = favorites ?: TidalSearchResult()
-                    item {
-                        CategoryRow(
-                            label = LibraryCategory.Playlists.label,
-                            count = safeFavorites.playlists.size,
-                            icon = Icons.Filled.LibraryMusic,
-                            onClick = { selectedCategory = LibraryCategory.Playlists },
-                        )
-                    }
-                    item {
-                        CategoryRow(
-                            label = LibraryCategory.Albums.label,
-                            count = safeFavorites.albums.size,
-                            icon = Icons.Filled.Album,
-                            onClick = { selectedCategory = LibraryCategory.Albums },
-                        )
-                    }
-                    item {
-                        CategoryRow(
-                            label = LibraryCategory.Tracks.label,
-                            count = safeFavorites.tracks.size,
-                            icon = Icons.Filled.GraphicEq,
-                            onClick = { selectedCategory = LibraryCategory.Tracks },
-                        )
-                    }
-                    item {
-                        CategoryRow(
-                            label = LibraryCategory.Artists.label,
-                            count = safeFavorites.artists.size,
-                            icon = Icons.Filled.Person,
-                            onClick = { selectedCategory = LibraryCategory.Artists },
-                        )
-                    }
-                }
-                else -> {
-                    val safeFavorites = favorites ?: TidalSearchResult()
-                    val category = selectedCategory ?: LibraryCategory.Playlists
-                    when (category) {
-                        LibraryCategory.Albums -> safeFavorites.albums.forEach { album ->
-                            item {
-                                LibraryResultRow(
-                                    label = album.title,
-                                    secondaryLabel = album.artist.ifBlank { "Album" },
-                                    artworkUrl = album.artworkUrl,
-                                    fallback = "▣",
-                                    onClick = { onOpenAlbum(album) },
-                                )
+            } else {
+                when {
+                    loading -> item { LoadingCollection() }
+                    error -> item { ErrorRow(networkAvailable = networkAvailable, onClick = { loadTick++ }) }
+                    else -> {
+                        val safeFavorites = favorites ?: TidalSearchResult()
+                        val category = selectedCategory ?: LibraryCategory.Playlists
+                        when (category) {
+                            LibraryCategory.Albums -> safeFavorites.albums.forEach { album ->
+                                item {
+                                    LibraryResultRow(
+                                        label = album.title,
+                                        secondaryLabel = album.artist.ifBlank { "Album" },
+                                        artworkUrl = album.artworkUrl,
+                                        fallback = "▣",
+                                        onClick = { onOpenAlbum(album) },
+                                    )
+                                }
                             }
-                        }
-                        LibraryCategory.Tracks -> safeFavorites.tracks.forEach { track ->
-                            item {
-                                LibraryResultRow(
-                                    label = track.title,
-                                    secondaryLabel = track.artist.ifBlank { track.album.ifBlank { "Track" } },
-                                    artworkUrl = track.artworkUrl,
-                                    fallback = "♪",
-                                    onClick = { onPlayTrack(track) },
-                                )
+                            LibraryCategory.Tracks -> safeFavorites.tracks.forEach { track ->
+                                item {
+                                    LibraryResultRow(
+                                        label = track.title,
+                                        secondaryLabel = track.artist.ifBlank { track.album.ifBlank { "Track" } },
+                                        artworkUrl = track.artworkUrl,
+                                        fallback = "♪",
+                                        onClick = { onPlayTrack(track) },
+                                    )
+                                }
                             }
-                        }
-                        LibraryCategory.Playlists -> safeFavorites.playlists.forEach { playlist ->
-                            item {
-                                LibraryResultRow(
-                                    label = playlist.title,
-                                    secondaryLabel = playlist.creator.ifBlank { "Playlist" },
-                                    artworkUrl = playlist.artworkUrl,
-                                    fallback = "≡",
-                                    onClick = { onOpenPlaylist(playlist) },
-                                )
+                            LibraryCategory.Playlists -> safeFavorites.playlists.forEach { playlist ->
+                                item {
+                                    LibraryResultRow(
+                                        label = playlist.title,
+                                        secondaryLabel = playlist.creator.ifBlank { "Playlist" },
+                                        artworkUrl = playlist.artworkUrl,
+                                        fallback = "≡",
+                                        onClick = { onOpenPlaylist(playlist) },
+                                    )
+                                }
                             }
-                        }
-                        LibraryCategory.Artists -> safeFavorites.artists.forEach { artist ->
-                            item {
-                                LibraryResultRow(
-                                    label = artist.name,
-                                    secondaryLabel = "Artist",
-                                    artworkUrl = artist.artworkUrl,
-                                    fallback = "★",
-                                    onClick = { onOpenArtist(artist) },
-                                )
+                            LibraryCategory.Artists -> safeFavorites.artists.forEach { artist ->
+                                item {
+                                    LibraryResultRow(
+                                        label = artist.name,
+                                        secondaryLabel = "Artist",
+                                        artworkUrl = artist.artworkUrl,
+                                        fallback = "★",
+                                        onClick = { onOpenArtist(artist) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -225,8 +247,8 @@ fun LibraryScreen(
 private enum class LibraryCategory(val label: String) {
     Playlists("Playlists"),
     Albums("Albums"),
-    Tracks("Tracks"),
     Artists("Artists"),
+    Tracks("Liked tracks"),
 }
 
 private fun TidalSearchResult?.isEmpty(): Boolean = this == null ||
@@ -266,15 +288,39 @@ private fun LibraryTitle(title: String) {
 }
 
 @Composable
+private fun OnThisWatchRow(count: Int, onClick: () -> Unit) {
+    Chip(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+        onClick = onClick,
+        colors = ChipDefaults.primaryChipColors(
+            backgroundColor = TidalColors.Cyan,
+            contentColor = TidalColors.Black,
+            secondaryContentColor = TidalColors.Black.copy(alpha = 0.72f),
+            iconColor = TidalColors.Black,
+        ),
+        icon = { Icon(Icons.Filled.Download, contentDescription = null) },
+        label = { RowText("On this watch") },
+        secondaryLabel = {
+            RowText(if (count == 1) "1 downloaded track" else "$count downloaded tracks")
+        },
+        contentPadding = PaddingValues(horizontal = 12.dp),
+    )
+}
+
+@Composable
 private fun CategoryRow(
     label: String,
     count: Int,
     icon: ImageVector,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     Chip(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
         onClick = onClick,
+        enabled = enabled,
         colors = ChipDefaults.secondaryChipColors(
             backgroundColor = TidalColors.Surface,
             contentColor = TidalColors.White,

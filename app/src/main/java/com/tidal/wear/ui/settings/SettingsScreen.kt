@@ -55,6 +55,7 @@ fun SettingsScreen(
     val repository = remember(context) { SettingsRepository(context.applicationContext) }
     val preset by repository.preset.collectAsState(initial = AudioPreset.BatterySaver)
     val releaseVersionPreference by repository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
+    val downloadOverLte by repository.downloadOverLte.collectAsState(initial = false)
     val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
     val accountInfo by authRepository.accountInfo.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
@@ -134,18 +135,23 @@ fun SettingsScreen(
                     )
                 }
                 item {
-                    PresetChip("Battery Saver", AudioPreset.BatterySaver, preset) {
+                    PresetChip("Battery Saver", "Lowest data and power", AudioPreset.BatterySaver, preset) {
                         scope.launch { repository.setPreset(AudioPreset.BatterySaver) }
                     }
                 }
                 item {
-                    PresetChip("Balanced", AudioPreset.Balanced, preset) {
+                    PresetChip("Balanced", "Efficient everyday listening", AudioPreset.Balanced, preset) {
                         scope.launch { repository.setPreset(AudioPreset.Balanced) }
                     }
                 }
                 item {
-                    PresetChip("High", AudioPreset.High, preset) {
+                    PresetChip("High", "Up to 320 kbps", AudioPreset.High, preset) {
                         scope.launch { repository.setPreset(AudioPreset.High) }
+                    }
+                }
+                item {
+                    PresetChip("Full fidelity", "Lossless / HiRes source", AudioPreset.FullFidelity, preset) {
+                        scope.launch { repository.setPreset(AudioPreset.FullFidelity) }
                     }
                 }
 
@@ -181,7 +187,16 @@ fun SettingsScreen(
                     )
                 }
                 item { DisabledSettingChip("Download quality", "Fixed for this release") }
-                item { DisabledSettingChip("Download over LTE", "Wi‑Fi only for now") }
+                item {
+                    BooleanSettingChip(
+                        label = "Download over LTE",
+                        secondary = if (downloadOverLte) "Uses watch data plan" else "Wi‑Fi only",
+                        checked = downloadOverLte,
+                        onCheckedChange = { enabled ->
+                            scope.launch { repository.setDownloadOverLte(enabled) }
+                        },
+                    )
+                }
                 item { DisabledSettingChip("Storage limit", "Manual cleanup for now") }
                 if (downloadedTracks.isNotEmpty()) {
                     item {
@@ -237,7 +252,7 @@ fun SettingsScreen(
                 item { DisabledSettingChip("TIDAL attribution", "Unofficial client · TIDAL marks belong to TIDAL") }
                 item {
                     Text(
-                        text = "Stream policy: AAC/MP4A non-lossless to preserve battery.",
+                        text = streamingPolicyFooter(preset),
                         style = MaterialTheme.typography.caption1,
                         color = TidalColors.OnSurfaceDim,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
@@ -292,11 +307,18 @@ private fun DisabledSettingChip(label: String, secondary: String) {
 }
 
 @Composable
-private fun PresetChip(label: String, value: AudioPreset, selected: AudioPreset, onClick: () -> Unit) {
+private fun PresetChip(
+    label: String,
+    secondary: String,
+    value: AudioPreset,
+    selected: AudioPreset,
+    onClick: () -> Unit,
+) {
     ToggleChip(
         checked = value == selected,
         onCheckedChange = { onClick() },
         label = { Text(label) },
+        secondaryLabel = { Text(secondary) },
         toggleControl = {
             Icon(
                 imageVector = ToggleChipDefaults.radioIcon(checked = value == selected),
@@ -313,6 +335,43 @@ private fun PresetChip(label: String, value: AudioPreset, selected: AudioPreset,
             uncheckedContentColor = TidalColors.OnSurfaceDim,
         ),
     )
+}
+
+@Composable
+private fun BooleanSettingChip(
+    label: String,
+    secondary: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    ToggleChip(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        label = { Text(label) },
+        secondaryLabel = { Text(secondary) },
+        toggleControl = {
+            Icon(
+                imageVector = ToggleChipDefaults.switchIcon(checked),
+                contentDescription = null,
+                tint = if (checked) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
+            )
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        colors = ToggleChipDefaults.toggleChipColors(
+            checkedStartBackgroundColor = TidalColors.Surface,
+            checkedEndBackgroundColor = TidalColors.Surface,
+            checkedContentColor = TidalColors.White,
+            uncheckedStartBackgroundColor = Color.Transparent,
+            uncheckedContentColor = TidalColors.OnSurfaceDim,
+        ),
+    )
+}
+
+internal fun streamingPolicyFooter(preset: AudioPreset): String = when (preset) {
+    AudioPreset.BatterySaver -> "Battery Saver uses efficient AAC to protect battery."
+    AudioPreset.Balanced -> "Balanced uses efficient AAC for everyday listening."
+    AudioPreset.High -> "High requests up to 320 kbps AAC where available."
+    AudioPreset.FullFidelity -> "Full fidelity requests lossless / HiRes where available. Uses more data and battery."
 }
 
 @Composable

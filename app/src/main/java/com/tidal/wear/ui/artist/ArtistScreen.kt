@@ -48,6 +48,8 @@ import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -74,14 +76,28 @@ fun ArtistScreen(
         loading = true
         error = null
         try {
-            val loadedArtist = withContext(Dispatchers.IO) { runCatching { apiClient.artist(artistId) }.getOrNull() }
-            val loadedTracks = withContext(Dispatchers.IO) { apiClient.artistTracks(artistId) }
-            val loadedAlbumGroups = withContext(Dispatchers.IO) {
-                apiClient.artistAlbumGroups(
-                    artistId,
-                    limitPerGroup = ARTIST_ALBUM_PREVIEW_COUNT,
-                    releaseVersionPreference = releaseVersionPreference,
-                )
+            // These three bounded requests are independent. Starting them together removes
+            // the serial network waterfall while coroutineScope still cancels all work when
+            // the screen leaves or a retry starts.
+            val (loadedArtist, loadedTracks, loadedAlbumGroups) = coroutineScope {
+                val artistDeferred = async(Dispatchers.IO) {
+                    try {
+                        apiClient.artist(artistId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Throwable) {
+                        null
+                    }
+                }
+                val tracksDeferred = async(Dispatchers.IO) { apiClient.artistTracks(artistId) }
+                val albumsDeferred = async(Dispatchers.IO) {
+                    apiClient.artistAlbumGroups(
+                        artistId,
+                        limitPerGroup = ARTIST_ALBUM_PREVIEW_COUNT,
+                        releaseVersionPreference = releaseVersionPreference,
+                    )
+                }
+                Triple(artistDeferred.await(), tracksDeferred.await(), albumsDeferred.await())
             }
             artist = loadedArtist?.copy(
                 name = loadedArtist.name.ifBlank { initialArtist?.name.orEmpty() },
@@ -102,6 +118,8 @@ fun ArtistScreen(
 
     val safeTracks = tracks.orEmpty()
     val safeAlbumGroups = albumGroups ?: TidalArtistAlbums()
+    val topTracks = safeTracks.take(ARTIST_TRACK_PREVIEW_COUNT)
+    val primaryReleases = safeAlbumGroups.albums.take(ARTIST_ALBUM_PREVIEW_COUNT)
     val title = artist?.name ?: "Artist"
     val artworkUrl = artist?.artworkUrl
     val art = rememberArtworkPalette(artworkUrl, Size(160, 160))
@@ -131,7 +149,21 @@ fun ArtistScreen(
                 error != null -> item { RetryStatusChip(title = error.orEmpty(), onClick = { retryTick += 1 }) }
                 safeTracks.isEmpty() && safeAlbumGroups.all.isEmpty() -> item { StatusText("No artist content found") }
                 else -> {
-                    section("Top Tracks", safeTracks.take(12)) { track ->
+                    if (safeTracks.isNotEmpty()) {
+                        item {
+                            PlayTopTracksChip(
+                                count = safeTracks.size,
+                                onClick = {
+                                    if (safeTracks.size > 1) {
+                                        onPlayQueue(safeTracks, 0)
+                                    } else {
+                                        onPlayTrack(safeTracks.first())
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    section("Top tracks", topTracks) { track ->
                         TidalResultChip(
                             label = track.title,
                             secondaryLabel = listOf(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "Track" },
@@ -146,13 +178,10 @@ fun ArtistScreen(
                             },
                         )
                     }
-                    albumSection("Albums", safeAlbumGroups.albums, title, onOpenAlbum)
-                    albumSection("EPs & Singles", safeAlbumGroups.epsAndSingles, title, onOpenAlbum)
-                    albumSection("Compilations", safeAlbumGroups.compilations, title, onOpenAlbum)
-                    albumSection("Other", safeAlbumGroups.other, title, onOpenAlbum)
+                    albumSection("Top releases", primaryReleases, title, onOpenAlbum)
                     if (safeAlbumGroups.all.isNotEmpty()) {
                         item {
-                            MoreAlbumsChip {
+                            AllReleasesChip {
                                 onOpenAlbums(artist ?: TidalArtist(artistId, title, artworkUrl))
                             }
                         }
@@ -181,13 +210,24 @@ fun ArtistAlbumsScreen(
         loading = true
         error = null
         try {
-            val loadedArtist = withContext(Dispatchers.IO) { runCatching { apiClient.artist(artistId) }.getOrNull() }
-            val loadedAlbums = withContext(Dispatchers.IO) {
-                apiClient.artistAlbumGroups(
-                    artistId,
-                    limitPerGroup = ARTIST_ALBUM_FULL_LIMIT,
-                    releaseVersionPreference = releaseVersionPreference,
-                )
+            val (loadedArtist, loadedAlbums) = coroutineScope {
+                val artistDeferred = async(Dispatchers.IO) {
+                    try {
+                        apiClient.artist(artistId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Throwable) {
+                        null
+                    }
+                }
+                val albumsDeferred = async(Dispatchers.IO) {
+                    apiClient.artistAlbumGroups(
+                        artistId,
+                        limitPerGroup = ARTIST_ALBUM_FULL_LIMIT,
+                        releaseVersionPreference = releaseVersionPreference,
+                    )
+                }
+                artistDeferred.await() to albumsDeferred.await()
             }
             artist = loadedArtist?.copy(
                 name = loadedArtist.name.ifBlank { initialArtist?.name.orEmpty() },
@@ -245,7 +285,8 @@ fun ArtistAlbumsScreen(
     }
 }
 
-private const val ARTIST_ALBUM_PREVIEW_COUNT = 12
+private const val ARTIST_TRACK_PREVIEW_COUNT = 3
+private const val ARTIST_ALBUM_PREVIEW_COUNT = 3
 private const val ARTIST_ALBUM_FULL_LIMIT = 100
 
 private fun <T> androidx.wear.compose.foundation.lazy.ScalingLazyListScope.section(
@@ -285,13 +326,13 @@ private fun AlbumChip(
 }
 
 @Composable
-private fun MoreAlbumsChip(onClick: () -> Unit) {
+private fun PlayTopTracksChip(count: Int, onClick: () -> Unit) {
     Chip(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         onClick = onClick,
         label = {
             Text(
-                text = "View full discography",
+                text = "Play top tracks",
                 color = TidalColors.Black,
                 fontWeight = FontWeight.Black,
                 maxLines = 1,
@@ -302,7 +343,7 @@ private fun MoreAlbumsChip(onClick: () -> Unit) {
         },
         secondaryLabel = {
             Text(
-                text = "All releases",
+                text = if (count == 1) "1 track" else "$count tracks",
                 color = TidalColors.Black,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -313,6 +354,40 @@ private fun MoreAlbumsChip(onClick: () -> Unit) {
         colors = ChipDefaults.primaryChipColors(
             backgroundColor = TidalColors.Cyan,
             contentColor = TidalColors.Black,
+        ),
+    )
+}
+
+@Composable
+private fun AllReleasesChip(onClick: () -> Unit) {
+    Chip(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        onClick = onClick,
+        label = {
+            Text(
+                text = "All releases",
+                color = TidalColors.White,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        secondaryLabel = {
+            Text(
+                text = "Open full discography",
+                color = TidalColors.OnSurfaceMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        colors = ChipDefaults.secondaryChipColors(
+            backgroundColor = TidalColors.SurfaceHigh,
+            contentColor = TidalColors.White,
+            secondaryContentColor = TidalColors.OnSurfaceMuted,
         ),
     )
 }

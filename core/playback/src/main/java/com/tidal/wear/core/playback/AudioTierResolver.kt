@@ -39,6 +39,16 @@ class AudioTierResolver {
                 Candidate("audio/mpeg", 192),
                 Candidate("audio/mp4a-latm", 96),
             )
+            AudioPreset.FullFidelity -> listOf(
+                // FLAC is lossless; the bitrate is a nominal CD-quality value used only for
+                // capability diagnostics because lossless streams are variable bitrate.
+                Candidate("audio/flac", 1411),
+                Candidate("audio/mp4a-latm", 256),
+                Candidate("audio/mp4a-latm", 192),
+                Candidate("audio/mp4a-latm", 160),
+                Candidate("audio/mpeg", 192),
+                Candidate("audio/mp4a-latm", 96),
+            )
         }
 
         val selected = candidates.firstOrNull { it.mimeType in hardwareMimes }

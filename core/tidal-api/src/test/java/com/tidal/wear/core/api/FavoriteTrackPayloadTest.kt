@@ -30,4 +30,13 @@ class FavoriteTrackPayloadTest {
         assertEquals(JsonPrimitive("tracks"), item["type"])
         assertEquals(JsonPrimitive("123"), item["id"])
     }
+
+    @Test
+    fun favoriteWritesTreatAlreadyPresentAndAlreadyAbsentAsSuccess() {
+        assertEquals(true, isFavoriteMutationSuccess(favorite = true, isSuccessful = false, code = 409))
+        assertEquals(true, isFavoriteMutationSuccess(favorite = false, isSuccessful = false, code = 404))
+        assertEquals(false, isFavoriteMutationSuccess(favorite = true, isSuccessful = false, code = 404))
+        assertEquals(false, isFavoriteMutationSuccess(favorite = false, isSuccessful = false, code = 409))
+        assertEquals(true, isFavoriteMutationSuccess(favorite = true, isSuccessful = true, code = 200))
+    }
 }

@@ -5,6 +5,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.ReleaseVersionPreference
+import com.tidal.wear.core.playback.offline.OfflineDownloadScheduler
+import com.tidal.wear.core.playback.settings.downloadOverLteEnabled
+import com.tidal.wear.core.playback.settings.setDownloadOverLteEnabled
 import com.tidal.wear.core.playback.settings.sharedSettingsDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -20,12 +23,19 @@ class SettingsRepository(private val context: Context) {
             ?: ReleaseVersionPreference.Explicit
     }
 
+    val downloadOverLte: Flow<Boolean> = context.downloadOverLteEnabled
+
     suspend fun setPreset(p: AudioPreset) {
         context.sharedSettingsDataStore.edit { it[AUDIO_PRESET] = p.name }
     }
 
     suspend fun setReleaseVersionPreference(preference: ReleaseVersionPreference) {
         context.sharedSettingsDataStore.edit { it[RELEASE_VERSION_PREFERENCE] = preference.name }
+    }
+
+    suspend fun setDownloadOverLte(enabled: Boolean) {
+        context.setDownloadOverLteEnabled(enabled)
+        OfflineDownloadScheduler(context).refreshQueuedWorkConstraints()
     }
 
     private companion object {

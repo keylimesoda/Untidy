@@ -16,6 +16,22 @@ class RecentHistoryTest {
     }
 
     @Test
+    fun collectionContextsRemainDistinctFromEachOtherAndTracks() {
+        val result = listOf(
+            item(RecentItemType.Track, "shared", title = "Track"),
+            item(RecentItemType.Album, "shared", title = "Album"),
+            item(RecentItemType.Playlist, "shared", title = "Playlist"),
+        ).fold(emptyList<RecentItem>()) { history, recent ->
+            RecentHistory.record(history, recent)
+        }
+
+        assertEquals(
+            listOf(RecentItemType.Playlist, RecentItemType.Album, RecentItemType.Track),
+            result.map(RecentItem::type),
+        )
+    }
+
+    @Test
     fun recordCapsAtTwentyItems() {
         val existing = (1..25).map { index ->
             item(RecentItemType.Track, "track-$index", lastPlayedAt = index.toLong())

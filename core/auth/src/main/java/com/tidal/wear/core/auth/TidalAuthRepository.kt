@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -298,20 +300,14 @@ class DefaultTidalAuthRepository private constructor(
     override val authState: StateFlow<AuthState> = _authState.asStateFlow()
     private val _accountInfo = MutableStateFlow(readAccountInfo())
     override val accountInfo: StateFlow<TidalAccountInfo?> = _accountInfo.asStateFlow()
+    private val tokenRefreshMutex = Mutex()
 
     override val credentialsProvider: CredentialsProvider = StoredCredentialsProvider(
         prefs = prefs,
         defaultClientId = FALLBACK_CLIENT_ID,
         defaultScopes = userScopes,
-        refresh = { refreshToken ->
-            val tokenClientId = prefs.getString(KEY_TOKEN_CLIENT_ID, FALLBACK_CLIENT_ID) ?: FALLBACK_CLIENT_ID
-            val token = if (tokenClientId == clientId) {
-                catalogDeviceAuth.refresh(refreshToken)
-            } else {
-                userDeviceAuth.refresh(refreshToken)
-            }
-            saveToken(token, tokenClientId = tokenClientId)
-            token
+        refresh = { _ ->
+            refreshStoredToken() ?: throw TidalAuthException("Refresh token missing")
         },
         onAuthChanged = { updateAuthState() },
     )
@@ -355,17 +351,35 @@ class DefaultTidalAuthRepository private constructor(
         val existing = prefs.getString(KEY_ACCESS_TOKEN, null)
         val expiresAt = prefs.getLong(KEY_EXPIRES_AT, 0L)
         if (!existing.isNullOrBlank() && expiresAt - EXPIRY_SKEW_SECONDS > now) return existing
-        val refreshToken = prefs.getString(KEY_REFRESH_TOKEN, null) ?: return null
-        return runCatching {
-            val tokenClientId = prefs.getString(KEY_TOKEN_CLIENT_ID, FALLBACK_CLIENT_ID) ?: FALLBACK_CLIENT_ID
-            val token = if (tokenClientId == clientId) {
-                catalogDeviceAuth.refresh(refreshToken)
-            } else {
-                userDeviceAuth.refresh(refreshToken)
-            }
-            saveToken(token, tokenClientId = tokenClientId)
-            token.accessToken
-        }.getOrNull()
+        if (prefs.getString(KEY_REFRESH_TOKEN, null) == null) return null
+        return runCatching { refreshStoredToken()?.accessToken }.getOrNull()
+    }
+
+    /** Refreshes the persisted access token once for all concurrent callers. */
+    private suspend fun refreshStoredToken(): TokenResult.Success? = tokenRefreshMutex.withLock {
+        // Another caller may have completed the refresh while this caller was waiting.
+        val now = System.currentTimeMillis() / 1000L
+        val existing = prefs.getString(KEY_ACCESS_TOKEN, null)
+        val expiresAt = prefs.getLong(KEY_EXPIRES_AT, 0L)
+        if (!existing.isNullOrBlank() && expiresAt - EXPIRY_SKEW_SECONDS > now) {
+            return@withLock TokenResult.Success(
+                accessToken = existing,
+                refreshToken = prefs.getString(KEY_REFRESH_TOKEN, null),
+                expiresInSeconds = (expiresAt - now).coerceAtLeast(0L),
+                userId = prefs.getString(KEY_USER_ID, null),
+                scopes = prefs.getStringSet(KEY_GRANTED_SCOPES, emptySet()).orEmpty(),
+            )
+        }
+
+        val refreshToken = prefs.getString(KEY_REFRESH_TOKEN, null) ?: return@withLock null
+        val tokenClientId = prefs.getString(KEY_TOKEN_CLIENT_ID, FALLBACK_CLIENT_ID) ?: FALLBACK_CLIENT_ID
+        val token = if (tokenClientId == clientId) {
+            catalogDeviceAuth.refresh(refreshToken)
+        } else {
+            userDeviceAuth.refresh(refreshToken)
+        }
+        saveToken(token, tokenClientId = tokenClientId)
+        token
     }
 
     override suspend fun getClientIdForApi(): String = prefs.getString(KEY_TOKEN_CLIENT_ID, FALLBACK_CLIENT_ID) ?: FALLBACK_CLIENT_ID

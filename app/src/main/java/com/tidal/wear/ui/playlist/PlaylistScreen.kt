@@ -16,11 +16,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +53,6 @@ import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -62,17 +61,13 @@ fun PlaylistScreen(
     offlineDownloader: OfflineTrackDownloader,
     playlistId: String,
     initialPlaylist: TidalPlaylist?,
-    onPlayPlaylist: (TidalPlaylist, List<TidalTrack>) -> Unit,
-    onPlayQueue: (List<TidalTrack>, Int) -> Unit,
+    onPlayPlaylist: (TidalPlaylist, List<TidalTrack>, Int) -> Unit,
 ) {
     var playlist by remember(playlistId, initialPlaylist) { mutableStateOf(initialPlaylist) }
     var tracks by remember(playlistId) { mutableStateOf(emptyList<TidalTrack>()) }
     var loading by remember(playlistId) { mutableStateOf(true) }
     var error by remember(playlistId) { mutableStateOf<String?>(null) }
     var retryTick by remember(playlistId) { mutableIntStateOf(0) }
-    var offlineRefreshTick by remember(playlistId) { mutableIntStateOf(0) }
-    var downloadingOffline by remember(playlistId) { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(playlistId, retryTick) {
         loading = true
@@ -116,13 +111,22 @@ fun PlaylistScreen(
         tracks.mapNotNull { it.artworkUrl?.takeIf(String::isNotBlank) }
     }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val collectionDownloadSummary = remember(tracks, offlineRefreshTick) { context.collectionDownloadSummary(tracks) }
+    val collectionDownloadSummary by remember(offlineDownloader, tracks) {
+        offlineDownloader.observeCollectionSummary(tracks)
+    }.collectAsState(initial = context.collectionDownloadSummary(tracks))
     val offlinePresentation = remember(collectionDownloadSummary) {
         collectionDownloadSummary.offlineUnitPresentation(OfflineUnit.Playlist, downloadsAvailable = true)
     }
     val art = rememberArtworkPalette(playlistArtworkUrl ?: trackArtworkUrls.firstOrNull(), Size(160, 160))
     val accent = art.palette.accentColor()
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+
+    fun recentPlaylist(): TidalPlaylist = playlist ?: TidalPlaylist(
+        id = playlistId,
+        title = title,
+        creator = creator,
+        artworkUrl = playlistArtworkUrl,
+    )
 
     LaunchedEffect(playlistId, loading) {
         if (!loading) listState.scrollToItem(0)
@@ -147,17 +151,10 @@ fun PlaylistScreen(
             }
             if (tracks.isNotEmpty()) {
                 item {
-                    PlayAllChip(
+                    PlaylistPlaybackActions(
                         accent = accent,
-                        onClick = {
-                            val recentPlaylist = playlist ?: TidalPlaylist(
-                                id = playlistId,
-                                title = title,
-                                creator = creator,
-                                artworkUrl = playlistArtworkUrl,
-                            )
-                            onPlayPlaylist(recentPlaylist, tracks)
-                        },
+                        onPlay = { onPlayPlaylist(recentPlaylist(), tracks, 0) },
+                        onShuffle = { onPlayPlaylist(recentPlaylist(), tracks.shuffled(), 0) },
                     )
                 }
                 item {
@@ -166,22 +163,12 @@ fun PlaylistScreen(
                         secondary = offlinePresentation.detail,
                         accent = accent,
                         onClick = {
-                            if (downloadingOffline) return@CollectionDownloadChip
-                            downloadingOffline = true
-                            scope.launch {
-                                val result = offlineDownloader.downloadTracks(tracks)
-                                offlineRefreshTick++
-                                downloadingOffline = false
-                                Toast.makeText(
-                                    context,
-                                    when {
-                                        result.downloaded > 0 && result.failed == 0 -> "Playlist saved on watch"
-                                        result.downloaded > 0 -> "Playlist partially saved"
-                                        else -> "Playlist download failed"
-                                    },
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
+                            val result = offlineDownloader.enqueueTracks(tracks)
+                            Toast.makeText(
+                                context,
+                                if (result.scheduled > 0) "Playlist download queued" else "Already saved on watch",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         },
                     )
                 }
@@ -196,7 +183,7 @@ fun PlaylistScreen(
                             index = index + 1,
                             track = track,
                             accent = accent,
-                            onClick = { onPlayQueue(tracks, index) },
+                            onClick = { onPlayPlaylist(recentPlaylist(), tracks, index) },
                         )
                     }
                 }
@@ -250,23 +237,51 @@ private fun PlaylistHeader(
 }
 
 @Composable
-private fun PlayAllChip(
+private fun PlaylistPlaybackActions(
     accent: Color,
-    onClick: () -> Unit,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 3.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+    ) {
+        PlaybackActionButton(
+            label = "Play",
+            accent = accent,
+            onClick = onPlay,
+            modifier = Modifier.weight(1f),
+        )
+        PlaybackActionButton(
+            label = "Shuffle",
+            accent = accent,
+            onClick = onShuffle,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun PlaybackActionButton(
+    label: String,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
             .heightIn(min = 48.dp)
-            .padding(horizontal = 20.dp, vertical = 3.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(lerp(TidalColors.SurfaceHigh, accent, 0.28f))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .semantics { contentDescription = label }
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
-        Text("Play all", color = TidalColors.White, fontWeight = FontWeight.Black, fontSize = 14.sp, maxLines = 1)
+        Text(label, color = TidalColors.White, fontWeight = FontWeight.Black, fontSize = 13.sp, maxLines = 1)
     }
 }
 
@@ -328,7 +343,7 @@ private fun TrackChip(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 40.dp)
+            .heightIn(min = 48.dp)
             .padding(horizontal = 18.dp, vertical = 1.dp)
             .clickable(onClick = onClick)
             .semantics { contentDescription = "Play ${track.title}" }

@@ -2,6 +2,7 @@ package com.tidal.wear.core.playback.offline
 
 import android.content.Context
 import com.tidal.wear.core.model.TidalTrack
+import org.json.JSONArray
 import java.io.File
 
 data class DownloadedTrackSummary(
@@ -17,6 +18,8 @@ data class CollectionDownloadSummary(
     val playableCount: Int,
     val downloadedCount: Int,
     val failedCount: Int = 0,
+    /** Tracks persisted by WorkManager but not yet saved locally. */
+    val activeCount: Int = 0,
 )
 
 fun CollectionDownloadSummary.hasFailures(): Boolean = failedCount > 0
@@ -66,14 +69,17 @@ fun Context.readOfflineDownloadedTracks(): List<DownloadedTrackSummary> {
 
 fun Context.markOfflineTrackDownloaded(track: TidalTrack) {
     val record = track.toOfflineDownloadRecord() ?: return
-    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
-        .edit()
-        .putBoolean("$DOWNLOADED_PREFIX${record.id}", true)
-        .remove("$FAILED_PREFIX${record.id}")
-        .putString("title:${record.id}", record.title)
-        .putString("artist:${record.id}", record.artist)
-        .putLong("downloadedAt:${record.id}", System.currentTimeMillis())
-        .apply()
+    synchronized(offlineDownloadStateLock) {
+        if (isOfflineTrackDownloadRemovalRequestedLocked(record.id)) return
+        getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("$DOWNLOADED_PREFIX${record.id}", true)
+            .remove("$FAILED_PREFIX${record.id}")
+            .putString("title:${record.id}", record.title)
+            .putString("artist:${record.id}", record.artist)
+            .putLong("downloadedAt:${record.id}", System.currentTimeMillis())
+            .apply()
+    }
 }
 
 fun Context.markOfflineTracksDownloaded(tracks: List<TidalTrack>): Int {
@@ -113,10 +119,14 @@ private fun TidalTrack.toOfflineDownloadRecord(): OfflineDownloadRecord? {
 
 fun Context.markOfflineTrackDownloadFailed(trackId: String) {
     if (trackId.isBlank()) return
-    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
-        .edit()
-        .putBoolean("$FAILED_PREFIX$trackId", true)
-        .apply()
+    synchronized(offlineDownloadStateLock) {
+        if (!isOfflineTrackDownloadRemovalRequestedLocked(trackId)) {
+            getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("$FAILED_PREFIX$trackId", true)
+                .apply()
+        }
+    }
 }
 
 fun Context.clearOfflineTrackDownloadFailed(trackId: String) {
@@ -141,27 +151,21 @@ fun Context.isOfflineTrackDownloadFailed(trackId: String): Boolean =
  */
 fun Context.removeOfflineTrackDownload(trackId: String): Boolean {
     if (trackId.isBlank()) return false
-    val cacheDir = offlineTrackCacheDir(trackId)
-    val cacheRemoved = !cacheDir.exists() || cacheDir.deleteRecursively()
-    if (!cacheRemoved) return false
-
-    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
-        .edit()
-        .remove("$DOWNLOADED_PREFIX$trackId")
-        .remove("title:$trackId")
-        .remove("artist:$trackId")
-        .remove("downloadedAt:$trackId")
-        .remove("$FAILED_PREFIX$trackId")
-        .apply()
-    return true
+    markOfflineTrackDownloadRemovalRequested(trackId)
+    OfflineDownloadScheduler(this).cancel(trackId)
+    return removeOfflineTrackDownloadState(trackId)
 }
 
 /**
  * Removes all Untidy-local downloaded track state and cache bytes from this watch.
  * This never mutates TIDAL library, playlists, playlist membership, or remote assets.
  */
-fun Context.removeAllOfflineTrackDownloads(): Boolean =
-    readOfflineDownloadedTracks().map { removeOfflineTrackDownload(it.id) }.all { it }
+fun Context.removeAllOfflineTrackDownloads(): Boolean {
+    val queuedIds = tombstoneAndClearQueuedOfflineDownloads()
+    OfflineDownloadScheduler(this).cancelAll()
+    val ids = queuedIds + readOfflineDownloadedTracks().map { it.id }
+    return ids.distinct().map(::removeOfflineTrackDownloadState).all { it }
+}
 
 fun Context.offlineDownloadsStorageBytes(): Long =
     readOfflineDownloadedTracks()
@@ -181,3 +185,157 @@ private fun File.directorySizeBytes(): Long {
 private const val OFFLINE_DOWNLOAD_PREFS = "offline-downloads"
 private const val DOWNLOADED_PREFIX = "downloaded:"
 private const val FAILED_PREFIX = "failed:"
+private const val REMOVAL_REQUESTED_PREFIX = "removal-requested:"
+
+internal fun Context.markOfflineTrackDownloadRemovalRequested(trackId: String) {
+    synchronized(offlineDownloadStateLock) {
+        getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("$REMOVAL_REQUESTED_PREFIX$trackId", true)
+            .apply()
+    }
+}
+
+internal fun Context.markOfflineTrackDownloadQueued(record: OfflineDownloadRecord) {
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString("title:${record.id}", record.title)
+        .putString("artist:${record.id}", record.artist)
+        .apply()
+}
+
+internal fun Context.offlineTrackDownloadMetadata(trackId: String): Pair<String, String> {
+    val prefs = getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+    return (
+        prefs.getString("title:$trackId", null)?.takeIf { it.isNotBlank() } ?: "Downloaded track"
+    ) to prefs.getString("artist:$trackId", null).orEmpty()
+}
+
+internal fun Context.clearOfflineTrackDownloadRemovalRequested(trackId: String) {
+    synchronized(offlineDownloadStateLock) {
+        getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove("$REMOVAL_REQUESTED_PREFIX$trackId")
+            .apply()
+    }
+}
+
+internal fun Context.isOfflineTrackDownloadRemovalRequested(trackId: String): Boolean =
+    synchronized(offlineDownloadStateLock) { isOfflineTrackDownloadRemovalRequestedLocked(trackId) }
+
+internal fun Context.enqueueOfflineDownloadRecords(records: List<OfflineDownloadRecord>): List<OfflineDownloadRecord> =
+    synchronized(offlineDownloadStateLock) {
+        val queued = readQueuedOfflineDownloadRecordsLocked().toMutableList()
+        val additions = OfflineDownloadQueuePolicy.appendInOrder(
+            existing = queued,
+            candidates = records,
+            isAlreadyDownloaded = ::isOfflineTrackDownloaded,
+        )
+        additions.forEach { record ->
+            clearOfflineTrackDownloadRemovalRequested(record.id)
+            clearOfflineTrackDownloadFailed(record.id)
+            markOfflineTrackDownloadQueued(record)
+            queued += record
+        }
+        writeQueuedOfflineDownloadRecordsLocked(queued)
+        additions
+    }
+
+internal fun Context.readQueuedOfflineDownloadRecords(): List<OfflineDownloadRecord> =
+    synchronized(offlineDownloadStateLock) { readQueuedOfflineDownloadRecordsLocked() }
+
+internal fun Context.nextQueuedOfflineDownloadRecord(): OfflineDownloadRecord? =
+    synchronized(offlineDownloadStateLock) { readQueuedOfflineDownloadRecordsLocked().firstOrNull() }
+
+internal fun Context.removeQueuedOfflineDownloadRecord(trackId: String) {
+    synchronized(offlineDownloadStateLock) {
+        val mutation = OfflineDownloadQueuePolicy.tombstoneAndRemove(
+            records = readQueuedOfflineDownloadRecordsLocked(),
+            ids = setOf(trackId),
+        )
+        writeQueuedOfflineDownloadRecordsLocked(mutation.remaining)
+    }
+}
+
+/** Tombstones the active head and every queued record before cancellation can race with them. */
+internal fun Context.tombstoneAndClearQueuedOfflineDownloads(): List<String> =
+    synchronized(offlineDownloadStateLock) {
+        val records = readQueuedOfflineDownloadRecordsLocked()
+        val mutation = OfflineDownloadQueuePolicy.tombstoneAndRemove(
+            records = records,
+            ids = records.mapTo(mutableSetOf()) { it.id },
+        )
+        val ids = mutation.tombstonedIds
+        val editor = getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE).edit()
+        ids.forEach { editor.putBoolean("$REMOVAL_REQUESTED_PREFIX$it", true) }
+        editor.putString(QUEUED_TRACK_IDS_KEY, JSONArray().apply { mutation.remaining.forEach { put(it.id) } }.toString()).apply()
+        ids
+    }
+
+/** Clears cache and visible state, retaining the tombstone until a deliberate new enqueue. */
+internal fun Context.removeOfflineTrackDownloadState(trackId: String): Boolean =
+    synchronized(offlineDownloadStateLock) {
+        val cacheDir = offlineTrackCacheDir(trackId)
+        val cacheRemoved = !cacheDir.exists() || cacheDir.deleteRecursively()
+        if (!cacheRemoved) return false
+        getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove("$DOWNLOADED_PREFIX$trackId")
+            .remove("title:$trackId")
+            .remove("artist:$trackId")
+            .remove("downloadedAt:$trackId")
+            .remove("$FAILED_PREFIX$trackId")
+            .apply()
+        true
+    }
+
+private fun Context.readQueuedOfflineDownloadRecordsLocked(): List<OfflineDownloadRecord> {
+    val prefs = getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+    val ids = runCatching { JSONArray(prefs.getString(QUEUED_TRACK_IDS_KEY, "[]")) }.getOrDefault(JSONArray())
+    return buildList {
+        repeat(ids.length()) { index ->
+            val id = ids.optString(index).takeIf(String::isNotBlank) ?: return@repeat
+            val (title, artist) = offlineTrackDownloadMetadata(id)
+            add(OfflineDownloadRecord(id, title, artist))
+        }
+    }.distinctBy { it.id }
+}
+
+private fun Context.writeQueuedOfflineDownloadRecordsLocked(records: List<OfflineDownloadRecord>) {
+    val ids = JSONArray().apply { records.forEach { put(it.id) } }
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString(QUEUED_TRACK_IDS_KEY, ids.toString())
+        .apply()
+}
+
+private fun Context.isOfflineTrackDownloadRemovalRequestedLocked(trackId: String): Boolean =
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+        .getBoolean("$REMOVAL_REQUESTED_PREFIX$trackId", false)
+
+private val offlineDownloadStateLock = Any()
+private const val QUEUED_TRACK_IDS_KEY = "queued-track-ids"
+
+internal object OfflineDownloadQueuePolicy {
+    /** Appends only new, non-local records, retaining the caller's FIFO ordering. */
+    fun appendInOrder(
+        existing: List<OfflineDownloadRecord>,
+        candidates: List<OfflineDownloadRecord>,
+        isAlreadyDownloaded: (String) -> Boolean,
+    ): List<OfflineDownloadRecord> {
+        val knownIds = existing.mapTo(mutableSetOf()) { it.id }
+        return candidates.filter { record -> !isAlreadyDownloaded(record.id) && knownIds.add(record.id) }
+    }
+
+    /** The returned IDs must be tombstoned before the remaining queue is persisted. */
+    fun tombstoneAndRemove(records: List<OfflineDownloadRecord>, ids: Set<String>): OfflineQueueRemoval =
+        OfflineQueueRemoval(
+            tombstonedIds = records.asSequence().map { it.id }.filter(ids::contains).distinct().toList(),
+            remaining = records.filterNot { it.id in ids },
+        )
+}
+
+internal data class OfflineQueueRemoval(
+    val tombstonedIds: List<String>,
+    val remaining: List<OfflineDownloadRecord>,
+)

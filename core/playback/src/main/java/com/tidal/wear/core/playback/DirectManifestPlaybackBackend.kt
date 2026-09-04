@@ -3,6 +3,8 @@
 package com.tidal.wear.core.playback
 
 import android.content.Context
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
@@ -31,13 +33,16 @@ import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.core.playback.offline.offlineTrackCacheDir
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import okhttp3.Call
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -65,7 +70,13 @@ internal class DirectManifestPlaybackBackend(
     private val offlineCaches = ConcurrentHashMap<String, SimpleCache>()
     private var audioPreset = AudioPreset.BatterySaver
     private var currentManifest: ResolvedManifest? = null
-    private val manifestRequests = ConcurrentHashMap<String, Deferred<Result<ResolvedManifest>>>()
+    private val manifestRequests = ConcurrentHashMap<String, ManifestRequest>()
+    private val activeManifestCalls = ConcurrentHashMap<String, Call>()
+    private var queueWindow: PlaybackQueueWindow? = null
+    private var queueGeneration = 0L
+    private var appendedMediaItemCount = 0
+    private var lookAheadJob: Job? = null
+    private val resolvedManifestsByPlayerIndex = mutableMapOf<Int, ResolvedManifest>()
     private val player = ExoPlayer.Builder(appContext)
         .setAudioAttributes(AudioAttributes.DEFAULT, true)
         .build()
@@ -75,7 +86,13 @@ internal class DirectManifestPlaybackBackend(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_ENDED) {
-                        currentManifest?.let { _events.tryEmit(PlaybackBackendEvent.MediaEnded(it.toDiagnosticContext(exo.duration))) }
+                        currentManifest?.let {
+                            _events.tryEmit(
+                                PlaybackBackendEvent.MediaEnded(
+                                    it.toDiagnosticContext(exo.duration, queueIndexForPlayerIndex(exo.currentMediaItemIndex)),
+                                ),
+                            )
+                        }
                     } else {
                         _events.tryEmit(PlaybackBackendEvent.StateChanged(playbackState.toBackendState(exo.isPlaying)))
                     }
@@ -91,16 +108,42 @@ internal class DirectManifestPlaybackBackend(
 
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                     val mediaId = mediaItem?.mediaId.orEmpty()
+                    // A selected Format belongs to the previous item until ExoPlayer reports the
+                    // new item's tracks. Clear it at the transition so consumers cannot display
+                    // stale delivered-audio details for the new track.
+                    _events.tryEmit(
+                        PlaybackBackendEvent.AudioFormatChanged(
+                            trackId = mediaId.takeIf { it.isNotBlank() },
+                            format = null,
+                        ),
+                    )
                     currentManifest = mediaId.takeIf { it.isNotBlank() }
-                        ?.let { id -> currentManifest?.takeIf { it.trackId == id } ?: ResolvedManifest.placeholder(id) }
+                        ?.let { id ->
+                            resolvedManifestsByPlayerIndex[exo.currentMediaItemIndex]
+                                ?: currentManifest?.takeIf { it.trackId == id }
+                                ?: ResolvedManifest.placeholder(id)
+                        }
                     currentManifest?.let { manifest ->
-                        _events.tryEmit(PlaybackBackendEvent.MediaTransition(manifest.toDiagnosticContext(exo.duration)))
+                        _events.tryEmit(
+                            PlaybackBackendEvent.MediaTransition(
+                                manifest.toDiagnosticContext(exo.duration, queueIndexForPlayerIndex(exo.currentMediaItemIndex)),
+                            ),
+                        )
                     }
                     mediaId.takeIf { it.isNotBlank() }?.let { id ->
                         exo.setWakeMode(if (appContext.isOfflineTrackDownloaded(id)) C.WAKE_MODE_LOCAL else C.WAKE_MODE_NETWORK)
                     }
-                    val nextIndex = exo.currentMediaItemIndex + 1
-                    exo.getMediaItemAtOrNull(nextIndex)?.mediaId?.takeIf { it.isNotBlank() }?.let(::prefetchTrack)
+                    appendLookAheadAfter(exo.currentMediaItemIndex)
+                }
+
+                override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                    val trackId = exo.currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }
+                    _events.tryEmit(
+                        PlaybackBackendEvent.AudioFormatChanged(
+                            trackId = trackId,
+                            format = tracks.selectedAudioFormat()?.toDeliveredAudioFormat(),
+                        ),
+                    )
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
@@ -110,13 +153,18 @@ internal class DirectManifestPlaybackBackend(
         )
     }
 
+    init {
+        setPreferredAudioOutput(PreferredAudioOutputPreference.get(appContext))
+    }
+
     override val events: Flow<PlaybackBackendEvent> = _events.asSharedFlow()
     override val positionMs: Long get() = player.currentPosition.coerceAtLeast(0L)
     override val sessionPlayer: Player get() = player
 
     override fun setAudioPreset(preset: AudioPreset) {
         if (audioPreset != preset) {
-            manifestRequests.clear()
+            lookAheadJob?.cancel()
+            cancelManifestRequests()
         }
         audioPreset = preset
     }
@@ -134,39 +182,95 @@ internal class DirectManifestPlaybackBackend(
 
     override suspend fun loadQueue(tracks: List<TidalTrack>, startIndex: Int) {
         val queueStartedAt = SystemClock.elapsedRealtime()
-        val playableTracks = tracks.filter { it.id.isNotBlank() }
-        if (playableTracks.isEmpty()) return
-        val boundedStartIndex = startIndex.coerceIn(0, playableTracks.lastIndex)
+        val window = PlaybackQueueResolutionPolicy.window(tracks, startIndex) ?: return
+        val generation = ++queueGeneration
+        lookAheadJob?.cancel()
+        cancelManifestRequestsExcept(generation)
+        queueWindow = window
+        appendedMediaItemCount = 0
+        resolvedManifestsByPlayerIndex.clear()
         runCatching {
-            Log.d(DIRECT_LOG_TAG, "loadQueue start size=${playableTracks.size} start=$boundedStartIndex tail=${playableTracks.size - boundedStartIndex}")
-            val resolvedQueue = playableTracks
-                .drop(boundedStartIndex)
-                .mapIndexed { offset, track -> resolveMediaSource(track, playableTracks, boundedStartIndex + offset) }
-            val first = resolvedQueue.first()
+            Log.d(DIRECT_LOG_TAG, "loadQueue start size=${window.tracks.size} start=${window.startIndex} tail=${window.tracks.size - window.startIndex} initialManifestCount=${window.initialResolutionTracks.size}")
+            val first = resolveMediaSource(window.initialTrack, window.tracks, window.startIndex, generation)
+            if (generation != queueGeneration) return
             currentManifest = first.manifest
             player.setWakeMode(if (first.offline) C.WAKE_MODE_LOCAL else C.WAKE_MODE_NETWORK)
-            player.setMediaSources(resolvedQueue.map { it.source }, 0, C.TIME_UNSET)
+            player.setMediaSource(first.source)
             player.prepare()
-            Log.d(DIRECT_LOG_TAG, "loadQueue prepared size=${resolvedQueue.size} elapsedMs=${SystemClock.elapsedRealtime() - queueStartedAt}")
-            _events.emit(PlaybackBackendEvent.MediaTransition(first.manifest.toDiagnosticContext(player.duration)))
-            _events.emit(PlaybackBackendEvent.QualityChanged(first.manifest.toDiagnosticContext(player.duration)))
-            playableTracks.getOrNull(boundedStartIndex + 1)?.id?.let(::prefetchTrack)
+            appendedMediaItemCount = 1
+            resolvedManifestsByPlayerIndex[0] = first.manifest
+            Log.d(DIRECT_LOG_TAG, "loadQueue prepared initialManifestCount=${window.initialResolutionTracks.size} elapsedMs=${SystemClock.elapsedRealtime() - queueStartedAt}")
+            _events.emit(PlaybackBackendEvent.MediaTransition(first.manifest.toDiagnosticContext(player.duration, window.startIndex)))
+            appendLookAheadAfter(playerIndex = 0, generation = generation)
         }.onFailure { error ->
-            playableTracks.forEach { manifestRequests.remove(it.id) }
-            Log.e(DIRECT_LOG_TAG, "manifest queue load failed start=${playableTracks.getOrNull(boundedStartIndex)?.id.orEmpty()}", error)
-            _events.emit(PlaybackBackendEvent.Error(error::class.java.simpleName, error))
+            if (error is CancellationException) {
+                Log.d(DIRECT_LOG_TAG, "manifest queue load cancelled start=${window.initialTrack.id}")
+            } else {
+                Log.e(DIRECT_LOG_TAG, "manifest queue load failed start=${window.initialTrack.id}", error)
+                _events.emit(PlaybackBackendEvent.Error(error::class.java.simpleName, error))
+            }
         }.getOrThrow()
     }
 
+    override fun setPreferredAudioOutput(deviceId: Int?) {
+        val device = deviceId?.let { requestedId ->
+            appContext.getSystemService(AudioManager::class.java)
+                ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                ?.firstOrNull { it.id == requestedId && it.type.isSelectableWearOutputType() }
+        }
+        if (deviceId != null && device == null) {
+            Log.w(DIRECT_LOG_TAG, "preferred output unavailable id=$deviceId")
+            return
+        }
+        // Media3 forwards this to its AudioTrack. It is a preference for Untidy only; Android may
+        // still select a different physical route when the requested device disconnects.
+        player.setPreferredAudioDevice(device)
+        PreferredAudioOutputPreference.set(appContext, device?.id)
+        Log.d(DIRECT_LOG_TAG, "preferred output id=${device?.id ?: "system-default"}")
+    }
+
+    /**
+     * Resolves at most one future manifest. The current item is already prepared when this runs,
+     * so a slow next-item request cannot delay first audio. Keeping the source list contiguous
+     * lets MediaSession retain ordinary next/previous behaviour for the ready window.
+     */
+    private fun appendLookAheadAfter(playerIndex: Int, generation: Long = queueGeneration) {
+        val window = queueWindow ?: return
+        if (generation != queueGeneration || appendedMediaItemCount != playerIndex + 1) return
+        val next = window.lookAheadForPlayerIndex(playerIndex) ?: return
+        lookAheadJob?.takeIf { it.isActive }?.let { return }
+        lookAheadJob = scope.launch {
+            runCatching {
+                val queueIndex = window.queueIndexForPlayerIndex(playerIndex + 1)
+                val resolved = resolveMediaSource(next, window.tracks, queueIndex, generation)
+                if (generation != queueGeneration || queueWindow !== window || appendedMediaItemCount != playerIndex + 1) return@launch
+                player.addMediaSource(resolved.source)
+                resolvedManifestsByPlayerIndex[playerIndex + 1] = resolved.manifest
+                appendedMediaItemCount += 1
+                Log.d(DIRECT_LOG_TAG, "manifest lookahead appended id=${next.id} playerIndex=${playerIndex + 1} queueIndex=$queueIndex")
+            }.onFailure { error ->
+                if (generation == queueGeneration) {
+                    Log.w(DIRECT_LOG_TAG, "manifest lookahead failed id=${next.id} reason=${error::class.java.simpleName}: ${error.message}")
+                }
+            }
+        }
+    }
+
+    private fun queueIndexForPlayerIndex(playerIndex: Int): Int? =
+        queueWindow?.trackForPlayerIndex(playerIndex)?.let { queueWindow?.queueIndexForPlayerIndex(playerIndex) }
+
     override fun prefetchTrack(trackId: String) {
         if (trackId.isBlank()) return
-        val request = manifestRequest(trackId)
+        val generation = queueGeneration
+        val request = manifestRequest(trackId, generation)
         scope.launch {
-            request.await().onSuccess { manifest ->
+            request.deferred.await().onSuccess { manifest ->
                 Log.d(DIRECT_LOG_TAG, "manifest prefetched id=$trackId source=${manifest.source} presentation=${manifest.presentation} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
             }.onFailure { error ->
-                manifestRequests.remove(trackId)
-                Log.w(DIRECT_LOG_TAG, "manifest prefetch failed id=$trackId reason=${error::class.java.simpleName}: ${error.message}")
+                manifestRequests.remove(trackId, request)
+                if (generation == queueGeneration) {
+                    Log.w(DIRECT_LOG_TAG, "manifest prefetch failed id=$trackId reason=${error::class.java.simpleName}: ${error.message}")
+                }
             }
         }
     }
@@ -175,12 +279,14 @@ internal class DirectManifestPlaybackBackend(
         track: TidalTrack,
         queue: List<TidalTrack> = listOf(track),
         queueIndex: Int = 0,
+        generation: Long = queueGeneration,
     ): ResolvedMediaSource {
         val startedAt = SystemClock.elapsedRealtime()
         val trackId = track.id
-        val manifest = manifestRequest(trackId).await().getOrThrow()
+        val request = manifestRequest(trackId, generation)
+        val manifest = request.deferred.await().getOrThrow()
         val manifestMs = SystemClock.elapsedRealtime() - startedAt
-        manifestRequests.remove(trackId)
+        manifestRequests.remove(trackId, request)
         Log.d(DIRECT_LOG_TAG, "manifest loaded id=$trackId queueIndex=$queueIndex manifestMs=$manifestMs source=${manifest.source} presentation=${manifest.presentation} previewReason=${manifest.previewReason.orEmpty()} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
         val offlineCache = downloadedTrackCache(trackId)
         val source = when (manifest.kind) {
@@ -204,10 +310,39 @@ internal class DirectManifestPlaybackBackend(
         return ResolvedMediaSource(manifest = manifest, source = source, offline = offlineCache != null)
     }
 
-    private fun manifestRequest(trackId: String): Deferred<Result<ResolvedManifest>> =
-        manifestRequests.computeIfAbsent(trackId) { id ->
-            scope.async(Dispatchers.IO) { runCatching { fetchPlaybackManifest(id) } }
+    private fun manifestRequest(trackId: String, generation: Long): ManifestRequest =
+        manifestRequests.compute(trackId) { id, existing ->
+            if (existing != null && existing.generation == generation && !existing.deferred.isCancelled) {
+                existing
+            } else {
+                existing?.deferred?.cancel()
+                cancelManifestCall(id)
+                ManifestRequest(
+                    generation = generation,
+                    deferred = scope.async(Dispatchers.IO) { runCatching { fetchPlaybackManifest(id) } },
+                )
+            }
+        } ?: error("manifest request unexpectedly missing")
+
+    private fun cancelManifestRequestsExcept(keepGeneration: Long) {
+        manifestRequests.entries.forEach { (trackId, request) ->
+            if (shouldCancelManifestRequest(request.generation, keepGeneration) && manifestRequests.remove(trackId, request)) {
+                request.deferred.cancel()
+                cancelManifestCall(trackId)
+            }
         }
+    }
+
+    private fun cancelManifestRequests() {
+        manifestRequests.entries.forEach { (trackId, request) ->
+            if (manifestRequests.remove(trackId, request)) request.deferred.cancel()
+            cancelManifestCall(trackId)
+        }
+    }
+
+    private fun cancelManifestCall(trackId: String) {
+        activeManifestCalls.remove(trackId)?.cancel()
+    }
 
     override fun play() {
         player.playWhenReady = true
@@ -223,6 +358,8 @@ internal class DirectManifestPlaybackBackend(
     }
 
     override fun release() {
+        lookAheadJob?.cancel()
+        cancelManifestRequests()
         player.setWakeMode(C.WAKE_MODE_NONE)
         player.release()
         offlineCaches.values.forEach { cache -> runCatching { cache.release() } }
@@ -270,12 +407,36 @@ internal class DirectManifestPlaybackBackend(
     }
 
     private fun fetchTrackManifest(trackId: String, token: String, clientId: String, usage: String): ResolvedManifest {
+        var lastFailure: IOException? = null
+        manifestFormatAttempts(audioPreset).forEach { formats ->
+            try {
+                return fetchTrackManifestAttempt(trackId, token, clientId, usage, formats)
+            } catch (error: IOException) {
+                // The API can reject a format that is unavailable for this account/track. Keep
+                // trying the ordered list so FullFidelity still reaches the AAC fallback.
+                lastFailure = error
+                Log.w(
+                    DIRECT_LOG_TAG,
+                    "track manifest format attempt failed id=$trackId usage=$usage formats=${formats.joinToString(",")} reason=${error.message}",
+                )
+            }
+        }
+        throw lastFailure ?: IOException("track manifest request had no format candidates")
+    }
+
+    private fun fetchTrackManifestAttempt(
+        trackId: String,
+        token: String,
+        clientId: String,
+        usage: String,
+        formats: List<String>,
+    ): ResolvedManifest {
         val urlBuilder = "https://openapi.tidal.com/v2/trackManifests/$trackId".toHttpUrl().newBuilder()
             .addQueryParameter("manifestType", "MPEG_DASH")
             .addQueryParameter("uriScheme", "DATA")
             .addQueryParameter("usage", usage)
             .addQueryParameter("adaptive", "false")
-        requestedFormats().forEach { urlBuilder.addQueryParameter("formats", it) }
+        formats.forEach { urlBuilder.addQueryParameter("formats", it) }
         val url = urlBuilder.build()
         val request = Request.Builder()
             .url(url)
@@ -283,12 +444,12 @@ internal class DirectManifestPlaybackBackend(
             .header("X-Tidal-Token", clientId)
             .header("Authorization", "Bearer $token")
             .build()
-        httpClient.newCall(request).execute().use { response ->
+        return executeManifestCall(trackId, request) { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("track manifest ${response.code}: ${body.take(240)}")
             }
-            return body.toTrackManifest(trackId, usage)
+            body.toTrackManifest(trackId, usage)
         }
     }
 
@@ -304,30 +465,54 @@ internal class DirectManifestPlaybackBackend(
             .header("accept", "application/json")
             .header("Authorization", "Bearer $token")
             .build()
-        httpClient.newCall(request).execute().use { response ->
+        return executeManifestCall(trackId, request) { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw IOException("desktop playbackinfo ${response.code}: ${body.take(240)}")
             }
-            return body.toDesktopPlaybackManifest(trackId)
+            body.toDesktopPlaybackManifest(trackId)
         }
     }
 
-    private fun requestedFormats(): List<String> = when (audioPreset) {
-        AudioPreset.BatterySaver -> listOf("HEAACV1")
-        AudioPreset.Balanced,
-        AudioPreset.High,
-        -> listOf("HEAACV1", "AACLC")
-    }
-
-    private fun legacyAudioQuality(): String = when (audioPreset) {
-        AudioPreset.BatterySaver -> "LOW"
-        AudioPreset.Balanced,
-        AudioPreset.High,
-        -> "HIGH"
-    }
+    private fun legacyAudioQuality(): String = legacyAudioQualityForPreset(audioPreset)
 
     private fun countryCode(): String = Locale.getDefault().country.takeIf { it.length == 2 } ?: "US"
+
+    private fun <T> executeManifestCall(trackId: String, request: Request, block: (okhttp3.Response) -> T): T {
+        val call = httpClient.newCall(request)
+        activeManifestCalls.put(trackId, call)?.cancel()
+        return try {
+            call.execute().use(block)
+        } finally {
+            activeManifestCalls.remove(trackId, call)
+        }
+    }
+}
+
+/**
+ * Ordered OpenAPI format attempts for each preset. The generated TIDAL API artifact verifies these
+ * format tokens: FLAC_HIRES, FLAC, HEAACV1, and AACLC. FullFidelity intentionally makes the
+ * lossless requests separately so an unavailable hi-res/lossless tier cannot prevent AAC fallback.
+ */
+internal fun manifestFormatAttempts(preset: AudioPreset): List<List<String>> = when (preset) {
+    AudioPreset.BatterySaver -> listOf(listOf("HEAACV1"))
+    AudioPreset.Balanced,
+    AudioPreset.High,
+    -> listOf(listOf("HEAACV1", "AACLC"))
+    AudioPreset.FullFidelity -> listOf(
+        listOf("FLAC_HIRES"),
+        listOf("FLAC"),
+        listOf("HEAACV1", "AACLC"),
+    )
+}
+
+/** Legacy playbackinfo uses the same quality names exposed by the SDK's AudioQuality enum. */
+internal fun legacyAudioQualityForPreset(preset: AudioPreset): String = when (preset) {
+    AudioPreset.BatterySaver -> "LOW"
+    AudioPreset.Balanced,
+    AudioPreset.High,
+    -> "HIGH"
+    AudioPreset.FullFidelity -> "HI_RES_LOSSLESS"
 }
 
 private enum class ManifestKind {
@@ -363,6 +548,11 @@ private data class ResolvedMediaSource(
     val manifest: ResolvedManifest,
     val source: androidx.media3.exoplayer.source.MediaSource,
     val offline: Boolean,
+)
+
+private data class ManifestRequest(
+    val generation: Long,
+    val deferred: Deferred<Result<ResolvedManifest>>,
 )
 
 private fun ResolvedManifest.mediaItem(
@@ -460,12 +650,15 @@ private fun JSONArray?.toStringList(): List<String> {
     return List(length()) { index -> optString(index) }.filter { it.isNotBlank() }
 }
 
-private fun ResolvedManifest.toDiagnosticContext(playerDurationMs: Long): PlaybackDiagnosticContext = PlaybackDiagnosticContext(
+private fun ResolvedManifest.toDiagnosticContext(playerDurationMs: Long, queueIndex: Int? = null): PlaybackDiagnosticContext = PlaybackDiagnosticContext(
     productId = trackId,
+    queueIndex = queueIndex,
     assetPresentation = presentation,
     durationSeconds = playerDurationMs.takeIf { it > 0L }?.let { it / 1000f } ?: 0f,
     previewReason = previewReason,
-    audioQuality = source,
+    // Manifest source identifies how the asset was resolved, not the quality actually selected
+    // by ExoPlayer. Delivered audio details are emitted from onTracksChanged instead.
+    audioQuality = null,
     audioCodec = codec,
 )
 
@@ -478,6 +671,17 @@ private fun Int.toBackendState(isPlaying: Boolean): PlaybackBackendState = when 
     Player.STATE_IDLE -> PlaybackBackendState.Idle
     Player.STATE_ENDED -> PlaybackBackendState.NotPlaying
     else -> PlaybackBackendState.NotPlaying
+}
+
+private fun Int.isSelectableWearOutputType(): Boolean = when (this) {
+    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+    AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+    AudioDeviceInfo.TYPE_USB_HEADSET,
+    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+    -> true
+    else -> false
 }
 
 private fun sha256Short(value: String): String = MessageDigest.getInstance("SHA-256")

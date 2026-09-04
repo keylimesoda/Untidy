@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -45,7 +47,14 @@ private val rowArtworkCache = object : LruCache<String, RowArtwork>(2 * 1024) {
 
 @Composable
 fun rememberAlbumArt(track: TidalTrack?): AlbumArt? {
-    return rememberArtworkPalette(track?.artworkUrl, Size.ORIGINAL)
+    // Now Playing renders artwork at roughly 68dp. Request a bounded 2x bitmap
+    // for density-appropriate quality without decoding the source image in full.
+    val density = LocalDensity.current
+    val artworkSize = remember(density) {
+        val px = (68.dp.value * density.density * 2f).toInt().coerceIn(96, 256)
+        Size(px, px)
+    }
+    return rememberArtworkPalette(track?.artworkUrl, artworkSize)
 }
 
 @Composable
@@ -136,16 +145,17 @@ fun rememberArtworkPalette(
                 .memoryCacheKey(key)
                 .diskCacheKey(url)
                 .build()
-            (appContext.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
+            (appContext.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap?.let {
+                // Palette generation is CPU work; keep it off the Compose/main thread.
+                AlbumArt(
+                    bitmap = it.asImageBitmap(),
+                    palette = it.toAlbumPalette(),
+                    byteCount = it.allocationByteCount,
+                )
+            }
         }
-        art = loaded?.let {
-            AlbumArt(
-                bitmap = it.asImageBitmap(),
-                palette = it.toAlbumPalette(),
-                byteCount = it.allocationByteCount,
-            )
-        } ?: AlbumArt(null, AlbumPalette.Default)
-        putAlbumArt(key, art)
+        art = loaded ?: AlbumArt(null, AlbumPalette.Default)
+        loaded?.let { putAlbumArt(key, it) }
     }
     return art
 }

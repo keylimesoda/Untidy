@@ -2,23 +2,25 @@ package com.tidal.wear.ui.player
 
 import android.app.Activity
 import android.content.Context
-import android.content.Intent
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
+import android.media.AudioAttributes
 import android.media.AudioManager
-import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -67,6 +70,7 @@ import androidx.compose.ui.platform.LocalDensity
 import android.util.Log
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -100,7 +104,6 @@ import kotlinx.coroutines.withContext
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
-import kotlin.math.abs
 
 @Composable
 fun TidalPlayerScreen(
@@ -109,6 +112,7 @@ fun TidalPlayerScreen(
     ambientOffset: Pair<Int, Int>,
     deviceHasLowBitAmbient: Boolean,
     burnInProtectionRequired: Boolean,
+    ambientTime: LocalTime = LocalTime.now(),
     onOpenHome: () -> Unit = {},
     onOpenAlbum: (String) -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
@@ -147,6 +151,10 @@ fun TidalPlayerScreen(
                             downloadState = DownloadState.Unavailable
                             Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
                         }
+                        OfflineDownloadResult.WaitingForNetwork -> {
+                            downloadState = DownloadState.NotDownloaded
+                            Toast.makeText(context, "Download queued · waiting for network", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }
@@ -164,7 +172,7 @@ fun TidalPlayerScreen(
         }
     }
 
-    BackHandler { (context as? Activity)?.moveTaskToBack(true) }
+    BackHandler { (context as? Activity)?.finish() }
 
     if (isAmbient) {
         TidalPlayerAmbient(
@@ -173,6 +181,7 @@ fun TidalPlayerScreen(
             ambientOffset = ambientOffset,
             deviceHasLowBitAmbient = deviceHasLowBitAmbient,
             burnInProtectionRequired = burnInProtectionRequired,
+            ambientTime = ambientTime,
         )
     } else {
         TidalPlayerNonAmbient(
@@ -223,8 +232,22 @@ private fun TidalPlayerNonAmbient(
     val scope = rememberCoroutineScope()
     val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
     val loadedTrack = state.track
+    val moreHintEligible = loadedTrack != null && state.error.isNullOrBlank()
+    var showMoreHint by remember(loadedTrack?.id, moreHintEligible) {
+        mutableStateOf(
+            MoreActionsHintPolicy.shouldShow(
+                hasTrack = moreHintEligible,
+                hasBeenShown = MoreActionsHintPreference.hasBeenShown(context),
+            ),
+        )
+    }
     val configuration = LocalConfiguration.current
     val actionsSheetTravelPx = with(density) { (configuration.screenHeightDp.dp - 18.dp).toPx().coerceAtLeast(1f) }
+
+    fun markMoreHintLearned() {
+        if (showMoreHint) showMoreHint = false
+        MoreActionsHintPreference.markShown(context)
+    }
 
     LaunchedEffect(loadedTrack?.id, showActionsSheet) {
         if (!showActionsSheet) runCatching { focusRequester.requestFocus() }
@@ -240,16 +263,23 @@ private fun TidalPlayerNonAmbient(
             showVolume = false
         }
     }
+    LaunchedEffect(showMoreHint) {
+        if (showMoreHint) {
+            delay(1_200)
+            markMoreHintLearned()
+        }
+    }
     LaunchedEffect(state.track?.id) {
         val trackId = state.track?.id
         likeError = null
-        if (trackId.isNullOrBlank()) {
+        if (!trackId.isFavoriteLookupEligible()) {
             liked = false
             likeLoading = false
             return@LaunchedEffect
         }
+        val validTrackId = trackId ?: return@LaunchedEffect
         likeLoading = true
-        runCatching { apiClient.isFavoriteTrack(trackId) }
+        runCatching { apiClient.isFavoriteTrack(validTrackId) }
             .onSuccess { liked = it }
             .onFailure { likeError = "Like unavailable" }
         likeLoading = false
@@ -321,7 +351,7 @@ private fun TidalPlayerNonAmbient(
 
                 LikeIconAt(
                     liked = liked,
-                    enabled = !likeLoading,
+                    enabled = !likeLoading && state.track?.id.isFavoriteLookupEligible(),
                     description = when {
                         likeLoading -> "Loading like state"
                         liked -> "Unlike"
@@ -333,19 +363,23 @@ private fun TidalPlayerNonAmbient(
                     onClick = {
                         val trackId = state.track?.id ?: return@LikeIconAt
                         if (likeLoading) return@LikeIconAt
-                        if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
-                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                        }
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                         val target = !liked
                         liked = target
                         likeLoading = true
                         likeError = null
                         scope.launch {
                             runCatching { apiClient.setFavoriteTrack(trackId, target) }
-                                .onSuccess { persisted -> liked = persisted }
+                                .onSuccess { persisted ->
+                                    liked = persisted
+                                    if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
+                                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    }
+                                }
                                 .onFailure {
                                     liked = !target
                                     likeError = "Like failed"
+                                    view.performHapticFeedback(HapticFeedbackConstants.REJECT)
                                     Toast.makeText(context, "Couldn't update like", Toast.LENGTH_SHORT).show()
                                 }
                             likeLoading = false
@@ -444,17 +478,41 @@ private fun TidalPlayerNonAmbient(
                 }
 
 
+                AnimatedVisibility(
+                    visible = showMoreHint,
+                    enter = fadeIn(),
+                    exit = fadeOut(animationSpec = tween(300)),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 20.dp * scale),
+                ) {
+                    Text(
+                        text = "Swipe up for more",
+                        color = TidalColors.OnSurfaceMuted,
+                        fontSize = (10 * scale).sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+
                 BottomGripPullOverHandle(
                     scale = scale,
-                    armed = actionsGripArmed,
+                    travelPx = actionsSheetTravelPx,
                     modifier = Modifier.align(Alignment.BottomCenter),
+                    onDragProgress = { dragPx ->
+                        actionsSheetDragPx = dragPx.coerceIn(0f, actionsSheetTravelPx)
+                    },
                     onArmedChange = { actionsGripArmed = it },
-                    onDragProgress = { dragPx -> actionsSheetDragPx = dragPx.coerceIn(0f, actionsSheetTravelPx) },
                     onRelease = { dragPx ->
                         val shouldOpen = dragPx > actionsSheetTravelPx * 0.28f
+                        if (shouldOpen) markMoreHintLearned()
                         showActionsSheet = shouldOpen
                         actionsSheetDragPx = if (shouldOpen) actionsSheetTravelPx else 0f
                         actionsGripArmed = false
+                    },
+                    onAccessibilityOpen = {
+                        markMoreHintLearned()
+                        showActionsSheet = true
                     },
                 )
 
@@ -472,9 +530,9 @@ private fun TidalPlayerNonAmbient(
                 ActionsPullOverOverlay(
                     progressPx = if (showActionsSheet) actionsSheetTravelPx else actionsSheetDragPx,
                     travelPx = actionsSheetTravelPx,
-                    armed = actionsGripArmed,
                     downloadState = downloadState,
-                    outputOptions = rememberAudioOutputOptions(),
+                    deliveredAudioFormat = state.deliveredAudioFormat,
+                    requestedOutputId = state.preferredAudioOutputDeviceId,
                     onClose = {
                         showActionsSheet = false
                         actionsSheetDragPx = 0f
@@ -483,13 +541,14 @@ private fun TidalPlayerNonAmbient(
                     onDownload = onDownload,
                     onRemoveDownload = onRemoveDownload,
                     onHome = onOpenHome,
-                    onQueue = { showQueue = true },
-                    onOutputSettings = {
-                        runCatching {
-                            context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-                        }.onFailure {
-                            Toast.makeText(context, "Open Wear OS Bluetooth settings to change output", Toast.LENGTH_SHORT).show()
-                        }
+                    onQueue = {
+                        showActionsSheet = false
+                        actionsSheetDragPx = 0f
+                        actionsGripArmed = false
+                        showQueue = true
+                    },
+                    onOutputSelected = { deviceId ->
+                        viewModel.setPreferredAudioOutput(deviceId)
                     },
                     onAddToPlaylist = {
                         val track = state.track
@@ -529,58 +588,64 @@ private fun TidalPlayerNonAmbient(
 @Composable
 private fun BottomGripPullOverHandle(
     scale: Float,
-    armed: Boolean,
+    travelPx: Float,
     modifier: Modifier = Modifier,
-    onArmedChange: (Boolean) -> Unit,
     onDragProgress: (Float) -> Unit,
+    onArmedChange: (Boolean) -> Unit,
     onRelease: (Float) -> Unit,
+    onAccessibilityOpen: () -> Unit,
 ) {
     val view = LocalView.current
     var draggedUpPx by remember { mutableStateOf(0f) }
+    var hapticCommitted by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
-            .fillMaxWidth()
-            .height(44.dp * scale)
-            .pointerInput(Unit) {
-                detectDragGesturesAfterLongPress(
+            // Keep the gesture zone beneath the transport targets. There is intentionally no tap
+            // action here: opening More requires a deliberate upward pull from the bottom edge.
+            .width(72.dp * scale)
+            .height(18.dp * scale)
+            .pointerInput(travelPx) {
+                detectVerticalDragGestures(
                     onDragStart = {
                         draggedUpPx = 0f
-                        onDragProgress(0f)
+                        hapticCommitted = false
                         onArmedChange(true)
-                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        if (dragAmount >= 0f && draggedUpPx == 0f) return@detectVerticalDragGestures
+                        change.consume()
+                        draggedUpPx = (draggedUpPx - dragAmount).coerceIn(0f, travelPx)
+                        onDragProgress(draggedUpPx)
+                        if (!hapticCommitted && draggedUpPx >= travelPx * 0.10f) {
+                            hapticCommitted = true
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        }
                     },
                     onDragEnd = {
                         onRelease(draggedUpPx)
                         draggedUpPx = 0f
                     },
                     onDragCancel = {
+                        onRelease(0f)
                         draggedUpPx = 0f
-                        onDragProgress(0f)
-                        onArmedChange(false)
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        draggedUpPx = (draggedUpPx - dragAmount.y).coerceAtLeast(0f)
-                        onDragProgress(draggedUpPx)
                     },
                 )
+            }
+            .semantics {
+                contentDescription = "More actions"
+                onClick(label = "Open more actions") {
+                    onAccessibilityOpen()
+                    true
+                }
             },
         contentAlignment = Alignment.BottomCenter,
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(58.dp * scale)
-                .align(Alignment.BottomCenter)
-                .clip(RoundedCornerShape(topStart = 28.dp * scale, topEnd = 28.dp * scale))
-                .background(Color(0xFF171717).copy(alpha = if (armed) 0.94f else 0f)),
-        )
-        Box(
-            modifier = Modifier
                 .padding(bottom = 7.dp * scale)
-                .size(width = (if (armed) 78 else 34).dp * scale, height = 4.dp * scale)
+                .size(width = 24.dp * scale, height = 3.dp * scale)
                 .clip(CircleShape)
-                .background(Color(0xFF8A8A8A).copy(alpha = if (armed) 1f else 0.72f)),
+                .background(TidalColors.White.copy(alpha = 0.42f)),
         )
     }
 }
@@ -589,23 +654,22 @@ private fun BottomGripPullOverHandle(
 private fun ActionsPullOverOverlay(
     progressPx: Float,
     travelPx: Float,
-    armed: Boolean,
     downloadState: DownloadState,
-    outputOptions: List<AudioOutputOption>,
+    deliveredAudioFormat: com.tidal.wear.core.playback.DeliveredAudioFormat?,
+    requestedOutputId: Int?,
     onClose: () -> Unit,
     onDownload: () -> Unit,
     onRemoveDownload: () -> String?,
     onHome: () -> Unit,
     onQueue: () -> Unit,
-    onOutputSettings: () -> Unit,
+    onOutputSelected: (Int?) -> Unit,
     onAddToPlaylist: () -> String?,
     onViewAlbum: () -> String?,
     onViewArtist: () -> String?,
 ) {
-    var closeDragPx by remember { mutableStateOf(0f) }
     val fraction = (progressPx / travelPx).coerceIn(0f, 1f)
-    val sheetOffsetPx = (travelPx - progressPx + closeDragPx).coerceIn(0f, travelPx)
-    val materialColor = Color(0xFF171717)
+    val sheetOffsetPx = (travelPx - progressPx).coerceIn(0f, travelPx)
+    val materialColor = TidalColors.Black
     val dimAlpha = 0.22f * fraction
     Box(
         modifier = Modifier
@@ -623,22 +687,17 @@ private fun ActionsPullOverOverlay(
         ) {
             ActionsSheet(
                 downloadState = downloadState,
-                outputOptions = outputOptions,
+                deliveredAudioFormat = deliveredAudioFormat,
+                requestedOutputId = requestedOutputId,
                 onDownload = onDownload,
                 onRemoveDownload = onRemoveDownload,
                 onHome = onHome,
                 onQueue = onQueue,
-                onOutputSettings = onOutputSettings,
+                onOutputSelected = onOutputSelected,
                 onAddToPlaylist = onAddToPlaylist,
                 onViewAlbum = onViewAlbum,
                 onViewArtist = onViewArtist,
-                forceHandleArmed = armed,
-                onHandleDragStart = { closeDragPx = 0f },
-                onHandleDrag = { dragPx -> closeDragPx = dragPx.coerceAtLeast(0f) },
-                onHandleDragEnd = { dragPx ->
-                    if (dragPx > travelPx * 0.22f) onClose()
-                    closeDragPx = 0f
-                },
+                onHandleClick = onClose,
             )
         }
     }
@@ -798,6 +857,9 @@ private fun TidalTrack.isDownloadEligible(): Boolean = id.isNotBlank() &&
     id != "tidal-current" &&
     !id.startsWith("fixture", ignoreCase = true)
 
+private fun String?.isFavoriteLookupEligible(): Boolean =
+    !isNullOrBlank() && this != "tidal-current" && !startsWith("fixture", ignoreCase = true)
+
 @Composable
 private fun TidalPlayerAmbient(
     track: TidalTrack?,
@@ -805,6 +867,7 @@ private fun TidalPlayerAmbient(
     ambientOffset: Pair<Int, Int>,
     deviceHasLowBitAmbient: Boolean,
     burnInProtectionRequired: Boolean,
+    ambientTime: LocalTime,
 ) {
     val scale = playerLayoutScale()
     val primary = if (deviceHasLowBitAmbient) Color.White else Color.White.copy(alpha = 0.82f)
@@ -853,7 +916,7 @@ private fun TidalPlayerAmbient(
                 modifier = Modifier.padding(top = 14.dp),
             )
             Text(
-                text = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm")),
+                text = ambientTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                 fontSize = if (deviceHasLowBitAmbient) 24.sp else 28.sp,
                 fontWeight = FontWeight.Light,
                 color = primary,
@@ -864,28 +927,62 @@ private fun TidalPlayerAmbient(
 }
 
 @Composable
-private fun rememberAudioOutputOptions(): List<AudioOutputOption> {
+internal fun rememberAudioOutputOptions(requestedDeviceId: Int?): List<AudioOutputOption> {
     val context = LocalContext.current
-    return remember(context) { context.audioOutputOptions() }
+    val audioManager = remember(context) { context.getSystemService(AudioManager::class.java) }
+    var outputGeneration by remember(audioManager) { mutableIntStateOf(0) }
+    DisposableEffect(audioManager) {
+        if (audioManager == null) return@DisposableEffect onDispose {}
+        val callback = object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<AudioDeviceInfo>) {
+                outputGeneration += 1
+            }
+
+            override fun onAudioDevicesRemoved(removedDevices: Array<AudioDeviceInfo>) {
+                outputGeneration += 1
+            }
+        }
+        audioManager.registerAudioDeviceCallback(callback, null)
+        onDispose { audioManager.unregisterAudioDeviceCallback(callback) }
+    }
+    return remember(audioManager, outputGeneration, requestedDeviceId) {
+        audioManager.audioOutputOptions(requestedDeviceId)
+    }
 }
 
-private fun Context.audioOutputOptions(): List<AudioOutputOption> {
-    val audioManager = getSystemService(AudioManager::class.java) ?: return listOf(AudioOutputOption("System", true))
+private fun AudioManager?.audioOutputOptions(requestedDeviceId: Int?): List<AudioOutputOption> {
+    val audioManager = this ?: return emptyList()
     val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
         .filter { it.type.isWearOutputType() }
         .distinctBy { "${it.type}:${it.productName}" }
-    val preferred = devices.firstOrNull { it.type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER } ?: devices.firstOrNull()
+    val routedDeviceId = runCatching {
+        audioManager.getAudioDevicesForAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build(),
+        ).firstOrNull { routed -> devices.any { it.id == routed.id } }?.id
+    }.getOrNull()
+    val selectedId = AudioOutputSelectionPolicy.selectedDeviceId(
+        requestedDeviceId = requestedDeviceId,
+        routedDeviceId = routedDeviceId,
+        availableDeviceIds = devices.mapTo(mutableSetOf()) { it.id },
+    )
     return devices.map { device ->
         AudioOutputOption(
+            id = device.id,
             label = device.outputLabel(),
-            preferred = device == preferred,
+            selected = device.id == selectedId,
         )
-    }.ifEmpty { listOf(AudioOutputOption("System", true)) }
+    }
 }
 
 private fun Int.isWearOutputType(): Boolean = when (this) {
     AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
     AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+    AudioDeviceInfo.TYPE_BLE_HEADSET,
+    AudioDeviceInfo.TYPE_BLE_SPEAKER,
+    AudioDeviceInfo.TYPE_BLE_BROADCAST,
     AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
     AudioDeviceInfo.TYPE_WIRED_HEADSET,
     AudioDeviceInfo.TYPE_USB_HEADSET,
@@ -899,6 +996,9 @@ private fun AudioDeviceInfo.outputLabel(): String {
     val typeLabel = when (type) {
         AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
         AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        AudioDeviceInfo.TYPE_BLE_HEADSET,
+        AudioDeviceInfo.TYPE_BLE_SPEAKER,
+        AudioDeviceInfo.TYPE_BLE_BROADCAST,
         -> "Bluetooth"
         AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
         AudioDeviceInfo.TYPE_WIRED_HEADSET,
@@ -911,6 +1011,9 @@ private fun AudioDeviceInfo.outputLabel(): String {
         AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> typeLabel
         AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
         AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        AudioDeviceInfo.TYPE_BLE_HEADSET,
+        AudioDeviceInfo.TYPE_BLE_SPEAKER,
+        AudioDeviceInfo.TYPE_BLE_BROADCAST,
         AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
         AudioDeviceInfo.TYPE_WIRED_HEADSET,
         AudioDeviceInfo.TYPE_USB_HEADSET,

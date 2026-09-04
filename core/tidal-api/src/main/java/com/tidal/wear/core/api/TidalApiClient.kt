@@ -17,6 +17,8 @@ import com.tidal.wear.core.model.TidalTrack
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -47,9 +49,9 @@ import java.util.concurrent.TimeUnit
 interface TidalApiService {
     @GET("searchResults")
     suspend fun search(
-        @Query("query") query: String,
+        @Query("filter[query]") query: String,
         @Query("countryCode") countryCode: String,
-        @Query("include") include: String = "tracks,albums,artists,playlists",
+        @Query("include") include: List<String> = listOf("tracks", "albums", "artists", "playlists"),
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
@@ -133,6 +135,8 @@ interface TidalApiService {
     suspend fun userCollectionTrackItems(
         @Path("id") id: String,
         @Query("countryCode") countryCode: String,
+        @Query("page[limit]") pageLimit: Int? = null,
+        @Query("page[cursor]") pageCursor: String? = null,
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
@@ -146,6 +150,31 @@ interface TidalApiService {
 
     @HTTP(method = "DELETE", path = "userCollectionTracks/{id}/relationships/items", hasBody = true)
     suspend fun removeUserCollectionTrackItem(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Body body: JsonObject,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): Response<Unit>
+
+    @GET("userCollectionAlbums/{id}/relationships/items")
+    suspend fun userCollectionAlbumItems(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Query("page[limit]") pageLimit: Int? = null,
+        @Query("page[cursor]") pageCursor: String? = null,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @POST("userCollectionAlbums/{id}/relationships/items")
+    suspend fun addUserCollectionAlbumItem(
+        @Path("id") id: String,
+        @Query("countryCode") countryCode: String,
+        @Body body: JsonObject,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): Response<Unit>
+
+    @HTTP(method = "DELETE", path = "userCollectionAlbums/{id}/relationships/items", hasBody = true)
+    suspend fun removeUserCollectionAlbumItem(
         @Path("id") id: String,
         @Query("countryCode") countryCode: String,
         @Body body: JsonObject,
@@ -396,9 +425,13 @@ class TidalApiClient(
     private val service: TidalApiService
     private val legacyService: TidalLegacyApiService
     private val desktopService: TidalDesktopApiService
+    private val favoriteTrackCache = FavoriteTrackCache()
+    private val favoriteAlbumCache = FavoriteTrackCache()
 
     init {
-        val client = authenticatedClient(JSON_API_ACCEPT)
+        // Retrofit clients share this OkHttp instance so the v2, v1, and desktop
+        // endpoints reuse the same dispatcher and connection pool.
+        val client = authenticatedClient()
         service = Retrofit.Builder()
             .baseUrl("https://openapi.tidal.com/v2/")
             .client(client)
@@ -407,30 +440,31 @@ class TidalApiClient(
             .create(TidalApiService::class.java)
         legacyService = Retrofit.Builder()
             .baseUrl("https://api.tidal.com/v1/")
-            .client(authenticatedClient("application/json"))
+            .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(TidalLegacyApiService::class.java)
         desktopService = Retrofit.Builder()
             .baseUrl("https://listen.tidal.com/")
-            .client(authenticatedClient("application/json"))
+            .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(TidalDesktopApiService::class.java)
     }
 
-    private fun authenticatedClient(accept: String): OkHttpClient = OkHttpClient.Builder()
+    private fun authenticatedClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
             .callTimeout(15, TimeUnit.SECONDS)
             .addInterceptor { chain ->
+                val originalRequest = chain.request()
                 val token = runBlocking { authRepository.getAccessToken() }
                 val clientId = runBlocking { authRepository.getClientIdForApi() }
-                val request = chain.request().newBuilder()
-                    .header("accept", accept)
+                val request = originalRequest.newBuilder()
+                    .header("accept", originalRequest.header("accept") ?: defaultApiAccept(originalRequest.url.host))
                     .header("X-Tidal-Token", clientId)
                     .apply { if (!token.isNullOrBlank()) header("Authorization", "Bearer $token") }
-                    .build()
+                .build()
                 chain.proceed(request)
             }
             .build()
@@ -438,17 +472,49 @@ class TidalApiClient(
     suspend fun search(query: String): TidalSearchResult {
         val trimmed = query.trim()
         if (trimmed.isBlank()) return TidalSearchResult()
-        return runCatching { parseSearch(service.search(trimmed, countryCode)) }
-            .fold(
-                onSuccess = {
-                    Log.d(API_LOG_TAG, "search v2 ok queryChars=${trimmed.length} tracks=${it.tracks.size}")
-                    if (it.tracks.isNotEmpty()) it else legacySearch(trimmed, "v2-empty")
-                },
-                onFailure = {
-                    if (it is HttpException && it.code() !in setOf(401, 403, 404)) throw it
-                    legacySearch(trimmed, "v2-${it.safeReason()}")
-                },
-            )
+        val v2Result = try {
+            parseSearch(service.search(trimmed, countryCode))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (failure: Throwable) {
+            // Keep the legacy path during the v2 rollout, but make it explicit
+            // that the result below did not come from v2.
+            val reason = failure.safeReason()
+            Log.d(API_LOG_TAG, "search v2 failed reason=$reason, falling back")
+            return legacySearch(trimmed, "v2-$reason").also { result ->
+                Log.d(API_LOG_TAG, "search fallback v1 ok reason=v2-$reason tracks=${result.tracks.size}")
+            }
+        }
+        if (shouldFallbackToLegacySearch(v2Result)) {
+            Log.d(API_LOG_TAG, "search v2 empty, falling back")
+            return legacySearch(trimmed, "v2-empty").also { result ->
+                Log.d(API_LOG_TAG, "search fallback v1 ok reason=v2-empty tracks=${result.tracks.size}")
+            }
+        }
+        if (shouldSupplementLegacySearch(v2Result)) {
+            Log.d(API_LOG_TAG, "search v2 track-only, supplementing entity results")
+            val supplement = try {
+                legacySearch(trimmed, "v2-track-only")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (failure: Throwable) {
+                Log.d(API_LOG_TAG, "search supplement failed reason=${failure.safeReason()}")
+                null
+            }
+            if (supplement != null) {
+                return supplementSearchResult(v2Result, supplement).also { result ->
+                    Log.d(
+                        API_LOG_TAG,
+                        "search supplemented tracks=${result.tracks.size} albums=${result.albums.size} artists=${result.artists.size} playlists=${result.playlists.size}",
+                    )
+                }
+            }
+        }
+        Log.d(
+            API_LOG_TAG,
+            "search v2 ok queryChars=${trimmed.length} tracks=${v2Result.tracks.size} albums=${v2Result.albums.size} artists=${v2Result.artists.size} playlists=${v2Result.playlists.size}",
+        )
+        return v2Result
     }
     suspend fun currentUser(): JsonElement = service.currentUser(countryCode)
     suspend fun favorites(): TidalSearchResult = runCatching { parseSearch(service.favorites(countryCode)) }
@@ -623,11 +689,17 @@ class TidalApiClient(
     suspend fun setFavoriteTrack(trackId: String, favorite: Boolean): Boolean {
         val normalizedId = normalizeTrackId(trackId) ?: return false
         return try {
-            if (favorite) {
+            val response = if (favorite) {
                 service.addUserCollectionTrackItem("me", countryCode, userCollectionTrackRelationshipBody(normalizedId))
             } else {
                 service.removeUserCollectionTrackItem("me", countryCode, userCollectionTrackRelationshipBody(normalizedId))
             }
+            if (!isFavoriteMutationSuccess(favorite, response.isSuccessful, response.code())) {
+                throw HttpException(response)
+            }
+            // Write through so the next Now Playing transition does not have to
+            // reload the complete favorite-track relationship.
+            favoriteTrackCache.update(normalizedId, favorite)
             Log.d(API_LOG_TAG, "favorite track write ok favorite=$favorite")
             favorite
         } catch (e: CancellationException) {
@@ -639,18 +711,106 @@ class TidalApiClient(
     }
 
     private suspend fun favoriteTrackIds(): Set<String> {
-        val v2Ids = runCatching {
-            service.userCollectionTrackItems("me", countryCode)
-                .allRelationshipItemIds()
-                .mapNotNull(::normalizeTrackId)
-                .toSet()
-        }.getOrElse { t ->
-            if (t is CancellationException) throw t
-            Log.d(API_LOG_TAG, "favorite tracks relationship v2 failed reason=${t.safeReason()}")
-            emptySet()
+        return favoriteTrackCache.getOrLoad {
+            val v2Ids = runCatching {
+                favoriteTrackRelationshipIds()
+            }.getOrElse { t ->
+                if (t is CancellationException) throw t
+                Log.d(API_LOG_TAG, "favorite tracks relationship v2 failed reason=${t.safeReason()}")
+                emptySet()
+            }
+            if (v2Ids.isNotEmpty()) v2Ids
+            else favorites().tracks.mapNotNull { normalizeTrackId(it.id) }.toSet()
         }
-        if (v2Ids.isNotEmpty()) return v2Ids
-        return favorites().tracks.mapNotNull { normalizeTrackId(it.id) }.toSet()
+    }
+
+    suspend fun isFavoriteAlbum(albumId: String): Boolean {
+        val normalizedId = normalizeAlbumId(albumId) ?: return false
+        return runCatching { favoriteAlbumIds().contains(normalizedId) }
+            .getOrElse { t ->
+                if (t is CancellationException) throw t
+                Log.d(API_LOG_TAG, "favorite album read failed reason=${t.safeReason()}")
+                throw t
+            }
+    }
+
+    suspend fun setFavoriteAlbum(albumId: String, favorite: Boolean): Boolean {
+        val normalizedId = normalizeAlbumId(albumId) ?: return false
+        return try {
+            val response = if (favorite) {
+                service.addUserCollectionAlbumItem("me", countryCode, userCollectionAlbumRelationshipBody(normalizedId))
+            } else {
+                service.removeUserCollectionAlbumItem("me", countryCode, userCollectionAlbumRelationshipBody(normalizedId))
+            }
+            if (!isFavoriteMutationSuccess(favorite, response.isSuccessful, response.code())) {
+                throw HttpException(response)
+            }
+            favoriteAlbumCache.update(normalizedId, favorite)
+            Log.d(API_LOG_TAG, "favorite album write ok favorite=$favorite")
+            favorite
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.d(API_LOG_TAG, "favorite album write failed favorite=$favorite reason=${t.safeReason()}")
+            throw t
+        }
+    }
+
+    private suspend fun favoriteAlbumIds(): Set<String> {
+        return favoriteAlbumCache.getOrLoad {
+            val v2Ids = runCatching {
+                favoriteAlbumRelationshipIds()
+            }.getOrElse { t ->
+                if (t is CancellationException) throw t
+                Log.d(API_LOG_TAG, "favorite albums relationship v2 failed reason=${t.safeReason()}")
+                emptySet()
+            }
+            if (v2Ids.isNotEmpty()) v2Ids
+            else favorites().albums.mapNotNull { normalizeAlbumId(it.id) }.toSet()
+        }
+    }
+
+    private suspend fun favoriteAlbumRelationshipIds(): Set<String> {
+        val ids = mutableSetOf<String>()
+        val seenCursors = mutableSetOf<String>()
+        var cursor: String? = null
+        while (true) {
+            val root = service.userCollectionAlbumItems(
+                id = "me",
+                countryCode = countryCode,
+                pageLimit = FAVORITE_TRACK_PAGE_SIZE,
+                pageCursor = cursor,
+            )
+            ids += root.allRelationshipItemIds().mapNotNull(::normalizeAlbumId)
+            val nextCursor = root.nextPageCursor()
+                ?.takeIf { it.isNotBlank() }
+                ?.takeIf { seenCursors.add(it) }
+                ?: break
+            cursor = nextCursor
+        }
+        return ids
+    }
+
+    /** Follows the JSON:API relationship cursor exposed by the existing endpoint. */
+    private suspend fun favoriteTrackRelationshipIds(): Set<String> {
+        val ids = mutableSetOf<String>()
+        val seenCursors = mutableSetOf<String>()
+        var cursor: String? = null
+        while (true) {
+            val root = service.userCollectionTrackItems(
+                id = "me",
+                countryCode = countryCode,
+                pageLimit = FAVORITE_TRACK_PAGE_SIZE,
+                pageCursor = cursor,
+            )
+            ids += root.allRelationshipItemIds().mapNotNull(::normalizeTrackId)
+            val nextCursor = root.nextPageCursor()
+                ?.takeIf { it.isNotBlank() }
+                ?.takeIf { seenCursors.add(it) }
+                ?: break
+            cursor = nextCursor
+        }
+        return ids
     }
 
     suspend fun track(id: String): TidalTrack? = service.track(id, countryCode).dataObjects().firstOrNull()?.toTrack()
@@ -860,26 +1020,26 @@ class TidalApiClient(
     }
 
     private fun parseSearch(element: JsonElement): TidalSearchResult {
-        val resources = element.allResourceObjects()
-        return TidalSearchResult(
-            tracks = resources.mapNotNull { it.toTrack() }.distinctBy { it.id },
-            albums = resources.mapNotNull { it.toAlbum() }.distinctBy { it.id },
-            artists = resources.mapNotNull { it.toArtist() }.distinctBy { it.id },
-            playlists = resources.mapNotNull { it.toPlaylist() }.distinctBy { it.id },
-        )
+        return parseV2Search(element)
     }
 
     private suspend fun legacySearch(query: String, reason: String): TidalSearchResult {
         Log.d(API_LOG_TAG, "search v1 fallback reason=$reason queryChars=${query.length}")
         val clientId = authRepository.getClientIdForApi()
-        return runCatching { parseLegacySearch(legacyService.search(query, countryCode, token = clientId)) }
-            .recoverCatching {
-                Log.d(API_LOG_TAG, "search v1 failed reason=${it.safeReason()}, trying desktop")
-                parseLegacySearch(desktopService.search("https://listen.tidal.com/v1/search", query, countryCode))
-            }
-            .onFailure { Log.d(API_LOG_TAG, "search desktop failed reason=${it.safeReason()}") }
-            .getOrThrow()
-            .also { Log.d(API_LOG_TAG, "search v1 ok tracks=${it.tracks.size}") }
+        return requestWithFallback(
+            request = { parseLegacySearch(legacyService.search(query, countryCode, token = clientId)) },
+            fallback = { failure ->
+                Log.d(API_LOG_TAG, "search v1 failed reason=${failure.safeReason()}, trying desktop")
+                try {
+                    parseLegacySearch(desktopService.search("https://listen.tidal.com/v1/search", query, countryCode))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    Log.d(API_LOG_TAG, "search desktop failed reason=${e.safeReason()}")
+                    throw e
+                }
+            },
+        ).also { Log.d(API_LOG_TAG, "search v1 ok tracks=${it.tracks.size}") }
     }
 
     private fun parseLegacySearch(element: JsonElement): TidalSearchResult {
@@ -1122,6 +1282,13 @@ internal fun normalizeTrackId(trackId: String): String? = trackId
 
 internal fun userCollectionTrackRelationshipBody(trackId: String): JsonObject = playlistTrackRelationshipBody(trackId)
 
+internal fun normalizeAlbumId(albumId: String): String? = albumId
+    .substringAfterLast(':')
+    .trim()
+    .takeIf { it.isNotBlank() && !it.startsWith("fixture", ignoreCase = true) }
+
+internal fun userCollectionAlbumRelationshipBody(albumId: String): JsonObject = collectionRelationshipBody("albums", albumId)
+
 internal fun addTrackToPlaylistOutcome(response: Response<Unit>): AddTrackToPlaylistOutcome = when {
     response.isSuccessful -> AddTrackToPlaylistOutcome.Added
     response.code() == 409 -> AddTrackToPlaylistOutcome.AlreadyPresent
@@ -1144,14 +1311,16 @@ internal fun createPlaylistBody(name: String, description: String): JsonObject =
     )
 }
 
-internal fun playlistTrackRelationshipBody(trackId: String): JsonObject = buildJsonObject {
+internal fun playlistTrackRelationshipBody(trackId: String): JsonObject = collectionRelationshipBody("tracks", trackId)
+
+private fun collectionRelationshipBody(type: String, id: String): JsonObject = buildJsonObject {
     put(
         "data",
         buildJsonArray {
             add(
                 buildJsonObject {
-                    put("type", "tracks")
-                    put("id", trackId)
+                    put("type", type)
+                    put("id", id)
                 },
             )
         },
@@ -1169,8 +1338,106 @@ private fun JsonElement.allRelationshipItemIds(): List<String> {
     return includedObjects().filter { it.typeMatches("track", "tracks") }.mapNotNull { it.id }
 }
 
+internal fun shouldFallbackToLegacySearch(result: TidalSearchResult): Boolean = result.isEmpty()
+
+/**
+ * Some v2 search responses contain a full track list but omit albums and artists entirely.
+ * Treat that as a partial response so the UI does not silently collapse into track-only search.
+ */
+internal fun shouldSupplementLegacySearch(result: TidalSearchResult): Boolean =
+    result.tracks.isNotEmpty() && result.albums.isEmpty() && result.artists.isEmpty()
+
+/** Keeps v2 ordering while filling missing metadata and entity groups from the legacy response. */
+internal fun supplementSearchResult(
+    primary: TidalSearchResult,
+    supplement: TidalSearchResult,
+): TidalSearchResult {
+    val supplementTracks = supplement.tracks.associateBy { it.id }
+    val primaryTrackIds = primary.tracks.mapTo(mutableSetOf()) { it.id }
+    val tracks = primary.tracks.map { track ->
+        val fallback = supplementTracks[track.id]
+        track.copy(
+            artist = track.artist.ifBlank { fallback?.artist.orEmpty() },
+            album = track.album.ifBlank { fallback?.album.orEmpty() },
+            artworkUrl = track.artworkUrl?.takeIf(String::isNotBlank) ?: fallback?.artworkUrl,
+            durationMs = track.durationMs.takeIf { it > 0L } ?: fallback?.durationMs ?: 0L,
+            albumId = track.albumId.ifBlank { fallback?.albumId.orEmpty() },
+            artistId = track.artistId.ifBlank { fallback?.artistId.orEmpty() },
+        )
+    } + supplement.tracks.filterNot { it.id in primaryTrackIds }
+
+    return TidalSearchResult(
+        tracks = tracks,
+        albums = (primary.albums + supplement.albums).distinctBy { it.id },
+        artists = (primary.artists + supplement.artists).distinctBy { it.id },
+        playlists = (primary.playlists + supplement.playlists).distinctBy { it.id },
+    )
+}
+
+/**
+ * Runs a request with a fallback while keeping coroutine cancellation intact.
+ * Cancellation must never trigger another network request or become a UI error.
+ */
+internal suspend fun <T> requestWithFallback(
+    request: suspend () -> T,
+    fallbackWhen: (Throwable) -> Boolean = { true },
+    fallback: suspend (Throwable) -> T,
+): T = try {
+    request()
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Throwable) {
+    if (fallbackWhen(e)) fallback(e) else throw e
+}
+
+/** Favorite writes are idempotent when the server reports the desired state already exists. */
+internal fun isFavoriteMutationSuccess(favorite: Boolean, isSuccessful: Boolean, code: Int): Boolean =
+    isSuccessful || (favorite && code == 409) || (!favorite && code == 404)
+
+/** Select the default response format when a Retrofit endpoint omits Accept. */
+internal fun defaultApiAccept(host: String): String =
+    if (host.equals("openapi.tidal.com", ignoreCase = true)) JSON_API_ACCEPT else LEGACY_JSON_ACCEPT
+
 private fun TidalSearchResult.isEmpty(): Boolean =
     tracks.isEmpty() && albums.isEmpty() && artists.isEmpty() && playlists.isEmpty()
+
+/**
+ * A short-lived, concurrency-safe snapshot of the user's favorite track ids.
+ *
+ * Now Playing asks about the current track whenever the queue advances. Keeping
+ * this cache at the API-client boundary avoids repeating the full relationship
+ * request while still allowing changes made elsewhere to appear promptly.
+ */
+internal class FavoriteTrackCache(
+    private val ttlMillis: Long = FAVORITE_TRACK_CACHE_TTL_MILLIS,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
+) {
+    private data class Entry(val ids: Set<String>, val storedAtMillis: Long)
+
+    init {
+        require(ttlMillis >= 0L) { "Favorite cache TTL must not be negative" }
+    }
+
+    private val mutex = Mutex()
+    private var entry: Entry? = null
+
+    suspend fun getOrLoad(loader: suspend () -> Set<String>): Set<String> = mutex.withLock {
+        val current = entry
+        val age = current?.let { nowMillis() - it.storedAtMillis }
+        if (current != null && age != null && age >= 0L && age < ttlMillis) {
+            return@withLock current.ids
+        }
+        loader().toSet().also { loaded ->
+            entry = Entry(loaded, nowMillis())
+        }
+    }
+
+    suspend fun update(trackId: String, favorite: Boolean) = mutex.withLock {
+        val ids = entry?.ids?.toMutableSet() ?: return@withLock
+        if (favorite) ids += trackId else ids -= trackId
+        entry = Entry(ids, nowMillis())
+    }
+}
 
 private fun List<TidalSearchResult>.mergeSearchResults(): TidalSearchResult = TidalSearchResult(
     tracks = flatMap { it.tracks }.distinctBy { it.id },
@@ -1178,6 +1445,17 @@ private fun List<TidalSearchResult>.mergeSearchResults(): TidalSearchResult = Ti
     artists = flatMap { it.artists }.distinctBy { it.id },
     playlists = flatMap { it.playlists }.distinctBy { it.id },
 )
+
+internal fun parseV2Search(element: JsonElement): TidalSearchResult {
+    val resources = element.allResourceObjects()
+    val resourcesByKey = resources.associateBy { it.resourceKey() }
+    return TidalSearchResult(
+        tracks = resources.mapNotNull { it.toTrack(resourcesByKey) }.distinctBy { it.id },
+        albums = resources.mapNotNull { it.toAlbum() }.distinctBy { it.id },
+        artists = resources.mapNotNull { it.toArtist() }.distinctBy { it.id },
+        playlists = resources.mapNotNull { it.toPlaylist() }.distinctBy { it.id },
+    )
+}
 
 private fun List<TidalAlbum>.toArtistAlbumGroups(): TidalArtistAlbums {
     val distinct = distinctBy { it.id }
@@ -1596,11 +1874,14 @@ private fun Throwable.safeReason(): String = when (this) {
 }
 
 private const val JSON_API_ACCEPT = "application/vnd.api+json"
+private const val LEGACY_JSON_ACCEPT = "application/json"
 private const val API_LOG_TAG = "Untidy/API"
 private const val ALBUM_TRACK_PAGE_SIZE = 50
+private const val FAVORITE_TRACK_PAGE_SIZE = 50
 private const val LEGACY_ALBUM_TRACK_PAGE_SIZE = 50
 private const val LEGACY_ALBUM_TRACK_MAX_PAGES = 4
 private const val LEGACY_ALBUM_TRACK_MAX_TRACKS = 100
 private const val ARTIST_ALBUM_PREVIEW_LIMIT = 12
 private const val ARTIST_ALBUM_PAGE_SIZE = 25
 private const val ARTIST_ALBUM_MAX_PAGES = 8
+private const val FAVORITE_TRACK_CACHE_TTL_MILLIS = 30_000L

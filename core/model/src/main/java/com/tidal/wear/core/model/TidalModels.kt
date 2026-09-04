@@ -89,6 +89,11 @@ enum class AudioPreset {
     BatterySaver,
     Balanced,
     High,
+    /**
+     * Opt-in lossless/hi-res request. Backends must retain their lower-quality fallbacks when
+     * the account, track, or device cannot serve a lossless representation.
+     */
+    FullFidelity,
 }
 
 data class EffectiveAudioTier(

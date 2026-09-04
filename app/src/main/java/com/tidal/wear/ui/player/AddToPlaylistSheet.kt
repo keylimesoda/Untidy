@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
+import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Icon
@@ -50,6 +51,7 @@ import com.tidal.wear.core.api.TidalApiClient
 import com.tidal.wear.core.model.AddTrackToPlaylistOutcome
 import com.tidal.wear.core.model.TidalPlaylist
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -211,8 +213,13 @@ private fun PlaylistChooser(
     onCreatePlaylist: () -> Unit,
     onReload: () -> Unit,
 ) {
+    val listState = rememberTransformingLazyColumnState()
     TransformingLazyColumn(
-        modifier = Modifier.fillMaxSize().padding(top = 6.dp),
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 6.dp)
+            .rotaryScrollableWithFocus(listState),
         contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -357,8 +364,8 @@ private fun SmallButton(label: String, onClick: () -> Unit) {
             backgroundColor = TidalColors.SurfaceHigh,
             contentColor = TidalColors.White,
         ),
-        modifier = Modifier.height(34.dp),
-        shape = RoundedCornerShape(17.dp),
+        modifier = Modifier.height(48.dp),
+        shape = RoundedCornerShape(24.dp),
     ) {
         Text(label, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }

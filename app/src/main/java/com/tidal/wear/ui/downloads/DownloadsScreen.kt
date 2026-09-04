@@ -3,13 +3,15 @@ package com.tidal.wear.ui.downloads
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -26,6 +28,8 @@ import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Text
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.offline.DownloadedTrackSummary
+import com.tidal.wear.core.playback.offline.OfflineDownloadScheduler
+import com.tidal.wear.core.playback.offline.OfflineQueuedTrack
 import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
 import com.tidal.wear.core.playback.offline.removeOfflineTrackDownload
 import com.tidal.wear.ui.components.TidalResultChip
@@ -38,15 +42,11 @@ fun DownloadsScreen(
     context: Context,
     onPlayTrack: (TidalTrack) -> Unit,
 ) {
-    var reloadTick by remember { mutableIntStateOf(0) }
-    var tracks by remember { mutableStateOf(emptyList<DownloadedTrackSummary>()) }
     var confirmRemove by remember { mutableStateOf<DownloadedTrackSummary?>(null) }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 1)
-
-    LaunchedEffect(reloadTick) {
-        tracks = context.readOfflineDownloadedTracks()
-        listState.scrollToItem(0)
-    }
+    val scheduler = remember(context) { OfflineDownloadScheduler(context.applicationContext) }
+    val activeTracks by remember(scheduler) { scheduler.observeActiveTracks() }.collectAsState(initial = emptyList())
+    var tracks by remember(activeTracks) { mutableStateOf(context.readOfflineDownloadedTracks()) }
 
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(
@@ -59,8 +59,19 @@ fun DownloadsScreen(
             item {
                 DownloadsSummaryChip(
                     count = tracks.size,
-                    onClick = { reloadTick++ },
+                    activeCount = activeTracks.size,
                 )
+            }
+            activeTracks.forEach { row ->
+                item {
+                    ActiveDownloadChip(
+                        row = row,
+                        onCancel = {
+                            context.removeOfflineTrackDownload(row.id)
+                            Toast.makeText(context, "Download cancelled", Toast.LENGTH_SHORT).show()
+                        },
+                    )
+                }
             }
             if (tracks.isEmpty()) {
                 item { EmptyDownloadsChip() }
@@ -95,9 +106,9 @@ fun DownloadsScreen(
                     Chip(
                         onClick = {
                             if (context.removeOfflineTrackDownload(row.id)) {
+                                tracks = tracks.filterNot { it.id == row.id }
                                 Toast.makeText(context, "Download removed", Toast.LENGTH_SHORT).show()
                                 confirmRemove = null
-                                reloadTick++
                             } else {
                                 Toast.makeText(context, "Couldn't remove download", Toast.LENGTH_SHORT).show()
                             }
@@ -143,13 +154,36 @@ private fun DownloadsTitle() {
 }
 
 @Composable
-private fun DownloadsSummaryChip(count: Int, onClick: () -> Unit) {
+private fun DownloadsSummaryChip(count: Int, activeCount: Int) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .background(TidalColors.SurfaceHigh, RoundedCornerShape(8.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Column {
+            Text("Tracks", color = TidalColors.White, fontWeight = FontWeight.Bold)
+            Text(
+                buildString {
+                    append(if (count == 1) "1 downloaded" else "$count downloaded")
+                    if (activeCount > 0) append(" · $activeCount saving")
+                },
+                color = TidalColors.OnSurfaceMuted,
+                fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActiveDownloadChip(row: OfflineQueuedTrack, onCancel: () -> Unit) {
     Chip(
-        onClick = onClick,
-        label = { Text("Tracks") },
-        secondaryLabel = { Text(if (count == 1) "1 downloaded" else "$count downloaded") },
+        onClick = onCancel,
+        label = { Text(row.title) },
+        secondaryLabel = { Text("Saves on Wi-Fi · tap to cancel") },
         colors = ChipDefaults.secondaryChipColors(
-            backgroundColor = TidalColors.SurfaceHigh,
+            backgroundColor = TidalColors.Surface,
             contentColor = TidalColors.White,
             secondaryContentColor = TidalColors.OnSurfaceMuted,
         ),
@@ -163,7 +197,7 @@ private fun EmptyDownloadsChip() {
         onClick = {},
         enabled = false,
         label = { Text("No downloads on this watch") },
-        secondaryLabel = { Text("Downloads are unavailable in this release") },
+        secondaryLabel = { Text("Save albums or playlists to listen offline") },
         colors = ChipDefaults.secondaryChipColors(
             backgroundColor = TidalColors.Surface,
             contentColor = TidalColors.White,

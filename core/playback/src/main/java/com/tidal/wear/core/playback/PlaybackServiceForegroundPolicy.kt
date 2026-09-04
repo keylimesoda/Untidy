@@ -14,6 +14,7 @@ internal object PlaybackServiceForegroundPolicy {
         PlaybackActions.ACTION_SKIP_NEXT,
         PlaybackActions.ACTION_SKIP_PREVIOUS,
         PlaybackActions.ACTION_JUMP_TO_QUEUE_INDEX,
+        PlaybackActions.ACTION_SET_PREFERRED_AUDIO_OUTPUT,
     )
 
     private val customStartActions = playbackControlActions + setOf(
