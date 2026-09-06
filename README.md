@@ -74,9 +74,9 @@ Untidy is useful now, but it is still under active validation:
 
 The lowest-friction path is to install the current known-good APK directly on a Wear OS watch. You do **not** install this on your phone. A GitHub APK download will not automatically sync from the phone to the watch; that only becomes a normal user flow once Untidy is distributed through a proper Wear OS/Google Play channel or a companion-app packaging path.
 
-1. Download the latest known-good APK to your computer:
-   - [`app-release.apk`](https://github.com/keylimesoda/Untidy/releases/download/v0.1.0-known-good-watch-2026-06-18/app-release.apk)
-   - Release page: [`v0.1.0-known-good-watch-2026-06-18`](https://github.com/keylimesoda/Untidy/releases/tag/v0.1.0-known-good-watch-2026-06-18)
+1. Download the current beta APK to your computer:
+   - [`Untidy-orchestrated-0.6.0-beta.5-album-like.apk`](https://github.com/keylimesoda/Untidy/releases/download/v0.6.0-beta.5/Untidy-orchestrated-0.6.0-beta.5-album-like.apk)
+   - Release notes and validation limits: [`v0.6.0-beta.5`](https://github.com/keylimesoda/Untidy/releases/tag/v0.6.0-beta.5)
 2. Install Android platform tools on your computer so the `adb` command is available.
    - Android Studio includes it, or install the standalone SDK Platform Tools from Google.
 3. On the watch, enable **Developer options**.
@@ -93,7 +93,7 @@ adb connect WATCH_IP:ADB_PORT
 6. Install the APK:
 
 ```bash
-adb install -r app-release.apk
+adb -s WATCH_IP:ADB_PORT install -r Untidy-orchestrated-0.6.0-beta.5-album-like.apk
 ```
 
 If `adb devices` shows the watch as `unauthorized`, accept the debugging prompt on the watch. If pairing expires, turn Wireless debugging off/on and try again with the new ports.
