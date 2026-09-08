@@ -124,7 +124,7 @@ internal data class MainRouteRequest(
 internal data class ExternalRoutePlan(
     val route: String,
     val clearBackStack: Boolean,
-    val returnRootPattern: String?,
+    val returnToPlayer: Boolean,
 )
 
 class MainActivity : ComponentActivity() {
@@ -223,14 +223,19 @@ private fun TidalWearApp(
                 recentItems = recentItems,
             )
             var currentRoute by remember { mutableStateOf<String?>(null) }
-            var returnToPlayerRoot by rememberSaveable { mutableStateOf<String?>(null) }
+            var currentBackStackEntryId by remember { mutableStateOf<String?>(null) }
+            // A route is only a destination pattern, so it cannot distinguish two artist
+            // (or album) entries. Keep the concrete entry created for a player handoff.
+            var returnToPlayerRootEntryId by rememberSaveable { mutableStateOf<String?>(null) }
 
             DisposableEffect(navController) {
                 val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
                     currentRoute = destination.route
+                    currentBackStackEntryId = navController.currentBackStackEntry?.id
                 }
                 navController.addOnDestinationChangedListener(listener)
                 currentRoute = navController.currentDestination?.route
+                currentBackStackEntryId = navController.currentBackStackEntry?.id
                 onDispose { navController.removeOnDestinationChangedListener(listener) }
             }
 
@@ -238,18 +243,22 @@ private fun TidalWearApp(
                 val request = routeRequest ?: return@LaunchedEffect
                 if (request.route.isBlank() || authState != AuthState.UserSignedIn) return@LaunchedEffect
                 val plan = planExternalRoute(request.route, request.returnToPlayer)
-                returnToPlayerRoot = plan.returnRootPattern
                 if (plan.clearBackStack) {
                     navController.navigateAndClear(plan.route)
                 } else {
                     navController.navigate(plan.route)
                 }
+                // Destination callbacks are not guaranteed to update Compose state before
+                // consuming the request. Publish the synchronous destination here so the
+                // signed-in redirect cannot mistake this transition for an unhandled startup.
+                currentRoute = navController.currentDestination?.route
+                returnToPlayerRootEntryId = plan.returnToPlayerRootEntryId(navController.currentBackStackEntry?.id)
                 onRouteRequestConsumed()
             }
 
-            LaunchedEffect(authState, currentRoute) {
+            LaunchedEffect(authState, currentRoute, routeRequest) {
                 when (authState) {
-                    AuthState.UserSignedIn -> if (currentRoute == null || currentRoute == Routes.Onboarding) {
+                    AuthState.UserSignedIn -> if (shouldNavigateSignedInHome(routeRequest != null, currentRoute)) {
                         navController.navigateAndClear(Routes.Home)
                     }
                     AuthState.Anonymous -> if (currentRoute != Routes.Onboarding) {
@@ -268,27 +277,39 @@ private fun TidalWearApp(
             }
             fun playTrack(track: TidalTrack) {
                 val started = context.startTrackPlayback(track)
-                if (started) recentRepository.recordTrack(track)
+                if (!started) {
+                    onPlaybackRejected()
+                    return
+                }
+                recentRepository.recordTrack(track)
                 openPlayer()
-                if (!started) onPlaybackRejected()
             }
             fun playQueue(tracks: List<TidalTrack>, startIndex: Int) {
                 val started = context.startQueuePlayback(tracks, startIndex)
-                if (started) tracks.getOrNull(startIndex)?.let(recentRepository::recordTrack)
+                if (!started) {
+                    onPlaybackRejected()
+                    return
+                }
+                tracks.getOrNull(startIndex)?.let(recentRepository::recordTrack)
                 openPlayer()
-                if (!started) onPlaybackRejected()
             }
             fun playAlbum(album: TidalAlbum, tracks: List<TidalTrack>, startIndex: Int) {
                 val started = context.startQueuePlayback(tracks, startIndex)
-                if (started) recentRepository.recordAlbum(album)
+                if (!started) {
+                    onPlaybackRejected()
+                    return
+                }
+                recentRepository.recordAlbum(album)
                 openPlayer()
-                if (!started) onPlaybackRejected()
             }
             fun playPlaylist(playlist: TidalPlaylist, tracks: List<TidalTrack>, startIndex: Int) {
                 val started = context.startQueuePlayback(tracks, startIndex)
-                if (started) recentRepository.recordPlaylist(playlist)
+                if (!started) {
+                    onPlaybackRejected()
+                    return
+                }
+                recentRepository.recordPlaylist(playlist)
                 openPlayer()
-                if (!started) onPlaybackRejected()
             }
             fun openAlbumId(albumId: String) {
                 navController.navigate(Routes.album(albumId))
@@ -456,13 +477,16 @@ private fun TidalWearApp(
                     )
                 }
             }
-            BackHandler(enabled = returnToPlayerRoot != null && currentRoute == returnToPlayerRoot) {
-                returnToPlayerRoot = null
+            BackHandler(enabled = isReturnToPlayerRoot(returnToPlayerRootEntryId, currentBackStackEntryId)) {
+                returnToPlayerRootEntryId = null
                 (context as? MainActivity)?.finish()
             }
         }
     }
 }
+
+internal fun shouldNavigateSignedInHome(hasPendingRouteRequest: Boolean, currentRoute: String?): Boolean =
+    !hasPendingRouteRequest && (currentRoute == null || currentRoute == Routes.Onboarding)
 
 private fun Intent.toMainRouteRequest(): MainRouteRequest? =
     getStringExtra(MainActivity.EXTRA_ROUTE)
@@ -478,17 +502,14 @@ internal fun planExternalRoute(route: String, returnToPlayer: Boolean): External
     ExternalRoutePlan(
         route = route,
         clearBackStack = route == Routes.Home || returnToPlayer,
-        returnRootPattern = route.takeIf { returnToPlayer }?.toDestinationPattern(),
+        returnToPlayer = returnToPlayer,
     )
 
-private fun String.toDestinationPattern(): String = when {
-    startsWith("album/") -> Routes.Album
-    startsWith("playlist/") -> Routes.Playlist
-    startsWith("artist/") && endsWith("/albums") -> Routes.ArtistAlbums
-    startsWith("artist/") -> Routes.Artist
-    startsWith("recent/track/") -> Routes.TrackContext
-    else -> this
-}
+internal fun ExternalRoutePlan.returnToPlayerRootEntryId(currentEntryId: String?): String? =
+    currentEntryId.takeIf { returnToPlayer }
+
+internal fun isReturnToPlayerRoot(rootEntryId: String?, currentEntryId: String?): Boolean =
+    rootEntryId != null && rootEntryId == currentEntryId
 
 @Composable
 private fun HomeScreen(
@@ -827,7 +848,9 @@ private fun Context.canStartLiveOrDownloadedPlayback(trackId: String): Boolean =
 
 private fun NavHostController.navigateAndClear(route: String) {
     navigate(route) {
-        popUpTo(graph.startDestinationId) { inclusive = true }
+        // The graph entry remains in the back stack even after its start destination
+        // has been replaced. Clearing to it avoids targeting a removed Onboarding entry.
+        popUpTo(graph.id) { inclusive = false }
         launchSingleTop = true
     }
 }

@@ -48,6 +48,7 @@ import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.dialog.Dialog
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import com.tidal.wear.core.playback.DeliveredAudioFormat
@@ -78,7 +79,7 @@ fun ActionsSheet(
 ) {
     var confirmRemoveDownload by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
-    val outputOptions = rememberAudioOutputOptions(requestedOutputId)
+    var showOutputPicker by remember { mutableStateOf(false) }
     val quality = remember(deliveredAudioFormat) { deliveredAudioFormat.toQualityGemPresentation() }
     val listState = rememberTransformingLazyColumnState()
     fun runAction(action: () -> String?) {
@@ -201,34 +202,13 @@ fun ActionsSheet(
                 )
             }
             item {
-                SectionLabel("Play on")
-            }
-            if (outputOptions.isEmpty()) {
-                item {
-                    ActionRow(
-                        icon = Icons.AutoMirrored.Filled.VolumeUp,
-                        label = "No audio outputs",
-                        rightIndicator = null,
-                        iconTint = TidalColors.OnSurfaceMuted,
-                        enabled = false,
-                        onClick = {},
-                    )
-                }
-            } else {
-                outputOptions.forEach { output ->
-                    item {
-                        ActionRow(
-                            icon = Icons.AutoMirrored.Filled.VolumeUp,
-                            label = output.label,
-                            rightIndicator = if (output.selected) Icons.Filled.Check else null,
-                            iconTint = if (output.selected) TidalColors.Cyan else TidalColors.OnSurfaceMuted,
-                            selected = output.selected,
-                            onClick = {
-                                onOutputSelected(output.id)
-                            },
-                        )
-                    }
-                }
+                ActionRow(
+                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    label = "Play on",
+                    rightIndicator = null,
+                    iconTint = TidalColors.White,
+                    onClick = { showOutputPicker = true },
+                )
             }
             item { ActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist", null, TidalColors.White, onClick = { runAction(onAddToPlaylist) }) }
             item { ActionRow(Icons.Filled.Album, "View album", null, TidalColors.White, onClick = { runAction(onViewAlbum) }) }
@@ -238,6 +218,21 @@ fun ActionsSheet(
             }
         }
     }
+    // A separate Wear window owns Back and swipe-to-dismiss. The action sheet stays composed
+    // underneath, preserving its scroll position when the picker closes.
+    Dialog(
+        showDialog = showOutputPicker,
+        onDismissRequest = { showOutputPicker = false },
+    ) {
+        AudioOutputPicker(
+            requestedOutputId = requestedOutputId,
+            onOutputSelected = { id ->
+                onOutputSelected(id)
+                showOutputPicker = false
+            },
+            onBack = { showOutputPicker = false },
+        )
+    }
 }
 
 data class AudioOutputOption(
@@ -246,17 +241,6 @@ data class AudioOutputOption(
     /** The output Untidy has requested for its own player, not a claim about system routing. */
     val selected: Boolean,
 )
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        color = TidalColors.OnSurfaceMuted,
-        style = MaterialTheme.typography.caption1,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.fillMaxWidth(0.82f).padding(top = 8.dp, bottom = 2.dp),
-    )
-}
 
 @Composable
 private fun QualityGem(quality: QualityGemPresentation) {
@@ -316,7 +300,7 @@ private fun downloadLabel(state: DownloadState): String = when (state) {
 }
 
 @Composable
-private fun ActionRow(
+internal fun ActionRow(
     icon: ImageVector,
     label: String,
     rightIndicator: ImageVector?,

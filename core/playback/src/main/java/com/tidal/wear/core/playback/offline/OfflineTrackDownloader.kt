@@ -5,16 +5,18 @@ package com.tidal.wear.core.playback.offline
 import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
-import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheKeyFactory
-import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.dash.offline.DashDownloader
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.TidalTrack
+import com.tidal.wear.core.model.AudioPreset
+import com.tidal.wear.core.playback.manifestFormatAttempts
+import com.tidal.wear.core.playback.settings.sharedSettingsDataStore
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.tidal.wear.core.playback.settings.downloadOverLteEnabled
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -57,9 +59,11 @@ class OfflineTrackDownloader(
         try {
             val token = authRepository.getAccessToken() ?: throw IOException("No TIDAL access token")
             val clientId = authRepository.getClientIdForApi()
-            val manifestUri = fetchDownloadManifest(record.id, token, clientId)
+            val presetName = appContext.sharedSettingsDataStore.data.first()[stringPreferencesKey("audio_preset")]
+            val preset = AudioPreset.entries.firstOrNull { it.name == presetName } ?: AudioPreset.BatterySaver
+            val manifest = fetchDownloadManifest(record.id, token, clientId, preset)
             val cacheDir = appContext.offlineTrackCacheDir(record.id).apply { mkdirs() }
-            val cache = SimpleCache(cacheDir, NoOpCacheEvictor(), StandaloneDatabaseProvider(appContext))
+            val cache = OfflineCacheRegistry.acquire(appContext, record.id)
             var discardCache = false
             try {
                 val dataSourceFactory = CacheDataSource.Factory()
@@ -80,9 +84,9 @@ class OfflineTrackDownloader(
                     )
                 val mediaItem = MediaItem.Builder()
                     .setMediaId(record.id)
-                    .setUri(manifestUri)
+                    .setUri(manifest.uri)
                     .setMimeType(MimeTypes.APPLICATION_MPD)
-                    .setCustomCacheKey("untidy-download-${record.id}-${sha256Short(manifestUri)}")
+                    .setCustomCacheKey("untidy-download-${record.id}-${sha256Short(manifest.uri)}")
                     .build()
                 DashDownloader(mediaItem, dataSourceFactory).download { _, _, _ -> }
                 if (cache.cacheSpace <= 0L || cache.keys.isEmpty()) {
@@ -92,10 +96,22 @@ class OfflineTrackDownloader(
                     discardCache = true
                     return@withContext OfflineDownloadResult.Skipped
                 }
-                appContext.markOfflineTrackDownloaded(track)
+                // Commit the marker and descriptor only after DashDownloader has completed and
+                // the cache is non-empty. This prevents a completed-looking download that still
+                // needs an authenticated manifest request at replay time.
+                appContext.markOfflineTrackDownloaded(
+                    track,
+                    OfflinePlaybackDescriptor(
+                        trackId = record.id,
+                        manifestUri = manifest.uri,
+                        format = manifest.format,
+                        presentation = manifest.presentation,
+                        previewReason = manifest.previewReason,
+                    ),
+                )
                 OfflineDownloadResult.Downloaded
             } finally {
-                runCatching { cache.release() }
+                runCatching { OfflineCacheRegistry.release(appContext, record.id) }
                 if (discardCache) runCatching { cacheDir.deleteRecursively() }
             }
         } catch (error: CancellationException) {
@@ -132,15 +148,27 @@ class OfflineTrackDownloader(
         return OfflineBatchDownloadResult(downloaded = downloaded, failed = failed, skipped = skipped)
     }
 
-    private fun fetchDownloadManifest(trackId: String, token: String, clientId: String): String {
-        val url = "https://openapi.tidal.com/v2/trackManifests/$trackId".toHttpUrl().newBuilder()
+    private fun fetchDownloadManifest(trackId: String, token: String, clientId: String, preset: AudioPreset): DownloadManifest {
+        var lastError: IOException? = null
+        for (formats in manifestFormatAttempts(preset)) {
+            try {
+                return fetchDownloadManifestFormat(trackId, token, clientId, formats)
+            } catch (error: DownloadFormatUnavailable) {
+                lastError = error
+            }
+        }
+        throw lastError ?: IOException("No download format available")
+    }
+
+    private fun fetchDownloadManifestFormat(trackId: String, token: String, clientId: String, formats: List<String>): DownloadManifest {
+        val urlBuilder = "https://openapi.tidal.com/v2/trackManifests/$trackId".toHttpUrl().newBuilder()
             .addQueryParameter("manifestType", "MPEG_DASH")
-            .addQueryParameter("formats", "HEAACV1")
             .addQueryParameter("uriScheme", "DATA")
             .addQueryParameter("usage", "DOWNLOAD")
             .addQueryParameter("adaptive", "false")
             .addQueryParameter("countryCode", countryCode())
-            .build()
+        formats.forEach { urlBuilder.addQueryParameter("formats", it) }
+        val url = urlBuilder.build()
         val request = Request.Builder()
             .url(url)
             .header("accept", "application/vnd.api+json")
@@ -149,13 +177,24 @@ class OfflineTrackDownloader(
             .build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw IOException("download manifest ${response.code}: ${body.take(160)}")
-            return JSONObject(body)
+            if (response.code in listOf(403, 404, 406)) throw DownloadFormatUnavailable("Download format unavailable")
+            if (!response.isSuccessful) throw IOException("download manifest ${response.code}")
+            val attributes = JSONObject(body)
                 .getJSONObject("data")
                 .getJSONObject("attributes")
-                .getString("uri")
+            val uri = attributes.optString("uri")
                 .takeIf { it.isNotBlank() }
                 ?: throw IOException("download manifest missing uri")
+            val format = attributes.optJSONArray("formats")
+                ?.let { formats -> List(formats.length()) { formats.optString(it) } }
+                ?.lastOrNull { it.isNotBlank() }
+                ?: formats.last()
+            return DownloadManifest(
+                uri = uri,
+                format = format,
+                presentation = attributes.optString("trackPresentation", "UNKNOWN"),
+                previewReason = attributes.optString("previewReason").takeIf { it.isNotBlank() },
+            )
         }
     }
 
@@ -169,6 +208,13 @@ sealed interface OfflineDownloadResult {
     /** The request was persisted and is waiting for Wi-Fi or an allowed connected network. */
     data object WaitingForNetwork : OfflineDownloadResult
 }
+
+private data class DownloadManifest(
+    val uri: String,
+    val format: String,
+    val presentation: String,
+    val previewReason: String?,
+)
 
 data class OfflineBatchDownloadResult(
     val downloaded: Int,
@@ -193,3 +239,5 @@ private fun sha256Short(value: String): String = MessageDigest.getInstance("SHA-
     .digest(value.toByteArray())
     .joinToString("") { "%02x".format(it) }
     .take(12)
+
+private class DownloadFormatUnavailable(message: String) : IOException(message)

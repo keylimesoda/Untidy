@@ -74,17 +74,23 @@ fun TrackContextScreen(
 ) {
     var track by remember(trackId, initialRecent) { mutableStateOf(initialRecent?.toTrack() ?: placeholderTrack(trackId)) }
     var loading by remember(trackId) { mutableStateOf(true) }
+    var metadataLookupFailed by remember(trackId) { mutableStateOf(false) }
+    var metadataRetryTick by remember(trackId) { mutableIntStateOf(0) }
     var showAddToPlaylist by remember(trackId) { mutableStateOf(false) }
     var downloadedRefreshTick by remember(trackId) { mutableIntStateOf(0) }
     var downloading by remember(trackId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    LaunchedEffect(trackId) {
+    LaunchedEffect(trackId, metadataRetryTick) {
         loading = true
+        metadataLookupFailed = false
         runCatching { withContext(Dispatchers.IO) { apiClient.track(trackId) } }
             .onSuccess { loaded -> if (loaded != null) track = track.mergeLoaded(loaded) }
-            .onFailure { throwable -> if (throwable is CancellationException) throw throwable }
+            .onFailure { throwable ->
+                if (throwable is CancellationException) throw throwable
+                metadataLookupFailed = true
+            }
         loading = false
     }
 
@@ -100,9 +106,11 @@ fun TrackContextScreen(
     TrackContextContent(
         track = track,
         loading = loading,
+        metadataLookupFailed = metadataLookupFailed,
         downloaded = remember(track.id, downloadedRefreshTick) { context.isOfflineTrackDownloaded(track.id) },
         downloading = downloading,
         onPlayTrack = { onPlayTrack(track) },
+        onRetryMetadata = { metadataRetryTick++ },
         onOpenAlbum = {
             track.albumId.takeIf { it.isNotBlank() }?.let(onOpenAlbum)
                 ?: Toast.makeText(context, "Album unavailable", Toast.LENGTH_SHORT).show()
@@ -139,9 +147,11 @@ fun TrackContextScreen(
 private fun TrackContextContent(
     track: TidalTrack,
     loading: Boolean,
+    metadataLookupFailed: Boolean,
     downloaded: Boolean,
     downloading: Boolean,
     onPlayTrack: () -> Unit,
+    onRetryMetadata: () -> Unit,
     onOpenAlbum: () -> Unit,
     onOpenArtist: () -> Unit,
     onAddToPlaylist: () -> Unit,
@@ -194,6 +204,17 @@ private fun TrackContextContent(
                 }
             }
             item { ContextActionChip("Play", "Start this track", Icons.Filled.PlayArrow, TidalColors.Cyan, onClick = onPlayTrack) }
+            if (metadataLookupFailed) {
+                item {
+                    ContextActionChip(
+                        label = "Retry details",
+                        secondary = "Couldn’t load track metadata",
+                        icon = Icons.Filled.PlayArrow,
+                        iconTint = TidalColors.Cyan,
+                        onClick = onRetryMetadata,
+                    )
+                }
+            }
             item { ContextActionChip("View album", if (track.albumId.isBlank()) "Album unavailable" else track.album.ifBlank { "Open album" }, Icons.Filled.Album, TidalColors.White, onClick = onOpenAlbum) }
             item { ContextActionChip("View artist", if (track.artistId.isBlank()) "Artist unavailable" else track.artist.ifBlank { "Open artist" }, Icons.Filled.Person, TidalColors.White, onClick = onOpenArtist) }
             item { ContextActionChip("Add to playlist", "Choose a playlist", Icons.AutoMirrored.Filled.PlaylistAdd, TidalColors.White, onClick = onAddToPlaylist) }

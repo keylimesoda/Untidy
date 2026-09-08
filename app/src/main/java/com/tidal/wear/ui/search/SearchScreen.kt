@@ -37,6 +37,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,6 +78,25 @@ import kotlinx.coroutines.withContext
 
 private const val SearchInputKey = "tidal_search_input"
 
+/** Retained by the navigation back-stack entry, not by this composable instance. */
+internal class SearchSessionState {
+    var query by mutableStateOf("")
+    var submittedQuery by mutableStateOf("")
+    var result by mutableStateOf<TidalSearchResult?>(null)
+    var loading by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+    var inputPending by mutableStateOf(true)
+    private var autoInputLaunchPending = true
+
+    fun consumeAutoInputLaunch(): Boolean = autoInputLaunchPending.also {
+        autoInputLaunchPending = false
+    }
+}
+
+internal class SearchViewModel : ViewModel() {
+    val session = SearchSessionState()
+}
+
 @Composable
 fun SearchScreen(
     apiClient: TidalApiClient,
@@ -85,14 +107,16 @@ fun SearchScreen(
     onOpenDownloads: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    val searchModel = viewModel<SearchViewModel>()
+    val session = searchModel.session
+    val scope = searchModel.viewModelScope
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    var query by remember { mutableStateOf("") }
-    var submittedQuery by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<TidalSearchResult?>(null) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var inputPending by remember { mutableStateOf(true) }
+    var query by session::query
+    var submittedQuery by session::submittedQuery
+    var result by session::result
+    var loading by session::loading
+    var error by session::error
+    var inputPending by session::inputPending
     val networkAvailable = rememberNetworkAvailable()
 
     fun searchFor(rawQuery: String) {
@@ -156,8 +180,8 @@ fun SearchScreen(
         searchInputLauncher.launch(intent)
     }
 
-    LaunchedEffect(Unit) {
-        launchSearchInput()
+    LaunchedEffect(session) {
+        if (session.consumeAutoInputLaunch()) launchSearchInput()
     }
 
     LaunchedEffect(submittedQuery, loading, networkAvailable) {

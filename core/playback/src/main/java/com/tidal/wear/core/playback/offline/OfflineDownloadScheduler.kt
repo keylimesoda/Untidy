@@ -32,6 +32,7 @@ class OfflineDownloadScheduler(context: Context) {
     private val workManager = WorkManager.getInstance(appContext)
 
     fun enqueue(tracks: List<TidalTrack>): OfflineBatchScheduleResult {
+        tracks.filter { it.id.isNotBlank() }.forEach(appContext::saveOfflineTrackMetadata)
         val records = tracks.toOfflineDownloadRecords()
         val scheduled = appContext.enqueueOfflineDownloadRecords(records)
         if (scheduled.isNotEmpty()) {

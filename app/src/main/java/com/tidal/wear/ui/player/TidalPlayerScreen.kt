@@ -9,6 +9,8 @@ import android.media.AudioManager
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -89,6 +91,7 @@ import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.core.playback.offline.OfflineDownloadResult
 import com.tidal.wear.core.playback.offline.OfflineTrackDownloader
 import com.tidal.wear.core.playback.offline.removeOfflineTrackDownload
+import com.tidal.wear.core.playback.offline.repairOfflineTrackDownload
 import com.tidal.wear.playback.NowPlayingUiState
 import com.tidal.wear.playback.NowPlayingViewModel
 import com.tidal.wear.ui.art.AlbumArt
@@ -129,6 +132,19 @@ fun TidalPlayerScreen(
     }
     val offlineDownloader = remember(authRepository) { OfflineTrackDownloader(context.applicationContext, authRepository) }
     val scope = rememberCoroutineScope()
+    // Keep destination state above the ambient branch: ambient suspends interaction, not context.
+    val navigation = viewModel<PlayerNavigationState>()
+
+    // A write can finish while the screen is ambient. Retain its outcome until an interactive
+    // frame can report it rather than losing it with the dismissed sheet.
+    LaunchedEffect(isAmbient, navigation.playlistResult) {
+        if (!isAmbient) {
+            navigation.playlistResult?.let { message ->
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                navigation.playlistResult = null
+            }
+        }
+    }
 
     fun startTrackDownload() {
         val track = currentTrack
@@ -196,6 +212,8 @@ fun TidalPlayerScreen(
             onOpenHome = onOpenHome,
             onOpenAlbum = onOpenAlbum,
             onOpenArtist = onOpenArtist,
+            navigation = navigation,
+            playlistOperationScope = navigation.viewModelScope,
         )
     }
 }
@@ -213,6 +231,8 @@ private fun TidalPlayerNonAmbient(
     onOpenHome: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
+    navigation: PlayerNavigationState,
+    playlistOperationScope: kotlinx.coroutines.CoroutineScope,
 ) {
     val focusRequester = remember { FocusRequester() }
     val view = LocalView.current
@@ -221,14 +241,9 @@ private fun TidalPlayerNonAmbient(
     val density = LocalDensity.current
     var showVolume by remember { mutableStateOf(false) }
     var volumeChangePulse by remember { mutableIntStateOf(0) }
-    var liked by remember(state.track?.id) { mutableStateOf(false) }
-    var likeLoading by remember(state.track?.id) { mutableStateOf(false) }
-    var likeError by remember(state.track?.id) { mutableStateOf<String?>(null) }
-    var showQueue by remember { mutableStateOf(false) }
-    var showActionsSheet by remember { mutableStateOf(false) }
-    var actionsSheetDragPx by remember { mutableStateOf(0f) }
-    var actionsGripArmed by remember { mutableStateOf(false) }
-    var addToPlaylistTrack by remember { mutableStateOf<TidalTrack?>(null) }
+    var liked by navigation::liked
+    var likeLoading by navigation::likeLoading
+    var likeError by navigation::likeError
     val scope = rememberCoroutineScope()
     val progress = if (state.durationMs > 0) state.positionMs.toFloat() / state.durationMs else 0f
     val loadedTrack = state.track
@@ -249,13 +264,11 @@ private fun TidalPlayerNonAmbient(
         MoreActionsHintPreference.markShown(context)
     }
 
-    LaunchedEffect(loadedTrack?.id, showActionsSheet) {
-        if (!showActionsSheet) runCatching { focusRequester.requestFocus() }
+    LaunchedEffect(loadedTrack?.id, navigation.showActionsSheet) {
+        if (!navigation.showActionsSheet) runCatching { focusRequester.requestFocus() }
     }
-    BackHandler(enabled = showActionsSheet) {
-        showActionsSheet = false
-        actionsSheetDragPx = 0f
-        actionsGripArmed = false
+    BackHandler(enabled = navigation.showActionsSheet) {
+        navigation.closeActions()
     }
     LaunchedEffect(volumeChangePulse) {
         if (volumeChangePulse > 0) {
@@ -271,7 +284,9 @@ private fun TidalPlayerNonAmbient(
     }
     LaunchedEffect(state.track?.id) {
         val trackId = state.track?.id
+        if (trackId != null && navigation.favoriteTrackId == trackId) return@LaunchedEffect
         likeError = null
+        liked = false
         if (!trackId.isFavoriteLookupEligible()) {
             liked = false
             likeLoading = false
@@ -280,29 +295,36 @@ private fun TidalPlayerNonAmbient(
         val validTrackId = trackId ?: return@LaunchedEffect
         likeLoading = true
         runCatching { apiClient.isFavoriteTrack(validTrackId) }
-            .onSuccess { liked = it }
+            .onSuccess { liked = it; navigation.favoriteTrackId = validTrackId }
             .onFailure { likeError = "Like unavailable" }
         likeLoading = false
     }
 
-    addToPlaylistTrack?.let { trackSnapshot ->
+    navigation.addToPlaylistTrack?.let { trackSnapshot ->
         AddToPlaylistSheet(
             track = trackSnapshot,
             apiClient = apiClient,
-            onBack = { addToPlaylistTrack = null },
+            onBack = { navigation.addToPlaylistTrack = null },
+            operationScope = playlistOperationScope,
+            operationPending = navigation.pendingPlaylistTrackId != null,
+            onOperationStarted = { trackId -> navigation.pendingPlaylistTrackId = trackId },
+            onOperationResult = { message ->
+                navigation.pendingPlaylistTrackId = null
+                navigation.playlistResult = message.takeIf { it.isNotBlank() }
+            },
         )
         return
     }
 
-    if (showQueue) {
+    if (navigation.showQueue) {
         QueueSheet(
             queue = state.queue,
             currentTrack = state.track,
             onJumpToIndex = { index ->
                 viewModel.jumpToQueueIndex(index)
-                showQueue = false
+                navigation.showQueue = false
             },
-            onBack = { showQueue = false },
+            onBack = { navigation.showQueue = false },
         )
         return
     }
@@ -315,7 +337,7 @@ private fun TidalPlayerNonAmbient(
                 .focusRequester(focusRequester)
                 .onFocusChanged { if (BuildConfig.DEBUG) Log.d("UntidyRotaryVolume", "nowPlayingFocus=${it.isFocused} track=${loadedTrack?.id.orEmpty()}") }
                 .onPreRotaryScrollEvent { event ->
-                    if (showActionsSheet) return@onPreRotaryScrollEvent false
+                    if (navigation.showActionsSheet) return@onPreRotaryScrollEvent false
                     if (BuildConfig.DEBUG) Log.d("UntidyRotaryVolume", "rotary pixels=${event.verticalScrollPixels} volume=${state.volume}/${state.maxVolume}")
                     val maxVolume = state.maxVolume.coerceAtLeast(1)
                     val step = if (event.verticalScrollPixels > 0f) 1 else -1
@@ -330,7 +352,7 @@ private fun TidalPlayerNonAmbient(
                 }
                 .focusable(),
         ) {
-            if (loadedTrack != null) {
+            if (loadedTrack != null && state.error.isNullOrBlank() && !state.isLoading) {
                 CircularPerimeterProgress(
                     progress = progress,
                     modifier = Modifier.fillMaxSize().padding(3.dp * scale),
@@ -392,7 +414,7 @@ private fun TidalPlayerNonAmbient(
                     x = 134,
                     y = 36,
                     scale = scale,
-                    onClick = { showQueue = true },
+                    onClick = { navigation.showQueue = true },
                 )
 
                 Box(
@@ -500,19 +522,19 @@ private fun TidalPlayerNonAmbient(
                     travelPx = actionsSheetTravelPx,
                     modifier = Modifier.align(Alignment.BottomCenter),
                     onDragProgress = { dragPx ->
-                        actionsSheetDragPx = dragPx.coerceIn(0f, actionsSheetTravelPx)
+                        navigation.actionsSheetDragPx = dragPx.coerceIn(0f, actionsSheetTravelPx)
                     },
-                    onArmedChange = { actionsGripArmed = it },
+                    onArmedChange = { navigation.actionsGripArmed = it },
                     onRelease = { dragPx ->
                         val shouldOpen = dragPx > actionsSheetTravelPx * 0.28f
                         if (shouldOpen) markMoreHintLearned()
-                        showActionsSheet = shouldOpen
-                        actionsSheetDragPx = if (shouldOpen) actionsSheetTravelPx else 0f
-                        actionsGripArmed = false
+                        navigation.showActionsSheet = shouldOpen
+                        navigation.actionsSheetDragPx = if (shouldOpen) actionsSheetTravelPx else 0f
+                        navigation.actionsGripArmed = false
                     },
                     onAccessibilityOpen = {
                         markMoreHintLearned()
-                        showActionsSheet = true
+                        navigation.showActionsSheet = true
                     },
                 )
 
@@ -524,28 +546,38 @@ private fun TidalPlayerNonAmbient(
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
                 )
             } else {
-                PlayerLoadingState(scale = scale, accent = accent, isPlaying = state.isPlaying)
+                PlayerEmptyState(
+                    scale = scale,
+                    accent = accent,
+                    error = state.error,
+                    loading = state.isLoading,
+                    retryLabel = if (PlayerRecoveryPolicy.needsDownloadRepair(state.error)) "Repair" else "Retry",
+                    onRetry = {
+                        if (PlayerRecoveryPolicy.needsDownloadRepair(state.error) && loadedTrack != null) {
+                            context.repairOfflineTrackDownload(loadedTrack)
+                            Toast.makeText(context, "Repair queued. Check Downloads for progress.", Toast.LENGTH_LONG).show()
+                            onOpenHome()
+                        } else viewModel.retryPlayback()
+                    },
+                    onHome = onOpenHome,
+                )
             }
-            if (showActionsSheet || actionsSheetDragPx > 0f || actionsGripArmed) {
+            if (navigation.showActionsSheet || navigation.actionsSheetDragPx > 0f || navigation.actionsGripArmed) {
                 ActionsPullOverOverlay(
-                    progressPx = if (showActionsSheet) actionsSheetTravelPx else actionsSheetDragPx,
+                    progressPx = if (navigation.showActionsSheet) actionsSheetTravelPx else navigation.actionsSheetDragPx,
                     travelPx = actionsSheetTravelPx,
                     downloadState = downloadState,
                     deliveredAudioFormat = state.deliveredAudioFormat,
                     requestedOutputId = state.preferredAudioOutputDeviceId,
                     onClose = {
-                        showActionsSheet = false
-                        actionsSheetDragPx = 0f
-                        actionsGripArmed = false
+                        navigation.closeActions()
                     },
                     onDownload = onDownload,
                     onRemoveDownload = onRemoveDownload,
                     onHome = onOpenHome,
                     onQueue = {
-                        showActionsSheet = false
-                        actionsSheetDragPx = 0f
-                        actionsGripArmed = false
-                        showQueue = true
+                        navigation.closeActions()
+                        navigation.showQueue = true
                     },
                     onOutputSelected = { deviceId ->
                         viewModel.setPreferredAudioOutput(deviceId)
@@ -555,8 +587,9 @@ private fun TidalPlayerNonAmbient(
                         when {
                             track == null -> "Nothing playing"
                             track.id.isBlank() || track.id == "tidal-current" || track.id.startsWith("fixture", ignoreCase = true) -> "Track unavailable"
+                            !PlayerRecoveryPolicy.canStartPlaylistWrite(navigation.pendingPlaylistTrackId, track.id) -> "Adding to a playlist…"
                             else -> {
-                                addToPlaylistTrack = track
+                                navigation.addToPlaylistTrack = track
                                 null
                             }
                         }
@@ -704,10 +737,14 @@ private fun ActionsPullOverOverlay(
 }
 
 @Composable
-private fun PlayerLoadingState(
+private fun PlayerEmptyState(
     scale: Float,
     accent: Color,
-    isPlaying: Boolean,
+    error: String?,
+    loading: Boolean,
+    retryLabel: String,
+    onRetry: () -> Unit,
+    onHome: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -716,30 +753,42 @@ private fun PlayerLoadingState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(34.dp * scale)
-                .clip(CircleShape)
-                .background(accent.copy(alpha = 0.16f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(7.dp * scale)
-                    .clip(CircleShape)
-                    .background(accent.copy(alpha = 0.72f)),
-            )
-        }
         Text(
-            text = if (isPlaying) "Starting playback…" else "Loading track…",
-            color = TidalColors.OnSurfaceMuted,
+            text = if (loading) "Starting playback…" else PlayerRecoveryPolicy.emptyMessage(error),
+            color = if (error.isNullOrBlank()) TidalColors.OnSurfaceMuted else Color(0xFFFF8A80),
             fontSize = (13 * scale).sp,
             fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp * scale),
+            modifier = Modifier.fillMaxWidth(),
         )
+        Text(
+            text = "Return home to choose a track",
+            color = TidalColors.OnSurfaceMuted,
+            fontSize = (11 * scale).sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp * scale),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 16.dp * scale)) {
+            if (!error.isNullOrBlank()) {
+                RecoveryButton(retryLabel, onRetry, scale)
+            }
+            RecoveryButton("Home", onHome, scale)
+        }
+    }
+}
+
+@Composable
+private fun RecoveryButton(label: String, onClick: () -> Unit, scale: Float) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(TidalColors.SurfaceHigh)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp * scale, vertical = 12.dp * scale),
+    ) {
+        Text(label, color = TidalColors.White, fontSize = (12 * scale).sp, fontWeight = FontWeight.Bold)
     }
 }
 

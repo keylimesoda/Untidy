@@ -22,15 +22,19 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.datasource.cache.CacheKeyFactory
-import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
-import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
+import com.tidal.wear.core.playback.offline.OfflinePlaybackDescriptor
+import com.tidal.wear.core.playback.offline.OfflineCacheRegistry
+import com.tidal.wear.core.playback.offline.markOfflineTrackRepairRequired
+import com.tidal.wear.core.playback.offline.OfflinePlaybackPlan
+import com.tidal.wear.core.playback.offline.offlinePlaybackDescriptor
+import com.tidal.wear.core.playback.offline.offlinePlaybackPlan
 import com.tidal.wear.core.playback.offline.offlineTrackCacheDir
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -66,7 +70,6 @@ internal class DirectManifestPlaybackBackend(
         .callTimeout(20, TimeUnit.SECONDS)
         .build()
     private val _events = MutableSharedFlow<PlaybackBackendEvent>(extraBufferCapacity = 32)
-    private val databaseProvider = StandaloneDatabaseProvider(appContext)
     private val offlineCaches = ConcurrentHashMap<String, SimpleCache>()
     private var audioPreset = AudioPreset.BatterySaver
     private var currentManifest: ResolvedManifest? = null
@@ -81,6 +84,17 @@ internal class DirectManifestPlaybackBackend(
         .setAudioAttributes(AudioAttributes.DEFAULT, true)
         .build()
         .also { exo ->
+            exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
+                .setAudioOffloadPreferences(playbackAudioOffloadPreferences())
+                .build()
+            exo.addAudioOffloadListener(object : ExoPlayer.AudioOffloadListener {
+                override fun onOffloadedPlayback(offloadedPlayback: Boolean) {
+                    Log.d(DIRECT_LOG_TAG, "audio offloaded=$offloadedPlayback")
+                }
+                override fun onSleepingForOffloadChanged(sleepingForOffload: Boolean) {
+                    Log.d(DIRECT_LOG_TAG, "audio sleepingForOffload=$sleepingForOffload")
+                }
+            })
             exo.setWakeMode(C.WAKE_MODE_NETWORK)
         exo.addListener(
             object : Player.Listener {
@@ -147,7 +161,14 @@ internal class DirectManifestPlaybackBackend(
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    _events.tryEmit(PlaybackBackendEvent.Error(error.errorCodeName, error))
+                    val id = exo.currentMediaItem?.mediaId
+                    val cause = if (id != null && appContext.isOfflineTrackDownloaded(id) &&
+                        error.errorCode in PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
+                    ) {
+                        appContext.markOfflineTrackRepairRequired(id)
+                        IOException("Downloaded track needs repair: local cache cannot be read", error)
+                    } else error
+                    _events.tryEmit(PlaybackBackendEvent.Error(error.errorCodeName, cause))
                 }
             },
         )
@@ -220,6 +241,8 @@ internal class DirectManifestPlaybackBackend(
         }
         if (deviceId != null && device == null) {
             Log.w(DIRECT_LOG_TAG, "preferred output unavailable id=$deviceId")
+            player.setPreferredAudioDevice(null)
+            PreferredAudioOutputPreference.set(appContext, null)
             return
         }
         // Media3 forwards this to its AudioTrack. It is a preference for Untidy only; Android may
@@ -261,6 +284,12 @@ internal class DirectManifestPlaybackBackend(
 
     override fun prefetchTrack(trackId: String) {
         if (trackId.isBlank()) return
+        // A local cache already has its authorized descriptor. Prefetching it must never renew
+        // credentials or issue a network manifest request.
+        if (isMarkedDownloaded(trackId)) {
+            Log.d(DIRECT_LOG_TAG, "manifest prefetch skipped for local track id=$trackId")
+            return
+        }
         val generation = queueGeneration
         val request = manifestRequest(trackId, generation)
         scope.launch {
@@ -283,21 +312,27 @@ internal class DirectManifestPlaybackBackend(
     ): ResolvedMediaSource {
         val startedAt = SystemClock.elapsedRealtime()
         val trackId = track.id
-        val request = manifestRequest(trackId, generation)
-        val manifest = request.deferred.await().getOrThrow()
+        val local = localOfflineSource(trackId)
+        val manifest = if (local != null) {
+            local.descriptor.toResolvedManifest()
+        } else {
+            val request = manifestRequest(trackId, generation)
+            request.deferred.await().getOrThrow().also { manifestRequests.remove(trackId, request) }
+        }
         val manifestMs = SystemClock.elapsedRealtime() - startedAt
-        manifestRequests.remove(trackId, request)
         Log.d(DIRECT_LOG_TAG, "manifest loaded id=$trackId queueIndex=$queueIndex manifestMs=$manifestMs source=${manifest.source} presentation=${manifest.presentation} previewReason=${manifest.previewReason.orEmpty()} mime=${manifest.mimeType} codec=${manifest.codec.orEmpty()}")
-        val offlineCache = downloadedTrackCache(trackId)
         val source = when (manifest.kind) {
             ManifestKind.Dash -> {
-                val mediaSourceFactory = if (offlineCache != null) {
+                val mediaSourceFactory = if (local != null) {
                     Log.d(DIRECT_LOG_TAG, "using offline cache for downloaded track id=$trackId wakeMode=LOCAL")
                     DashMediaSource.Factory(
                         CacheDataSource.Factory()
-                            .setCache(offlineCache)
+                            .setCache(local.cache)
                             .setCacheKeyFactory(canonicalDownloadCacheKeyFactory(trackId))
-                            .setUpstreamDataSourceFactory(DefaultDataSource.Factory(appContext)),
+                            // A cache miss is corruption/incompletion, never a reason to contact
+                            // the manifest host or stream a different entitlement/quality.
+                            .setFlags(CacheDataSource.FLAG_BLOCK_ON_CACHE)
+                            .setUpstreamDataSourceFactory(null),
                     )
                 } else {
                     DashMediaSource.Factory(DefaultDataSource.Factory(appContext))
@@ -307,7 +342,7 @@ internal class DirectManifestPlaybackBackend(
             ManifestKind.DirectUrl -> ProgressiveMediaSource.Factory(DefaultDataSource.Factory(appContext))
                 .createMediaSource(manifest.mediaItem(track, queue, queueIndex))
         }
-        return ResolvedMediaSource(manifest = manifest, source = source, offline = offlineCache != null)
+        return ResolvedMediaSource(manifest = manifest, source = source, offline = local != null)
     }
 
     private fun manifestRequest(trackId: String, generation: Long): ManifestRequest =
@@ -362,7 +397,7 @@ internal class DirectManifestPlaybackBackend(
         cancelManifestRequests()
         player.setWakeMode(C.WAKE_MODE_NONE)
         player.release()
-        offlineCaches.values.forEach { cache -> runCatching { cache.release() } }
+        offlineCaches.keys.forEach { id -> runCatching { OfflineCacheRegistry.release(appContext, id) } }
         offlineCaches.clear()
     }
 
@@ -370,8 +405,26 @@ internal class DirectManifestPlaybackBackend(
         if (!appContext.isOfflineTrackDownloaded(trackId)) return null
         val cacheDir = appContext.offlineTrackCacheDir(trackId)
         if (!cacheDir.isDirectory) return null
-        return offlineCaches.computeIfAbsent(trackId) {
-            SimpleCache(cacheDir, NoOpCacheEvictor(), databaseProvider)
+        val cache = offlineCaches.computeIfAbsent(trackId) {
+            OfflineCacheRegistry.acquire(appContext, trackId)
+        }
+        return cache.takeIf { it.cacheSpace > 0L && it.keys.isNotEmpty() }
+    }
+
+    private fun localOfflineSource(trackId: String): LocalOfflineSource? {
+        val downloadedMarker = isMarkedDownloaded(trackId)
+        if (!downloadedMarker) return null
+        val descriptor = appContext.offlinePlaybackDescriptor(trackId)
+        val cache = descriptor?.let { downloadedTrackCache(trackId) }
+        return when (offlinePlaybackPlan(downloadedMarker, descriptor != null, cache != null)) {
+            OfflinePlaybackPlan.Local -> LocalOfflineSource(checkNotNull(descriptor), checkNotNull(cache))
+            OfflinePlaybackPlan.RepairDescriptor ->
+                throw IOException("Downloaded track needs repair: authorized offline descriptor is missing")
+            OfflinePlaybackPlan.RepairCache ->
+                throw IOException("Downloaded track needs repair: local cache is incomplete or corrupt").also {
+                    appContext.markOfflineTrackRepairRequired(trackId)
+                }
+            OfflinePlaybackPlan.Stream -> null
         }
     }
 
@@ -550,6 +603,11 @@ private data class ResolvedMediaSource(
     val offline: Boolean,
 )
 
+private data class LocalOfflineSource(
+    val descriptor: OfflinePlaybackDescriptor,
+    val cache: SimpleCache,
+)
+
 private data class ManifestRequest(
     val generation: Long,
     val deferred: Deferred<Result<ResolvedManifest>>,
@@ -672,6 +730,17 @@ private fun Int.toBackendState(isPlaying: Boolean): PlaybackBackendState = when 
     Player.STATE_ENDED -> PlaybackBackendState.NotPlaying
     else -> PlaybackBackendState.NotPlaying
 }
+
+private fun OfflinePlaybackDescriptor.toResolvedManifest(): ResolvedManifest = ResolvedManifest(
+    trackId = trackId,
+    uri = manifestUri,
+    kind = ManifestKind.Dash,
+    source = "offline-download-descriptor",
+    presentation = presentation,
+    previewReason = previewReason,
+    mimeType = MimeTypes.APPLICATION_MPD,
+    codec = format,
+)
 
 private fun Int.isSelectableWearOutputType(): Boolean = when (this) {
     AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,

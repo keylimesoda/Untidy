@@ -3,6 +3,8 @@ package com.tidal.wear.core.playback.offline
 import android.content.Context
 import com.tidal.wear.core.model.TidalTrack
 import org.json.JSONArray
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 
 data class DownloadedTrackSummary(
@@ -10,8 +12,32 @@ data class DownloadedTrackSummary(
     val title: String,
     val artist: String,
     val downloadedAt: Long,
+    val metadata: TidalTrack? = null,
 ) {
-    fun toTrack(): TidalTrack = TidalTrack(id = id, title = title, artist = artist, album = "Downloaded")
+    fun toTrack(): TidalTrack = metadata ?: TidalTrack(id = id, title = title, artist = artist, album = "Downloaded")
+}
+
+/** The authorized DASH descriptor that populated a completed local cache. */
+internal data class OfflinePlaybackDescriptor(
+    val trackId: String,
+    val manifestUri: String,
+    val format: String,
+    val presentation: String,
+    val previewReason: String?,
+)
+
+/** Kept pure so the critical no-stream fallback rule is JVM-testable. */
+internal enum class OfflinePlaybackPlan { Stream, Local, RepairDescriptor, RepairCache }
+
+internal fun offlinePlaybackPlan(
+    downloadedMarker: Boolean,
+    descriptorPresent: Boolean,
+    cacheReady: Boolean,
+): OfflinePlaybackPlan = when {
+    !downloadedMarker -> OfflinePlaybackPlan.Stream
+    !descriptorPresent -> OfflinePlaybackPlan.RepairDescriptor
+    !cacheReady -> OfflinePlaybackPlan.RepairCache
+    else -> OfflinePlaybackPlan.Local
 }
 
 data class CollectionDownloadSummary(
@@ -33,8 +59,8 @@ fun CollectionDownloadSummary.isPartiallyDownloaded(): Boolean =
 fun Context.collectionDownloadSummary(tracks: List<TidalTrack>): CollectionDownloadSummary =
     collectionDownloadSummary(
         tracks = tracks,
-        isDownloaded = ::isOfflineTrackDownloaded,
-        isFailed = ::isOfflineTrackDownloadFailed,
+        isDownloaded = { id -> isOfflineTrackDownloaded(id) && !isOfflineTrackDownloadRepairRequired(id) },
+        isFailed = { id -> isOfflineTrackDownloadFailed(id) || isOfflineTrackDownloadRepairRequired(id) },
     )
 
 internal fun collectionDownloadSummary(
@@ -62,23 +88,35 @@ fun Context.readOfflineDownloadedTracks(): List<DownloadedTrackSummary> {
                 title = prefs.getString("title:$id", null)?.takeIf { it.isNotBlank() } ?: "Downloaded track",
                 artist = prefs.getString("artist:$id", null).orEmpty(),
                 downloadedAt = prefs.getLong("downloadedAt:$id", 0L),
+                metadata = offlineTrackMetadata(id),
             )
         }
         .sortedByDescending { it.downloadedAt }
 }
 
-fun Context.markOfflineTrackDownloaded(track: TidalTrack) {
+fun Context.markOfflineTrackDownloaded(track: TidalTrack) = markOfflineTrackDownloaded(track, null)
+
+internal fun Context.markOfflineTrackDownloaded(track: TidalTrack, descriptor: OfflinePlaybackDescriptor?) {
     val record = track.toOfflineDownloadRecord() ?: return
     synchronized(offlineDownloadStateLock) {
         if (isOfflineTrackDownloadRemovalRequestedLocked(record.id)) return
-        getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+        saveOfflineTrackMetadata(track)
+        val editor = getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
             .edit()
             .putBoolean("$DOWNLOADED_PREFIX${record.id}", true)
+            .remove("repair-required:${record.id}")
             .remove("$FAILED_PREFIX${record.id}")
             .putString("title:${record.id}", record.title)
             .putString("artist:${record.id}", record.artist)
             .putLong("downloadedAt:${record.id}", System.currentTimeMillis())
-            .apply()
+        if (descriptor != null && descriptor.trackId == record.id) {
+            editor
+                .putString("$OFFLINE_MANIFEST_URI_PREFIX${record.id}", descriptor.manifestUri)
+                .putString("$OFFLINE_FORMAT_PREFIX${record.id}", descriptor.format)
+                .putString("$OFFLINE_PRESENTATION_PREFIX${record.id}", descriptor.presentation)
+                .putString("$OFFLINE_PREVIEW_REASON_PREFIX${record.id}", descriptor.previewReason)
+        }
+        editor.apply()
     }
 }
 
@@ -146,6 +184,38 @@ fun Context.isOfflineTrackDownloadFailed(trackId: String): Boolean =
         .getBoolean("$FAILED_PREFIX$trackId", false)
 
 /**
+ * Old versions stored only the marker and cache bytes. Keep those bytes intact, but require a
+ * deliberate redownload before replay: obtaining a fresh stream would not be offline playback.
+ */
+fun Context.isOfflineTrackDownloadRepairRequired(trackId: String): Boolean =
+    isOfflineTrackDownloaded(trackId) && (offlinePlaybackDescriptor(trackId) == null ||
+        !offlineTrackCacheDir(trackId).isDirectory ||
+        getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE).getBoolean("repair-required:$trackId", false))
+
+internal fun Context.markOfflineTrackRepairRequired(trackId: String) {
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE).edit()
+        .putBoolean("repair-required:$trackId", true).apply()
+}
+
+internal fun Context.offlinePlaybackDescriptor(trackId: String): OfflinePlaybackDescriptor? {
+    if (trackId.isBlank()) return null
+    val prefs = getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+    val manifestUri = prefs.getString("$OFFLINE_MANIFEST_URI_PREFIX$trackId", null)
+        ?.takeIf { it.isNotBlank() } ?: return null
+    val format = prefs.getString("$OFFLINE_FORMAT_PREFIX$trackId", null)
+        ?.takeIf { it.isNotBlank() } ?: return null
+    return OfflinePlaybackDescriptor(
+        trackId = trackId,
+        manifestUri = manifestUri,
+        format = format,
+        presentation = prefs.getString("$OFFLINE_PRESENTATION_PREFIX$trackId", null)
+            ?.takeIf { it.isNotBlank() } ?: "UNKNOWN",
+        previewReason = prefs.getString("$OFFLINE_PREVIEW_REASON_PREFIX$trackId", null)
+            ?.takeIf { it.isNotBlank() },
+    )
+}
+
+/**
  * Removes only Untidy-local offline state for a downloaded track.
  * This never mutates TIDAL library, playlists, playlist membership, or remote assets.
  */
@@ -154,6 +224,17 @@ fun Context.removeOfflineTrackDownload(trackId: String): Boolean {
     markOfflineTrackDownloadRemovalRequested(trackId)
     OfflineDownloadScheduler(this).cancel(trackId)
     return removeOfflineTrackDownloadState(trackId)
+}
+
+/**
+ * Schedules a replacement for a legacy/incomplete local copy without removing its cache first.
+ * The old descriptor and bytes remain available for diagnostics until a new download completes.
+ */
+fun Context.repairOfflineTrackDownload(track: TidalTrack): OfflineBatchScheduleResult {
+    if (track.id.isBlank() || !isOfflineTrackDownloadRepairRequired(track.id)) {
+        return OfflineBatchScheduleResult(requested = 0, scheduled = 0)
+    }
+    return OfflineDownloadScheduler(this).enqueue(listOf(track))
 }
 
 /**
@@ -186,6 +267,10 @@ private const val OFFLINE_DOWNLOAD_PREFS = "offline-downloads"
 private const val DOWNLOADED_PREFIX = "downloaded:"
 private const val FAILED_PREFIX = "failed:"
 private const val REMOVAL_REQUESTED_PREFIX = "removal-requested:"
+private const val OFFLINE_MANIFEST_URI_PREFIX = "offline-manifest-uri:"
+private const val OFFLINE_FORMAT_PREFIX = "offline-format:"
+private const val OFFLINE_PRESENTATION_PREFIX = "offline-presentation:"
+private const val OFFLINE_PREVIEW_REASON_PREFIX = "offline-preview-reason:"
 
 internal fun Context.markOfflineTrackDownloadRemovalRequested(trackId: String) {
     synchronized(offlineDownloadStateLock) {
@@ -211,6 +296,19 @@ internal fun Context.offlineTrackDownloadMetadata(trackId: String): Pair<String,
     ) to prefs.getString("artist:$trackId", null).orEmpty()
 }
 
+internal fun Context.saveOfflineTrackMetadata(track: TidalTrack) {
+    // Queue workers have a minimal title/artist record; never overwrite richer saved context.
+    val existing = offlineTrackMetadata(track.id)
+    if (existing != null && track.albumId.isBlank() && track.artistId.isBlank() && track.album == "Downloaded") return
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE).edit()
+        .putString("metadata:${track.id}", Json.encodeToString(track)).apply()
+}
+
+internal fun Context.offlineTrackMetadata(trackId: String): TidalTrack? = runCatching {
+    getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE).getString("metadata:$trackId", null)
+        ?.let { Json.decodeFromString<TidalTrack>(it) }?.takeIf { it.id == trackId }
+}.getOrNull()
+
 internal fun Context.clearOfflineTrackDownloadRemovalRequested(trackId: String) {
     synchronized(offlineDownloadStateLock) {
         getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
@@ -229,7 +327,9 @@ internal fun Context.enqueueOfflineDownloadRecords(records: List<OfflineDownload
         val additions = OfflineDownloadQueuePolicy.appendInOrder(
             existing = queued,
             candidates = records,
-            isAlreadyDownloaded = ::isOfflineTrackDownloaded,
+            // A legacy marker without its descriptor is deliberately repairable. Do not delete
+            // its old bytes here; DashDownloader can reuse compatible cached spans.
+            isAlreadyDownloaded = { id -> isOfflineTrackDownloaded(id) && !isOfflineTrackDownloadRepairRequired(id) },
         )
         additions.forEach { record ->
             clearOfflineTrackDownloadRemovalRequested(record.id)
@@ -281,10 +381,16 @@ internal fun Context.removeOfflineTrackDownloadState(trackId: String): Boolean =
         getSharedPreferences(OFFLINE_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
             .edit()
             .remove("$DOWNLOADED_PREFIX$trackId")
+            .remove("repair-required:$trackId")
             .remove("title:$trackId")
             .remove("artist:$trackId")
             .remove("downloadedAt:$trackId")
+            .remove("metadata:$trackId")
             .remove("$FAILED_PREFIX$trackId")
+            .remove("$OFFLINE_MANIFEST_URI_PREFIX$trackId")
+            .remove("$OFFLINE_FORMAT_PREFIX$trackId")
+            .remove("$OFFLINE_PRESENTATION_PREFIX$trackId")
+            .remove("$OFFLINE_PREVIEW_REASON_PREFIX$trackId")
             .apply()
         true
     }

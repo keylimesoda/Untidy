@@ -55,6 +55,7 @@ import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -67,6 +68,11 @@ fun AddToPlaylistSheet(
     track: TidalTrack,
     apiClient: TidalApiClient,
     onBack: () -> Unit,
+    /** A parent-owned scope lets a selected write finish after this sheet is dismissed. */
+    operationScope: CoroutineScope? = null,
+    operationPending: Boolean = false,
+    onOperationStarted: (String) -> Unit = {},
+    onOperationResult: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var playlists by remember(track.id) { mutableStateOf<List<TidalPlaylist>>(emptyList()) }
@@ -78,12 +84,14 @@ fun AddToPlaylistSheet(
     var successMessage by remember(track.id) { mutableStateOf<String?>(null) }
     var creatingPlaylist by remember(track.id) { mutableStateOf(false) }
     var reloadToken by remember(track.id) { mutableIntStateOf(0) }
-    val scope = rememberCoroutineScope()
+    val localScope = rememberCoroutineScope()
+    val scope = operationScope ?: localScope
     val view = LocalView.current
 
     fun addToPlaylist(playlist: TidalPlaylist) {
-        if (addingTarget != null || creatingPlaylist || successMessage != null) return
+        if (operationPending || addingTarget != null || creatingPlaylist || successMessage != null) return
         addingTarget = playlist
+        onOperationStarted(track.id)
         addError = null
         scope.launch {
             runCatching {
@@ -94,18 +102,21 @@ fun AddToPlaylistSheet(
                     AddTrackToPlaylistOutcome.AlreadyPresent -> "Already in"
                 }
                 successMessage = "$prefix ${playlist.title}"
+                onOperationResult(successMessage.orEmpty())
                 view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
             }.onFailure { throwable ->
                 if (throwable is CancellationException) throw throwable
                 addError = playlistAddErrorMessage(throwable, playlist.title)
+                onOperationResult(addError.orEmpty())
             }
             addingTarget = null
         }
     }
 
     fun createPlaylistAndAddTrack() {
-        if (addingTarget != null || creatingPlaylist || successMessage != null) return
+        if (operationPending || addingTarget != null || creatingPlaylist || successMessage != null) return
         creatingPlaylist = true
+        onOperationStarted(track.id)
         addError = null
         createError = null
         scope.launch {
@@ -125,10 +136,12 @@ fun AddToPlaylistSheet(
                 }
                 playlists = listOf(playlist) + playlists.filterNot { it.id == playlist.id }
                 successMessage = "$prefix ${playlist.title}"
+                onOperationResult(successMessage.orEmpty())
                 view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
             }.onFailure { throwable ->
                 if (throwable is CancellationException) throw throwable
                 createError = playlistCreateErrorMessage(throwable)
+                onOperationResult(createError.orEmpty())
             }
             creatingPlaylist = false
         }
@@ -153,7 +166,8 @@ fun AddToPlaylistSheet(
     }
 
     BackHandler(enabled = true) {
-        if (addingTarget == null) onBack()
+        // Dismissal never cancels a selected server write. The parent scope retains the result.
+        onBack()
     }
 
     Column(
@@ -181,6 +195,7 @@ fun AddToPlaylistSheet(
         )
 
         when {
+            operationPending && addingTarget == null && !creatingPlaylist -> CenterStatus("Finishing playlist update…", secondaryAction = "Back" to onBack)
             loading -> CenterStatus("Loading playlists…")
             successMessage != null -> CenterStatus(successMessage.orEmpty(), icon = Icons.Filled.Check, iconTint = TidalColors.Cyan)
             loadError != null && playlists.isEmpty() -> CenterStatus(
@@ -233,6 +248,9 @@ private fun PlaylistChooser(
         }
         if (playlists.isEmpty()) {
             item { StatusLine("No editable playlists found", TidalColors.OnSurfaceMuted) }
+            if (!showCreatePlaylist) {
+                item { StatusLine("Create a playlist in TIDAL on your phone, then reload.", TidalColors.OnSurfaceMuted) }
+            }
             item { SmallButton("Reload", onReload) }
         } else {
             playlists.forEach { playlist ->

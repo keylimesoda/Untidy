@@ -17,6 +17,7 @@ import com.tidal.wear.core.auth.TidalAuthRepositoryProvider
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.TidalTrack
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
+import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
 import com.tidal.wear.core.playback.settings.sharedSettingsDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -93,6 +94,8 @@ class TidalMediaService : MediaLibraryService() {
                     }
                     is PlaybackBackendEvent.Error -> {
                         Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.code}", event.throwable)
+                        PlaybackRequestStatus.fail(event.throwable?.let(::playbackFailureMessage)
+                            ?: "Playback stopped. Try again.")
                         player.pause()
                     }
                     is PlaybackBackendEvent.Other -> if (event.name.contains("Error", ignoreCase = true)) {
@@ -233,7 +236,12 @@ class TidalMediaService : MediaLibraryService() {
         maxAttempts: Int = 1,
     ) {
         val id = trackId.ifBlank { return }
+        PlaybackRequestStatus.begin(
+            knownTrack ?: TidalTrack(id = id, title = "TIDAL", artist = "", album = ""),
+            currentQueue, currentQueueIndex,
+        )
         if (!canStartLiveOrDownloadedPlayback(id) && maxAttempts <= 1) {
+            PlaybackRequestStatus.fail("Not downloaded. Connect to play this track.")
             Log.w(PLAYER_LOG_TAG, "playTrack offline fallback: not downloaded id=$id")
             Log.w(PLAYER_LOG_TAG, "Not downloaded · connect to stream this track")
             return
@@ -252,6 +260,7 @@ class TidalMediaService : MediaLibraryService() {
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Throwable) {
+                    PlaybackRequestStatus.fail(playbackFailureMessage(error))
                     Log.w(
                         PLAYER_LOG_TAG,
                         "queue load attempt=${attempt + 1}/$maxAttempts failed id=$id reason=${error::class.java.simpleName}: ${error.message}",
@@ -274,7 +283,9 @@ class TidalMediaService : MediaLibraryService() {
         configureQuality()
         Log.d(PLAYER_LOG_TAG, "playTrack timing qualityMs=${SystemClock.elapsedRealtime() - qualityStartedAt} totalMs=${SystemClock.elapsedRealtime() - requestStartedAt}")
         val resolveStartedAt = SystemClock.elapsedRealtime()
-        val track = knownTrack ?: withContext(Dispatchers.IO) { runCatching { apiClient.track(id) }.getOrNull() }
+        val track = knownTrack
+            ?: (if (isOfflineTrackDownloaded(id)) readOfflineDownloadedTracks().firstOrNull { it.id == id }?.toTrack()
+            else withContext(Dispatchers.IO) { runCatching { apiClient.track(id) }.getOrNull() })
             ?: TidalTrack(id = id, title = "TIDAL", artist = "", album = "")
         Log.d(
             PLAYER_LOG_TAG,
@@ -294,6 +305,7 @@ class TidalMediaService : MediaLibraryService() {
         val transportStartedAt = SystemClock.elapsedRealtime()
         Log.d(PLAYER_LOG_TAG, "backend transport start playWhenReady=$playWhenReady totalMs=${transportStartedAt - requestStartedAt}")
         if (playWhenReady) playbackBackend?.play() else playbackBackend?.pause()
+        PlaybackRequestStatus.ready()
         Log.d(PLAYER_LOG_TAG, "backend transport completed transportMs=${SystemClock.elapsedRealtime() - transportStartedAt} totalMs=${SystemClock.elapsedRealtime() - requestStartedAt}")
     }
 

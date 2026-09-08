@@ -32,6 +32,8 @@ import com.tidal.wear.core.playback.offline.OfflineDownloadScheduler
 import com.tidal.wear.core.playback.offline.OfflineQueuedTrack
 import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
 import com.tidal.wear.core.playback.offline.removeOfflineTrackDownload
+import com.tidal.wear.core.playback.offline.isOfflineTrackDownloadRepairRequired
+import com.tidal.wear.core.playback.offline.repairOfflineTrackDownload
 import com.tidal.wear.ui.components.TidalResultChip
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
@@ -77,14 +79,28 @@ fun DownloadsScreen(
                 item { EmptyDownloadsChip() }
             } else {
                 tracks.forEach { row ->
+                    val needsRepair = context.isOfflineTrackDownloadRepairRequired(row.id)
                     item {
                         TidalResultChip(
                             label = row.title,
-                            secondaryLabel = row.artist.ifBlank { "Downloaded" },
+                            secondaryLabel = if (needsRepair) "Download needs repair" else row.artist.ifBlank { "Downloaded" },
                             artworkUrl = null,
                             fallback = "↓",
                             onClick = { onPlayTrack(row.toTrack()) },
                         )
+                    }
+                    if (needsRepair && activeTracks.none { it.id == row.id }) {
+                        item {
+                            Chip(
+                                onClick = {
+                                    context.repairOfflineTrackDownload(row.toTrack())
+                                    Toast.makeText(context, "Repair queued", Toast.LENGTH_SHORT).show()
+                                },
+                                label = { Text("Repair download") },
+                                secondaryLabel = { Text("Keeps existing cached audio") },
+                                modifier = Modifier.padding(horizontal = 8.dp),
+                            )
+                        }
                     }
                     item {
                         Chip(
