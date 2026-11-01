@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.RepeatMode
@@ -19,7 +20,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,7 +56,6 @@ fun OnboardingScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var retryCount by remember { mutableIntStateOf(0) }
-    val isAuthenticated by authRepository.isAuthenticated.collectAsState(initial = false)
     val view = LocalView.current
 
     DisposableEffect(view) {
@@ -105,8 +104,6 @@ fun OnboardingScreen(
                 userCode = session?.userCode,
                 verificationUri = session?.verificationUri ?: "link.tidal.com",
                 errorMessage = error,
-                isAuthenticated = isAuthenticated,
-                onDone = onAuthenticated,
                 onRetry = { retryCount += 1 },
             )
         }
@@ -122,8 +119,6 @@ private fun DeviceCodeContent(
     userCode: String?,
     verificationUri: String,
     errorMessage: String?,
-    isAuthenticated: Boolean,
-    onDone: () -> Unit,
     onRetry: () -> Unit,
 ) {
     Column(
@@ -167,21 +162,37 @@ private fun DeviceCodeContent(
             )
         }
         Spacer(Modifier.weight(1f))
-        Button(
-            onClick = { if (errorMessage != null) onRetry() else if (isAuthenticated) onDone() },
-            enabled = true,
-            colors = ButtonDefaults.buttonColors(
-                backgroundColor = TidalColors.SurfaceHigh,
-                contentColor = TidalColors.White,
-            ),
-            modifier = Modifier.fillMaxWidth().height(36.dp),
-            shape = RoundedCornerShape(18.dp),
-        ) {
-            Text(
-                text = if (errorMessage != null) "Retry" else "Done",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-            )
+        if (errorMessage != null) {
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = TidalColors.SurfaceHigh,
+                    contentColor = TidalColors.White,
+                ),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(24.dp),
+            ) {
+                Text(
+                    text = "Retry",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PulsingCyanDot()
+                Text(
+                    text = "Waiting — updates once you enter the code",
+                    color = TidalColors.OnSurfaceMuted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
         Spacer(Modifier.height(8.dp))
     }
