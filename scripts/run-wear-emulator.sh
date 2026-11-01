@@ -25,7 +25,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=env-android.sh
 source "$REPO_ROOT/scripts/env-android.sh" >/dev/null
 
-AVD_NAME="${UNTIDY_AVD_NAME:-UntidyWearOS51}"
+AVD_NAME="${UNTIDY_AVD_NAME:-wear6}"
 DEFAULT_ARGS=(
   -avd "$AVD_NAME"
   -no-window

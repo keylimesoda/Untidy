@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=env-android.sh
 source "$REPO_ROOT/scripts/env-android.sh" >/dev/null
 
-AVD_NAME="${UNTIDY_AVD_NAME:-UntidyWearOS51}"
+AVD_NAME="${UNTIDY_AVD_NAME:-wear6}"
 BOOT_TIMEOUT_SECONDS="${UNTIDY_EMULATOR_BOOT_TIMEOUT_SECONDS:-180}"
 LOG_DIR="$REPO_ROOT/reports"
 mkdir -p "$LOG_DIR"
