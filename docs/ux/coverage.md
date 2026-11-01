@@ -8,6 +8,7 @@ Anything not listed was **not run**. Never mark UNTESTED items as verified.
 |---|---|
 | wear6 emulator 454x454, anonymous, debug build | RUN: install, cold launch, permission dialog, onboarding, Done dead-tap test, screenshots+uiautomator |
 | Physical SM_R955U 432x432, signed-in, release build | RUN (read-only): cold start x1 (2716 ms), home scroll map, search-entry, swipe-back, Library, Settings, Track Context; screens+XML in evidence/. LATE SESSION: search→remote-input-picker→Back→Back chain (UX-013 withdrawn) |
+| Physical SM_R955U, beta.7 (versionCode 12) install | RUN: uninstall of differently-signed beta.6 (data wipe user-approved), clean install of 0.6.0-beta.7, launch, notification prompt, EXP-001 waiting state live on watch with fresh device code. Sign-in pairing pending (user will pair); post-pairing watch smoke not yet run |
 | wear6 emulator 454x454, SIGNED-IN, debug builds | RUN (late 2026-11-01): streaming playback (playlist play, explicit track play), playlist download batch (20 tracks over LTE toggle), offline shelf play, recent tracking, Track Context Like/Unlike round-trip vs server (curl truth), Library liked-tracks 47→264 fix (EXP-006), Settings LTE toggle, ActionsSheet pull-up |
 | Smaller display AVD | UNTESTED — no AVD created |
 | Larger display (454 vs watch 432 both exist) | partial |
