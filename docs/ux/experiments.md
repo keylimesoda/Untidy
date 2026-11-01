@@ -88,6 +88,41 @@ UPDATE 2026-11-01 late: auth fixture completed (user entered device code;
   clickable as intended.
 verdict: **ACCEPT** (device-verified signed-in, emulator 454x454)
 
+## EXP-005 — Like action in Track Context (UX-004)
+
+finding: UX-004 | commit: (below)
+problem: favoriting a recent track requires starting playback (Like exists
+  only on Now Playing); Track Context shows Play/View album/View artist/
+  Add to playlist/Download but no Like. Measured on signed-in watch
+  (watch-13-track-context-scrolled.xml).
+hypothesis: a Like toggle chip in Track Context (mirroring the player's
+  lookup/toggle/eligibility/haptic pattern) lets users favorite without
+  starting audio.
+expected: favorite+unfavorite possible from context with no playback;
+  state persists across re-entry (server-backed); Library "Liked tracks"
+  count +1/−1.
+invariants: existing context actions unchanged; eligibility rules identical
+  to player (fixture/placeholder ids excluded); no double-toggle races.
+falsifier: like state diverges from player/Library, or failure paths leave
+  stale "Liked" label.
+plan: reuse `isFavoriteLookupEligible` (made internal); lookup
+  isFavoriteTrack on track.id; setFavoriteTrack toggle with haptic confirm,
+  toast fallback, "Like unavailable" secondary on lookup failure.
+verification (device, signed-in emulator): downloaded "Love Is All Around"
+  via playlist (needed Download-over-LTE toggle on metered emu net; see
+  UX-016) → shelf tap → track recent recorded (prefs JSON verified) →
+  Recent screen → context: Play/View album/View artist/Add to playlist/
+  Like all present (evidence/2026-11-01-emul-context-before/after.png).
+  Like tap → chip "Liked · In your collection", `favorite track write ok
+  favorite=true`, server v2 relationships GET shows addedAt matching the
+  tap. Exit + re-enter context → still Liked (server read, not just cache).
+  Unlike → chip back to "Like", write ok favorite=false, v2 GET shows item
+  absent and no entries dated today (user state fully restored).
+before/after: context without/with Like chip (screenshots, 454x454)
+verdict: **ACCEPT** (device-verified round-trip; falsifier's Library-count
+  divergence also fired but is pre-existing and applies to the player's
+  like equally → filed separately as UX-017)
+
 ## Reverted / inconclusive
 
 (none yet — reverted experiments are the highest-value anti-recurrence data;
