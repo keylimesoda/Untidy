@@ -74,6 +74,18 @@
   shared_prefs/untidy_recent_history.xml` (and `untidy_player.xml`,
   `tidal_auth.xml` for tokens when replaying API calls with curl).
 
+## Session-death testing recipe (debug builds)
+
+- Force an expired+dead refresh token: BACK UP `shared_prefs/tidal_auth.xml`
+  first, then replace `refresh_token` with garbage and `expires_at` with 100.
+  Inject via `adb push <file> /data/local/tmp/ && run-as com.tidal.wear cp`
+  (run-as cannot read /sdcard; stdin pipes to run-as hang — use the tmp dir).
+- MUST force-stop and verify with `pidof` empty BEFORE swapping prefs: a
+  live process re-persists its in-memory SharedPreferences over your file
+  (media service can respawn the process after force-stop — re-check pid).
+- Restore afterwards from backup; re-verify with a user-scoped call
+  (`library fallback ok tracks=264`).
+
 ## Emulator auth persistence
 
 - `scripts/run-wear-emulator.sh` boots `-no-snapshot-load` (no wipe): once

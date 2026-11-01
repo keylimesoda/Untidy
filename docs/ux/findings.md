@@ -46,6 +46,7 @@ Status ∈ open / accepted / reverted / inconclusive / blocked(<reason>).
 | UX-017 | P1 | high | measured+fixed (emulator+curl) | Library "Liked tracks" showed 47 of 281 favorites: legacy v1 listing page-capped (limit=50→47 parsed) and unordered; liked state (v2) fine. Fixed via v2 relationship+batch (264 shown) | done | EXP-006 |
 | UX-018 | P3 | med | measured | Liked-tracks list rows lack artwork (v2 batch album resource carries no image URL) | low | EXP-006 |
 | UX-019 | P3 | low | measured | Albums/Artists/Playlists library rows also legacy-capped at 50 — same truncation class as UX-017 for other kinds | med | — |
+| UX-020 | P1 | high | measured+fixed (emulator) | Server-dead session stayed "signed in": stale "Library unavailable / Tap to retry" forever, no re-auth prompt (prefs-only hasUsableSession + Initializing no-op in nav). Fixed: permanent refresh rejection clears session and nav routes to fresh device code | done | EXP-008 |
 
 ## Detail (non-obvious only; lens transcripts hold full text — history://)
 

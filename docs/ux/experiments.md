@@ -151,6 +151,39 @@ methodology note (IMPORTANT): the original UX-017 "two stores" diagnosis
   from single-page API probes; paginators must be cross-checked against a
   second encoding of the cursor and against a server-reported total.
 
+## EXP-008 — dead-session honesty (UX-020)
+
+finding: UX-020 | commit: (git log below)
+problem: when the REFRESH token itself dies server-side (revoked/aged out
+  after disuse), refreshStoredToken's failure was swallowed: prefs kept the
+  dead token, hasUsableSession() (prefs-based) kept claiming signed-in, and
+  MainActivity's Initializing branch was a no-op -> user sees permanently
+  broken content panes with no path back to sign-in.
+hypothesis: treat refresh 400/401/403 as terminal (never 429/5xx), clear
+  the session, and let navigation land the user on the device-code screen.
+expected: one user-scoped call after token death -> logs the rejection,
+  prefs cleared, app navigates to Onboarding with a fresh code automatically.
+falsifier: transient failures ever clearing a session; or UI stuck.
+plan: TidalAuthException gains httpCode; isPermanentRefreshFailure pure
+  predicate (AuthSessionExpiry.kt, per JVM-test trap rule); clear +
+  updateAuthState in refreshStoredToken; MainActivity Initializing branch
+  navigates to Onboarding when no usable session and off Onboarding.
+verification (device, signed-in emulator): backed up real tidal_auth.xml,
+  injected DEAD_TEST_TOKEN + expired expires_at (via /data/local/tmp +
+  run-as cp; watch out: force-stop FIRST or live SharedPreferences
+  re-persists over the injection), opened Library ->
+  `auth endpoint token/refresh 400 invalid_grant` ->
+  `refresh rejected permanently code=400; clearing session for re-auth` ->
+  auto Onboarding showing fresh code "FLUUP" +
+  "Go to link.tidal.com to connect" (evidence/2026-11-01-emul-exp008-
+  reauth-prompt.png). Fixture restored from backup; library re-verified
+  tracks=264.
+verdict: **ACCEPT**
+notes: debug variant has no catalog client credentials ("client credentials
+  not configured"), so post-clear state is Initializing, not Anonymous —
+  the MainActivity branch must handle that (first attempt that relied on
+  Anonymous was wrong and was corrected in-session).
+
 ## Reverted / inconclusive
 
 ### EXP-007 — UX-013 search-strand fix (never implemented: finding withdrawn)

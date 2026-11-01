@@ -216,6 +216,7 @@ private fun TidalWearApp(
                     .distinctUntilChanged()
             }.collectAsState(initial = HomePlaybackSummary())
             val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
+            val hasUsableSession by authRepository.isAuthenticated.collectAsState(initial = true)
             val releaseVersionPreference by settingsRepository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
             val recentItems by recentRepository.items.collectAsState(initial = emptyList())
             val homeShelfContent = selectHomeShelfContent(
@@ -256,7 +257,7 @@ private fun TidalWearApp(
                 onRouteRequestConsumed()
             }
 
-            LaunchedEffect(authState, currentRoute, routeRequest) {
+            LaunchedEffect(authState, currentRoute, routeRequest, hasUsableSession) {
                 when (authState) {
                     AuthState.UserSignedIn -> if (shouldNavigateSignedInHome(routeRequest != null, currentRoute)) {
                         navController.navigateAndClear(Routes.Home)
@@ -264,7 +265,14 @@ private fun TidalWearApp(
                     AuthState.Anonymous -> if (currentRoute != Routes.Onboarding) {
                         navController.navigateAndClear(Routes.Onboarding)
                     }
-                    AuthState.Initializing -> Unit
+                    // A signed-in session that died server-side (refresh token revoked
+                    // or aged out) clears prefs and lands here; without this the user
+                    // keeps seeing dead content panes instead of a fresh sign-in code.
+                    AuthState.Initializing -> if (!hasUsableSession &&
+                        currentRoute != null && currentRoute != Routes.Onboarding
+                    ) {
+                        navController.navigateAndClear(Routes.Onboarding)
+                    }
                 }
             }
 

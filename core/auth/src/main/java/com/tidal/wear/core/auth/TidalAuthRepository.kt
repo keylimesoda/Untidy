@@ -100,7 +100,7 @@ data class TidalAccountInfo(
     val expiresAtEpochSeconds: Long,
 )
 
-class TidalAuthException(message: String) : IOException(message)
+class TidalAuthException(message: String, val httpCode: Int = -1) : IOException(message)
 
 class TidalDeviceAuth(
     private val clientId: String,
@@ -237,7 +237,7 @@ class TidalDeviceAuth(
     private fun authEndpointException(endpoint: String, code: Int, rawBody: String, label: String): TidalAuthException {
         val sanitizedBody = sanitizeAuthBody(rawBody)
         Log.w(AUTH_LOG_TAG, "auth endpoint $endpoint $code: $sanitizedBody")
-        return TidalAuthException("$label failed ($code): $sanitizedBody")
+        return TidalAuthException("$label failed ($code): $sanitizedBody", httpCode = code)
     }
 
     private fun decodeTokenResponse(responseBody: String): TokenResult.Success? {
@@ -373,10 +373,22 @@ class DefaultTidalAuthRepository private constructor(
 
         val refreshToken = prefs.getString(KEY_REFRESH_TOKEN, null) ?: return@withLock null
         val tokenClientId = prefs.getString(KEY_TOKEN_CLIENT_ID, FALLBACK_CLIENT_ID) ?: FALLBACK_CLIENT_ID
-        val token = if (tokenClientId == clientId) {
-            catalogDeviceAuth.refresh(refreshToken)
-        } else {
-            userDeviceAuth.refresh(refreshToken)
+        val token = try {
+            if (tokenClientId == clientId) {
+                catalogDeviceAuth.refresh(refreshToken)
+            } else {
+                userDeviceAuth.refresh(refreshToken)
+            }
+        } catch (e: TidalAuthException) {
+            if (isPermanentRefreshFailure(e.httpCode)) {
+                // hasUsableSession() only checks prefs, so a dead-but-stored refresh
+                // token otherwise leaves the app "signed in" while every user-scoped
+                // call fails (UX: stale/empty content with no re-login prompt).
+                Log.w(AUTH_LOG_TAG, "refresh rejected permanently code=${e.httpCode}; clearing session for re-auth")
+                prefs.edit().clear().apply()
+                updateAuthState()
+            }
+            throw e
         }
         saveToken(token, tokenClientId = tokenClientId)
         token
