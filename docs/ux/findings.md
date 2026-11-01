@@ -11,10 +11,10 @@ Status ∈ open / accepted / reverted / inconclusive / blocked(<reason>).
 | UX | Sev | Conf | Evidence | Summary | Effort | Blocked by |
 |---|---|---|---|---|---|---|
 | UX-001 | P2 | high | measured+observed | Onboarding: dead-tap Done + 36dp + redundant — **ACCEPTED EXP-001** | low | — |
-| UX-002 | P2 | high | measured+observed | Settings account chips: clickable dead affordance — **ACCEPT-PROVISIONALLY EXP-003** | low | device-verify needs auth |
-| UX-003 | P2 | high | observed | "Erase account" says erase, does sign-out | low | device-verify needs auth |
-| UX-004 | P2 | high | measured+observed | Track Context has no Like; favs require playback | low-med | device-verify needs auth |
-| UX-005 | P2 | medium | measured | Recent downloaded track: "Album/Artist unavailable" | ? | needs triage |
+| UX-002 | P2 | high | measured | Settings account chips: clickable dead affordance — **ACCEPTED EXP-003** (device-verified signed-in) | low | — |
+| UX-003 | P2 | high | observed+measured | "Erase account" says erase, does sign-out (emul sublabel already "Sign out on this watch") | low | — |
+| UX-004 | P2 | high | measured+observed | Track Context has no Like; favs require playback | low-med | — |
+| UX-005 | P2 | high | measured+triaged | Recent downloaded track: "Album/Artist unavailable" (see detail) | low-med | device-verify needs auth |
 | UX-006 | P2 | high | observed | Download shows fake static 5% progress | med | needs auth+download |
 | UX-007 | P2 | high | observed | OAuth slow_down polling not progressive — **ACCEPTED EXP-002** | low | — |
 | UX-008 | P2 | med | observed | wear-ongoing unused; notification denial ignored; no return affordance | med-high | needs auth |
@@ -61,11 +61,29 @@ Measured on watch 2026-11-01: "TIDAL account / User #38971465" chip
 clickable=true `evidence/2026-11-01-watch-10-settings.xml`;
 `SettingsScreen.kt:76-82,119-124,279-290` gives `StatusChip` `onClick={ }`.
 
-### UX-005 — NEW, measured on watch: Track Context "Album unavailable" /
-"Artist unavailable" for downloaded recent track Interlude I
-(`evidence/2026-11-01-watch-13-track-context-scrolled.xml`). Links exist but
-route metadata missing for downloaded recent tracks. Triage against
-`RecentRepository` metadata and `spec-view-album-artist-from-now-playing`.
+### UX-005 — measured on watch + triaged: Track Context "Album/Artist
+unavailable" (evidence 2026-11-01-watch-13-track-context-scrolled.xml).
+Root cause chain (Ux005Triage, transcript history://Ux005Triage):
+`TrackContextScreen.kt:218-219` keys the chips on blank `track.albumId`/
+`artistId`; `RecentRepository.recordTrack:63-76` stores whatever IDs the
+played `TidalTrack` carried (offline-shelf `DownloadedTrackSummary.toTrack()`
+supplies blank ones — OfflineDownloads.kt:10-18); and
+`TidalApiClient.toTrack():1547-1569` takes relationship IDs only from
+*included* resources, blank when the response carries relationship refs
+without them [INFERENCE on payload shape]. Context lookup
+(`TrackContextScreen.kt:76-91`) enriches screen state but never persists
+back, so repair doesn't stick. Worse affordance: unavailable chips are
+**clickable** and toast (TrackContextScreen.kt:114-120,228-264) — third dead
+tap found.
+Fix plan (minimal first, EXP-004+): (1) parse relationship IDs from the
+reference itself in TidalApiClient; (2) persist context enrichment into the
+recent item without re-recording (preserve order/lastPlayedAt); (3)
+`enabled=false` for blank-ID chips (keep copy). Lazy self-repair of existing
+history via online context opens; no schema migration needed (JSON fields
+already exist, blank = absent).
+Verification (signed-in emulator): online context open resolves labels;
+offline reopen stays resolved (persistence); disabled chips untappable;
+Home offline shelf + Search play paths record IDs.
 
 ### UX-006 — download progress honesty
 `TidalPlayerScreen.kt:150-175` flips to `Downloading(0.05f)` and only updates

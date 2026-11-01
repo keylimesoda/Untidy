@@ -52,5 +52,5 @@ graph TD
 - From player to a setting change: return home first (no shortcuts).
 - Home scroll position persists across app-exit/re-entry (observed; neither
   good nor bad, must be assumed by journeys).
-- "Plays from TIDAL" footer row appears on home after returning from
-  settings (investigate: state label provenance).
+- "Plays from TIDAL" is the intentional Home footer (`HomeFooter`,
+  MainActivity.kt:786) — always present at the end of Home; not a state label.

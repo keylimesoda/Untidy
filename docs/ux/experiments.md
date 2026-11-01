@@ -81,8 +81,12 @@ before: measured clickable=true inert chip on signed-in watch
   (watch-10-settings.xml, "TIDAL account / User #38971465" 398x111px).
 after: code renders non-clickable status Row (Surface bg, dot, same labels);
   compiles; device re-check of signed-in Settings blocked by UX-009.
-verdict: **ACCEPT-PROVISIONALLY** (objective code+build evidence; signed-in
-  device confirmation pending auth fixture — do not mark fully accepted)
+UPDATE 2026-11-01 late: auth fixture completed (user entered device code;
+  emulator poll logged Success). Signed-in wear6 Settings now shows
+  'TIDAL account / User #38971465' as clickable=false row
+  (evidence/2026-11-01-emul-settings-after-exp003.png); Erase chip still
+  clickable as intended.
+verdict: **ACCEPT** (device-verified signed-in, emulator 454x454)
 
 ## Reverted / inconclusive
 

@@ -90,8 +90,8 @@ fun SettingsScreen(
                         Chip(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                             onClick = { confirmErase = true },
-                            label = { Text("Erase account") },
-                            secondaryLabel = { Text(accountEraseSecondary(downloadedTracks.size)) },
+                            label = { Text("Sign out") },
+                            secondaryLabel = { Text(accountSignOutSecondary(downloadedTracks.size)) },
                             colors = tidalSecondaryChipColors(),
                         )
                     }
@@ -114,8 +114,8 @@ fun SettingsScreen(
                                         onSignedOut()
                                     }
                                 },
-                                label = { Text("Confirm erase") },
-                                secondaryLabel = { Text(accountEraseConfirmSecondary(downloadedTracks.size)) },
+                                label = { Text("Confirm sign out") },
+                                secondaryLabel = { Text(accountSignOutConfirmSecondary(downloadedTracks.size)) },
                                 colors = ChipDefaults.primaryChipColors(backgroundColor = TidalColors.Cyan, contentColor = TidalColors.Black),
                             )
                         }
@@ -440,9 +440,11 @@ private fun formatStorageBytes(bytes: Long): String = when {
     else -> "0 MB"
 }
 
-private fun accountEraseSecondary(downloadCount: Int): String =
-    if (downloadCount > 0) "Signs out · keeps downloads" else "Sign out on this watch"
+// Wording must state the local-only effect: the action signs out and never
+// deletes the TIDAL account (UX-003; "erase" implied account destruction).
+internal fun accountSignOutSecondary(downloadCount: Int): String =
+    if (downloadCount > 0) "Removes account from this watch · keeps downloads" else "Removes account from this watch"
 
-private fun accountEraseConfirmSecondary(downloadCount: Int): String =
-    if (downloadCount > 0) "Keeps local downloads" else "Remove account from watch"
+internal fun accountSignOutConfirmSecondary(downloadCount: Int): String =
+    if (downloadCount > 0) "Downloads stay on this watch" else "Nothing is deleted from TIDAL"
 

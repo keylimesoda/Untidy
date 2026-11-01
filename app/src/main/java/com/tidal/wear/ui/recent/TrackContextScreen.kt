@@ -1,5 +1,6 @@
 package com.tidal.wear.ui.recent
 
+import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
@@ -34,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,6 +60,7 @@ import com.tidal.wear.ui.components.RowArtworkThumb
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.player.AddToPlaylistSheet
+import com.tidal.wear.ui.player.isFavoriteLookupEligible
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -79,8 +84,12 @@ fun TrackContextScreen(
     var showAddToPlaylist by remember(trackId) { mutableStateOf(false) }
     var downloadedRefreshTick by remember(trackId) { mutableIntStateOf(0) }
     var downloading by remember(trackId) { mutableStateOf(false) }
+    var liked by remember(trackId) { mutableStateOf(false) }
+    var likeLoading by remember(trackId) { mutableStateOf(false) }
+    var likeError by remember(trackId) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val view = LocalView.current
 
     LaunchedEffect(trackId, metadataRetryTick) {
         loading = true
@@ -92,6 +101,18 @@ fun TrackContextScreen(
                 metadataLookupFailed = true
             }
         loading = false
+    }
+
+    LaunchedEffect(track.id) {
+        val validTrackId = track.id
+        likeError = null
+        liked = false
+        if (!validTrackId.isFavoriteLookupEligible()) return@LaunchedEffect
+        likeLoading = true
+        runCatching { withContext(Dispatchers.IO) { apiClient.isFavoriteTrack(validTrackId) } }
+            .onSuccess { liked = it }
+            .onFailure { likeError = "Like unavailable" }
+        likeLoading = false
     }
 
     if (showAddToPlaylist) {
@@ -120,6 +141,27 @@ fun TrackContextScreen(
                 ?: Toast.makeText(context, "Artist unavailable", Toast.LENGTH_SHORT).show()
         },
         onAddToPlaylist = { showAddToPlaylist = true },
+        liked = liked,
+        likeEnabled = !likeLoading && track.id.isFavoriteLookupEligible(),
+        likeUnavailable = likeError != null,
+        onToggleLike = {
+            val target = !liked
+            likeLoading = true
+            scope.launch {
+                runCatching { withContext(Dispatchers.IO) { apiClient.setFavoriteTrack(track.id, target) } }
+                    .onSuccess { persisted ->
+                        liked = persisted
+                        if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
+                            Toast.makeText(context, if (persisted) "Added to your collection" else "Removed from collection", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .onFailure { throwable ->
+                        if (throwable is CancellationException) throw throwable
+                        Toast.makeText(context, "Like failed — try again", Toast.LENGTH_SHORT).show()
+                    }
+                likeLoading = false
+            }
+        },
         onDownload = {
             if (downloading) return@TrackContextContent
             downloading = true
@@ -155,6 +197,10 @@ private fun TrackContextContent(
     onOpenAlbum: () -> Unit,
     onOpenArtist: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    liked: Boolean,
+    likeEnabled: Boolean,
+    likeUnavailable: Boolean,
+    onToggleLike: () -> Unit,
     onDownload: () -> Unit,
 ) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -218,6 +264,20 @@ private fun TrackContextContent(
             item { ContextActionChip("View album", if (track.albumId.isBlank()) "Album unavailable" else track.album.ifBlank { "Open album" }, Icons.Filled.Album, TidalColors.White, onClick = onOpenAlbum) }
             item { ContextActionChip("View artist", if (track.artistId.isBlank()) "Artist unavailable" else track.artist.ifBlank { "Open artist" }, Icons.Filled.Person, TidalColors.White, onClick = onOpenArtist) }
             item { ContextActionChip("Add to playlist", "Choose a playlist", Icons.AutoMirrored.Filled.PlaylistAdd, TidalColors.White, onClick = onAddToPlaylist) }
+            item {
+                ContextActionChip(
+                    label = if (liked) "Liked" else "Like",
+                    secondary = when {
+                        likeUnavailable -> "Like unavailable"
+                        liked -> "In your collection"
+                        else -> "Save to your collection"
+                    },
+                    icon = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    iconTint = if (liked) TidalColors.Cyan else TidalColors.White,
+                    enabled = likeEnabled,
+                    onClick = onToggleLike,
+                )
+            }
             item {
                 ContextActionChip(
                     label = when {

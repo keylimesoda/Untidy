@@ -906,7 +906,7 @@ private fun TidalTrack.isDownloadEligible(): Boolean = id.isNotBlank() &&
     id != "tidal-current" &&
     !id.startsWith("fixture", ignoreCase = true)
 
-private fun String?.isFavoriteLookupEligible(): Boolean =
+internal fun String?.isFavoriteLookupEligible(): Boolean =
     !isNullOrBlank() && this != "tidal-current" && !startsWith("fixture", ignoreCase = true)
 
 @Composable
