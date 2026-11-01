@@ -43,7 +43,9 @@ Status ∈ open / accepted / reverted / inconclusive / blocked(<reason>).
 | UX-014 | P3 | med | measured | IME-less emulator has no input fallback — automation-only, not user-facing | — | — |
 | UX-015 | P3 | low | measured (emulator) | "Download over LTE" (data-plan-cost setting) toggles with no confirmation/undo | low | — |
 | UX-016 | P2 | high | measured (emulator) | Download stalled at "0/20 saving in background" forever under Wi‑Fi-only constraint on metered net; Settings "Manage downloads: No downloads" contradicted playlist chip | med | UX-006 |
-| UX-017 | P1 | high | measured (emulator + curl) | Favorites store mismatch: writes go to v2 `userCollectionTracks` (20 items) but Library "Liked tracks" counts legacy v1 `users/{id}/favorites/tracks` (47); liked track never appears in Library count | med | — |
+| UX-017 | P1 | high | measured+fixed (emulator+curl) | Library "Liked tracks" showed 47 of 281 favorites: legacy v1 listing page-capped (limit=50→47 parsed) and unordered; liked state (v2) fine. Fixed via v2 relationship+batch (264 shown) | done | EXP-006 |
+| UX-018 | P3 | med | measured | Liked-tracks list rows lack artwork (v2 batch album resource carries no image URL) | low | EXP-006 |
+| UX-019 | P3 | low | measured | Albums/Artists/Playlists library rows also legacy-capped at 50 — same truncation class as UX-017 for other kinds | med | — |
 
 ## Detail (non-obvious only; lens transcripts hold full text — history://)
 
@@ -102,21 +104,21 @@ confirmed on emulator). Fix direction: Back while input is pending should
 pop to Home (session state can still persist per SearchSessionState); verify
 against existing deliberate session-retention decision.
 
-### UX-017 — two favorite stores, verified by direct API replay
-App writes favorites via `userCollectionTracks/me/relationships/items`
-(v2 openapi, `TidalApiClient.kt:143,693`) and the chip reads them back via
-the same v2 relationships list; but the Library "Liked tracks" count comes
-from legacy v1 (`library v1 ok tracks=47`, re-fetched fresh ~1min after the
-write with the count unchanged). Direct curl with the app's token: v2
-collection = 20 items (addedAt matches the in-app tap), legacy
-`api.tidal.com/v1/users/{id}/favorites/tracks` does not contain the track.
-Consequence: liking from Now Playing or Track Context never moves the
-Library count; `favoriteTrackIds()` fallback reads the v1 list, so if the
-v2 relationship GET ever fails, genuinely-liked tracks read as unliked.
-Pre-existing (shared by the player, not introduced by EXP-005). Fix
-direction: pick one canonical store (v2 appears to be the live one for
-writes; confirm which the TIDAL mobile app shows for this account) and
-route count + read + write through it.
+### UX-017 — library liked-tracks truncation (NOT a store split)
+First hypothesis (v1/v2 store split) was WRONG and is recorded as a
+methodology lesson in experiments: my curl probes under-paginated both
+stores (v2 links.next uses `page%5Bcursor%5D=` — naive `cursor=` regex
+misses it; v1 paging has no stable order, offset-walk duplicates/drops).
+Fully paginated: v2 relationships = 281, legacy v1 = 264 distinct entities
+— same favorites store. Actual app bug: Library rows are built from the
+legacy fallback (`favoriteTracks limit=50` → 47 parsed), so the category
+count "Liked tracks · 47" and the list screen are a truncated, unordered
+50-item sample of 281. Fix EXP-006: `favoriteTracksV2()` = full v2
+relationship id pagination + batched metadata
+(`GET /v2/tracks?filter[id]=…&include=artists,albums`; filter accepts max
+20 values and SILENTLY drops extras — chunk by 20). Device: row now
+"264", list scrolls past 200+. 17 relationship ids have no resolvable
+track resource (server-side unavailable favorites) — expected loss.
 
 ### UX-006 — download progress honesty
 `TidalPlayerScreen.kt:150-175` flips to `Downloading(0.05f)` and only updates

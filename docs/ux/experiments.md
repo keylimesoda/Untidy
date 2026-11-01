@@ -90,7 +90,7 @@ verdict: **ACCEPT** (device-verified signed-in, emulator 454x454)
 
 ## EXP-005 — Like action in Track Context (UX-004)
 
-finding: UX-004 | commit: (below)
+finding: UX-004 | commit: 63be2f2
 problem: favoriting a recent track requires starting playback (Like exists
   only on Now Playing); Track Context shows Play/View album/View artist/
   Add to playlist/Download but no Like. Measured on signed-in watch
@@ -122,6 +122,34 @@ before/after: context without/with Like chip (screenshots, 454x454)
 verdict: **ACCEPT** (device-verified round-trip; falsifier's Library-count
   divergence also fired but is pre-existing and applies to the player's
   like equally → filed separately as UX-017)
+
+## EXP-006 — Library liked-tracks from the v2 store (UX-017)
+
+finding: UX-017 | commit: EXP-006 (same commit as the code below in git log)
+problem: "Liked tracks · 47" + truncated list for an account with 281
+  favorites; source was the legacy v1 fallback page (limit=50, unordered).
+hypothesis: full v2 relationship pagination + batched track metadata gives
+  the real count and a browsable complete list.
+expected: count reflects true favorites (~all resolvable), list scrolls
+  past the old 47 cap, no liked-state regressions.
+falsifier: count unchanged/wrong, list still capped, or chip liked-state
+  regresses.
+plan: favoriteTracksV2(): relationship ids (cursor walk) ->
+  GET /v2/tracks?filter[id]=csv&include=artists,albums; filter caps at 20
+  values and SILENTLY drops extras (measured) so chunk=20; legacy path
+  remains as degraded fallback.
+verification (device): library row "Liked tracks · 264" (before 47);
+  logcat "library fallback ok tracks=264"; list renders titles+artists and
+  scrolls deep (evidence/2026-11-01-emul-liked-count-after.png,
+  ...liked-list-after.png).
+before/after: 47 -> 264 (count row, same account same second)
+verdict: **ACCEPT**
+methodology note (IMPORTANT): the original UX-017 "two stores" diagnosis
+  was my curl probes under-paginating BOTH stores (v2 next-link encodes
+  cursor as page%5Bcursor%5D= — naive `cursor=` regex breaks; v1 offset
+  paging is unordered). Lesson for the skill: never conclude dataset size
+  from single-page API probes; paginators must be cross-checked against a
+  second encoding of the cursor and against a server-reported total.
 
 ## Reverted / inconclusive
 

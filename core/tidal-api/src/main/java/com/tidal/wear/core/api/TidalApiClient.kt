@@ -243,6 +243,16 @@ interface TidalApiService {
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
+    @GET("tracks")
+    suspend fun tracksByIds(
+        @Query("filter[id]") ids: String,
+        @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "artists,albums",
+        @Query("page[limit]") pageLimit: Int? = null,
+        @Query("page[cursor]") pageCursor: String? = null,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
     @GET("artists/{id}")
     suspend fun artist(
         @Path("id") id: String,
@@ -814,6 +824,39 @@ class TidalApiClient(
     }
 
     suspend fun track(id: String): TidalTrack? = service.track(id, countryCode).dataObjects().firstOrNull()?.toTrack()
+
+    /**
+     * Full liked-tracks listing from the v2 collection relationship (the live store;
+     * the legacy v1 favoriteTracks listing is page-capped and unordered, which silently
+     * truncated the Library "Liked tracks" row and list to a 47-item sample of 281).
+     */
+    suspend fun favoriteTracksV2(): List<TidalTrack> {
+        val ids = favoriteTrackRelationshipIds()
+        if (ids.isEmpty()) return emptyList()
+        val out = ArrayList<TidalTrack>(ids.size)
+        // The v2 filter[id] accepts at most 20 values and SILENTLY drops the rest
+        // (measured 2026-11-01: 100 ids -> 20 tracks, no error), so chunk to 20 and
+        // page each chunk in case page limits apply.
+        ids.chunked(FAVORITE_TRACK_BATCH_SIZE).forEach { chunk ->
+            var cursor: String? = null
+            val seenCursors = mutableSetOf<String>()
+            while (true) {
+                val root = service.tracksByIds(
+                    ids = chunk.joinToString(","),
+                    countryCode = countryCode,
+                    pageLimit = chunk.size,
+                    pageCursor = cursor,
+                )
+                val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+                out += root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }
+                cursor = root.nextPageCursor()
+                    ?.takeIf { it.isNotBlank() }
+                    ?.takeIf { seenCursors.add(it) }
+                    ?: break
+            }
+        }
+        return out.distinctBy { it.id }
+    }
     suspend fun artist(id: String): TidalArtist? = try {
         val v2Artist = service.artist(id, countryCode).dataObjects().firstOrNull()?.toArtist()
         if (v2Artist != null && !v2Artist.artworkUrl.isNullOrBlank()) v2Artist else legacyArtist(id) ?: v2Artist
@@ -1059,7 +1102,13 @@ class TidalApiClient(
         val clientId = authRepository.getClientIdForApi()
         return try {
             TidalSearchResult(
-                tracks = parseLegacyTracks(legacyService.favoriteTracks(userId, countryCode, token = clientId)),
+                tracks = runCatching { favoriteTracksV2() }
+                    .getOrElse { t ->
+                        if (t is CancellationException) throw t
+                        Log.d(API_LOG_TAG, "library liked-tracks v2 failed reason=${t.safeReason()}")
+                        // Legacy listing is page-capped/unordered; only a degraded fallback.
+                        parseLegacyTracks(legacyService.favoriteTracks(userId, countryCode, token = clientId))
+                    },
                 albums = parseLegacyFavoriteObjects(legacyService.favoriteAlbums(userId, countryCode, token = clientId))
                     .mapNotNull { it.toLegacyAlbum() }
                     .distinctBy { it.id },
@@ -1070,7 +1119,8 @@ class TidalApiClient(
                     .mapNotNull { it.toLegacyPlaylist() }
                     .distinctBy { it.id },
             ).also {
-                Log.d(API_LOG_TAG, "library v1 ok tracks=${it.tracks.size} albums=${it.albums.size} artists=${it.artists.size} playlists=${it.playlists.size}")
+                // tracks may come from v2 (favoriteTracksV2); albums/artists/playlists stay legacy.
+                Log.d(API_LOG_TAG, "library fallback ok tracks=${it.tracks.size} albums=${it.albums.size} artists=${it.artists.size} playlists=${it.playlists.size}")
             }
         } catch (e: CancellationException) {
             throw e
@@ -1878,6 +1928,7 @@ private const val LEGACY_JSON_ACCEPT = "application/json"
 private const val API_LOG_TAG = "Untidy/API"
 private const val ALBUM_TRACK_PAGE_SIZE = 50
 private const val FAVORITE_TRACK_PAGE_SIZE = 50
+private const val FAVORITE_TRACK_BATCH_SIZE = 20
 private const val LEGACY_ALBUM_TRACK_PAGE_SIZE = 50
 private const val LEGACY_ALBUM_TRACK_MAX_PAGES = 4
 private const val LEGACY_ALBUM_TRACK_MAX_TRACKS = 100
