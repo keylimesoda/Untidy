@@ -50,6 +50,30 @@
   init throw `ExceptionInInitializerError` under plain JUnit. Pure logic
   gets its own file (see `core/.../DeviceAuthPolling.kt`).
 
+## Probe reliability (API + window state; learned 2026-11-01 late)
+
+- Never infer dataset size or "store splits" from API probes — validate
+  pagination against a server-reported total AND a second cursor encoding.
+  TIDAL v2 `links.next` encodes cursors as `page%5Bcursor%5D=`; a naive
+  `cursor=` regex silently stops paging. v1 offset paging is unordered
+  (duplicates/drops across pages). Both traps produced a false "two
+  favorite stores" diagnosis before full paging showed one store (281).
+- TIDAL v2 `filter[id]` takes at most 20 values and SILENTLY drops the
+  rest (no error). Batch by 20.
+- Stranded-state findings on emulators: check
+  `dumpsys window | grep mCurrentFocus` first. Phantom system windows
+  (RemoteInput picker with no IME installed) fake app bugs. UX-013 was
+  withdrawn after the same journey on the physical watch behaved
+  correctly (picker → "Back exits search" hint → Home).
+- Emulator network presents as metered CELLULAR: download jobs with
+  UNMETERED constraints stall forever. Toggle in-app "Download over LTE"
+  (re-queues with CONNECTED) rather than fighting job constraints.
+- Deep uiautomator XML trees blow Python's recursion limit — iterate with
+  `root.iter()`, never recursive walks.
+- Shared prefs readable for ground truth: `run-as com.tidal.wear cat
+  shared_prefs/untidy_recent_history.xml` (and `untidy_player.xml`,
+  `tidal_auth.xml` for tokens when replaying API calls with curl).
+
 ## Emulator auth persistence
 
 - `scripts/run-wear-emulator.sh` boots `-no-snapshot-load` (no wipe): once

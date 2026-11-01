@@ -153,5 +153,10 @@ methodology note (IMPORTANT): the original UX-017 "two stores" diagnosis
 
 ## Reverted / inconclusive
 
+### EXP-007 — UX-013 search-strand fix (never implemented: finding withdrawn)
+Emulator-only repro failed to reproduce on the physical watch (correct
+Back chain through the system remote-input picker). No code change made;
+UX-013 withdrawn in findings.md. Lesson stored in skill references.
+
 (none yet — reverted experiments are the highest-value anti-recurrence data;
 record them here, not in findings prose)

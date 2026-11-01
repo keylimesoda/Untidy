@@ -7,7 +7,8 @@ Anything not listed was **not run**. Never mark UNTESTED items as verified.
 | Scenario | Status |
 |---|---|
 | wear6 emulator 454x454, anonymous, debug build | RUN: install, cold launch, permission dialog, onboarding, Done dead-tap test, screenshots+uiautomator |
-| Physical SM_R955U 432x432, signed-in, release build | RUN (read-only): cold start x1 (2716 ms), home scroll map, search-entry, swipe-back, Library, Settings, Track Context; screens+XML in evidence/ |
+| Physical SM_R955U 432x432, signed-in, release build | RUN (read-only): cold start x1 (2716 ms), home scroll map, search-entry, swipe-back, Library, Settings, Track Context; screens+XML in evidence/. LATE SESSION: search→remote-input-picker→Back→Back chain (UX-013 withdrawn) |
+| wear6 emulator 454x454, SIGNED-IN, debug builds | RUN (late 2026-11-01): streaming playback (playlist play, explicit track play), playlist download batch (20 tracks over LTE toggle), offline shelf play, recent tracking, Track Context Like/Unlike round-trip vs server (curl truth), Library liked-tracks 47→264 fix (EXP-006), Settings LTE toggle, ActionsSheet pull-up |
 | Smaller display AVD | UNTESTED — no AVD created |
 | Larger display (454 vs watch 432 both exist) | partial |
 | Large system font | UNTESTED |
@@ -15,32 +16,39 @@ Anything not listed was **not run**. Never mark UNTESTED items as verified.
 | Ambient mode | NOT exercised this session |
 | Offline/disconnected states | NOT exercised |
 | Interrupted/resumed (process kill, backgrounding) | NOT exercised |
-| PlayerActivity + sheets on any device | NOT exercised 2026-11-01 |
-| Playback audio (any device) | NOT run 2026-11-01 (read-only watch policy; emulator unsigned-in) |
-| Downloads/offline on device | NOT exercised 2026-11-01 |
+| PlayerActivity + sheets on any device | RUN (emulator): transport buttons present, guarded pull-up opens ActionsSheet (Download/Queue/quality) |
+| Playback audio (any device) | RUN (emulator streaming + offline playback); watch read-only policy respected |
+| Downloads/offline on device | RUN (emulator): single-track via ActionsSheet, batch playlist via Download chip, metered-constraint stall UX-016 |
 | Macrobenchmark / Perfetto traces | NOT run (no benchmark module yet) |
 | Journeys via Android CLI | NOT run (auth blocks post-onboarding journeys) |
-| Unit tests | repo has 35 JVM tests; `testDebugUnitTest` full run NOT executed this session (gradle build succeeded; test task pending) |
+| Unit tests | `:core:tidal-api:testDebugUnitTest` green (incl. new pagination case); `:app` targeted tests green earlier (SignOutWording); full-suite run still pending |
 | lintDebug | NOT run |
 | CI | none exists in repo |
 
 ## Emulator state (wear6)
 
-Anonymous (device-code flow pending, code expired). App data persists across
-scripted boots (`-no-snapshot-load`, no wipe). Watch app data untouched;
+SIGNED IN (device code entered by user, session persisted; 20 downloaded
+tracks + recent history + likes intact — favorite test residue verified
+cleaned server-side). Auth survives boots (`-no-snapshot-load`, no wipe);
+`pm clear` would destroy it — do not clear. Watch app data untouched;
 watch `screen_off_timeout` was already 30000 (not modified; backup file unused).
+Toolchain note: SDK now at `~/Work/toolchains/android-sdk`, JDK via mise;
+`scripts/env-android.sh` probes both.
 
 ## Evidence inventory (docs/ux/evidence/, 2026-11-01)
 
-Emulator: fresh-launch (permission), onboarding, onboard before/after Done tap.
+Emulator: fresh-launch (permission), onboarding, onboard before/after Done
+tap; late session: signed-in home, settings sign-out wording, player,
+context before/after (Like chip), liked count before/after, liked list.
 Watch: home, search entry, swipe-dismiss, home scroll map x5, Library,
-Settings + scrolled, Track Context + scrolled (all .png + .xml where noted).
+Settings + scrolled, Track Context + scrolled, ux013 picker state
+(all .png + .xml where noted).
 
 ## Permanent gaps to schedule
 
-1. Signed-in emulator (UX-009) → unlocks WF-004..010 journeys, player, offline,
-   macrobenchmark on representative data (27 downloads on watch as data-shape
-   reference).
+1. ~~Signed-in emulator~~ DONE 2026-11-01 (keep it: do not `pm clear`).
+   Next: macrobenchmark on this signed-in emulator (20 downloads + 264 likes
+   as representative data shape).
 2. Benchmark module (Macrobenchmark) — `testing-setup` skill installed for this.
 3. androidTest/journey harness — repo has zero instrumented tests.
 4. Rotary + ambient + font-scale matrix on wear6.

@@ -39,7 +39,7 @@ Status ∈ open / accepted / reverted / inconclusive / blocked(<reason>).
 | UX-010 | P3 | med | measured | Watch cold start 2716ms (1 sample) vs emu 688ms | — | baseline only |
 | UX-011 | P3 | med | measured | Library Artists row clipped until scroll; home bottom rows mid-clip | low | — |
 | UX-012 | P2 | med | observed | No quick entry to settings/downloads/recents (home scroll only) | med | — |
-| UX-013 | P1 | high | measured (emulator) | Search input-pending state swallows Back + swipe-dismiss and survives relaunch; headless/IME-less context strands user | med | — |
+| UX-013 | — | — | withdrawn (watch) | NOT a product bug: Back trap was an emulator artifact (no IME: remote-input launcher left a phantom focus window). Real watch: honeyboard picker → Back returns to hint ("Back exits search") → Back to Home (verified w/ mCurrentFocus traces) | — | — |
 | UX-014 | P3 | med | measured | IME-less emulator has no input fallback — automation-only, not user-facing | — | — |
 | UX-015 | P3 | low | measured (emulator) | "Download over LTE" (data-plan-cost setting) toggles with no confirmation/undo | low | — |
 | UX-016 | P2 | high | measured (emulator) | Download stalled at "0/20 saving in background" forever under Wi‑Fi-only constraint on metered net; Settings "Manage downloads: No downloads" contradicted playlist chip | med | UX-006 |
@@ -92,17 +92,16 @@ Verification (signed-in emulator): online context open resolves labels;
 offline reopen stays resolved (persistence); disabled chips untappable;
 Home offline shelf + Search play paths record IDs.
 
-### UX-013 — measured on emulator: search entry traps the back stack
-From Search route, entered input-pending state (tapped input chip; no IME
-available so nothing opened). KEYCODE_BACK x3, edge-swipe dismiss, HOME +
-relaunch, and force-stop-ambiguity ALL left the app resuming on the Search
-entry screen; only `am start --activity-clear-top` escaped. On a real watch
-with an IME this state normally resolves by typing, but a user who presses
-Back expecting to leave search is stuck repeating Back (observed pattern;
-needs on-device confirmation on the watch — P1 hypothesis pending, P2
-confirmed on emulator). Fix direction: Back while input is pending should
-pop to Home (session state can still persist per SearchSessionState); verify
-against existing deliberate session-retention decision.
+### UX-013 — WITHDRAWN: emulator artifact, real watch behaves
+Emulator (no IME): search input chip left the app in a state where Back,
+swipe and relaunch all failed to escape. Same journey on the physical
+watch: tap Keyboard input → focus moves to `honeyboard/.RemoteInputActivity`
+(system picker), Back → returns to app hint screen that literally says
+"Back exits search", Back → Home. `onCancel` in MainActivity already pops
+correctly. The emulator's missing remote-input service created phantom
+focus windows — an automation hazard, not user-facing. Skill lesson added:
+check `dumpsys window mCurrentFocus` before classifying "stranded state"
+findings on emulators.
 
 ### UX-017 — library liked-tracks truncation (NOT a store split)
 First hypothesis (v1/v2 store split) was WRONG and is recorded as a

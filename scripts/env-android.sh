@@ -11,6 +11,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ -z "${JAVA_HOME:-}" || ! -x "${JAVA_HOME}/bin/java" ]]; then
   for candidate in \
+    "$HOME/.local/share/mise/installs/java/temurin-latest" \
     "$HOME/Work/toolchains/jdk21" \
     "$REPO_ROOT/../toolchains/jdk21" \
     "$REPO_ROOT/../../tools/jdks/jdk-17" \

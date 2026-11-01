@@ -19,6 +19,14 @@ Exercise → Compare → Accept/Revert → Learn → Repeat.
 A UX improvement is only "verified" if it was **exercised on a device**
 (emulator OK; physical watch required for performance conclusions).
 A passing build is not evidence. Screenshots alone are not evidence.
+Two corollaries learned the hard way (2026-11-01):
+- Any STRANDED-STATE or system-input anomaly seen only on an emulator must
+  be re-run on the physical watch before severity is assigned (check
+  `mCurrentFocus` for phantom system windows). One P1 was withdrawn this way.
+- Any API-derived claim (counts, "which store is canonical", dataset size)
+  must come from FULLY paginated probes validated against a server-reported
+  total; naive cursor regexes and silent filter caps produce confident
+  falsehoods. One wrong root cause was caught this way before shipping a fix.
 
 ## Resume protocol (every session — do not rediscover the app)
 
