@@ -2,11 +2,16 @@ package com.tidal.wear.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -15,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -275,23 +281,31 @@ private fun SectionHeader(label: String) {
     )
 }
 
+// Informational status row. Deliberately not a Chip: an inert control that
+// presents a chip's tap affordance reads as a dead button (UX-002).
 @Composable
 private fun StatusChip(label: String, secondary: String, active: Boolean) {
-    Chip(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-        onClick = { },
-        icon = {
-            Box(
-                Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(if (active) TidalColors.Cyan else TidalColors.OnSurfaceMuted),
-            )
-        },
-        label = { Text(label) },
-        secondaryLabel = { Text(secondary) },
-        colors = tidalSecondaryChipColors(),
-    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(TidalColors.Surface)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(if (active) TidalColors.Cyan else TidalColors.OnSurfaceMuted),
+        )
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, color = TidalColors.White)
+            Text(text = secondary, color = TidalColors.OnSurfaceDim)
+        }
+    }
 }
 
 @Composable
