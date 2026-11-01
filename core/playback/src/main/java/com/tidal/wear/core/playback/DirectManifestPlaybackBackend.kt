@@ -7,6 +7,8 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Base64
 import android.util.Log
@@ -80,12 +82,18 @@ internal class DirectManifestPlaybackBackend(
     private var appendedMediaItemCount = 0
     private var lookAheadJob: Job? = null
     private val resolvedManifestsByPlayerIndex = mutableMapOf<Int, ResolvedManifest>()
-    private val player = ExoPlayer.Builder(appContext)
+    // Rebuilt (never reconfigured in place) when the stall sentinel proves this device's
+    // offload pipeline is broken: renderer offload settings only bind at player creation.
+    private var player: ExoPlayer = buildPlayer()
+
+    private fun buildPlayer(): ExoPlayer = ExoPlayer.Builder(appContext)
         .setAudioAttributes(AudioAttributes.DEFAULT, true)
         .build()
         .also { exo ->
             exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
-                .setAudioOffloadPreferences(playbackAudioOffloadPreferences())
+                .setAudioOffloadPreferences(
+                    playbackAudioOffloadPreferences(AudioOffloadSuspension.isSuspended(appContext)),
+                )
                 .build()
             exo.addAudioOffloadListener(object : ExoPlayer.AudioOffloadListener {
                 override fun onOffloadedPlayback(offloadedPlayback: Boolean) {
@@ -121,6 +129,8 @@ internal class DirectManifestPlaybackBackend(
                 }
 
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    // Buffered/position continuity is per item; never carry stall history.
+                    stallSentinel.reset()
                     val mediaId = mediaItem?.mediaId.orEmpty()
                     // A selected Format belongs to the previous item until ExoPlayer reports the
                     // new item's tracks. Clear it at the transition so consumers cannot display
@@ -174,8 +184,56 @@ internal class DirectManifestPlaybackBackend(
         )
     }
 
+    private val stallSentinel = OffloadStallSentinel()
+    private val watchdogHandler = Handler(Looper.getMainLooper())
+    private val watchdogTick = object : Runnable {
+        override fun run() {
+            if (player.playWhenReady && player.isPlaying) {
+                val verdict = stallSentinel.observe(
+                    OffloadStallSentinel.Sample(
+                        positionMs = player.currentPosition.coerceAtLeast(0L),
+                        bufferedMs = player.bufferedPosition,
+                        durationMs = player.duration,
+                        isPlaying = true,
+                        isLoading = player.isLoading,
+                    ),
+                )
+                if (verdict != OffloadStallSentinel.Stall.None) recoverFromStall(verdict)
+            } else {
+                stallSentinel.reset()
+            }
+            watchdogHandler.postDelayed(this, OFFLOAD_WATCHDOG_INTERVAL_MS)
+        }
+    }
+
+    /**
+     * Offload is the battery default, but a wedged offload pipeline must not mean silent
+     * playback (UX-021): once the sentinel proves it, force software decoding for the
+     * current item and pin this device off offload so every later item starts audible.
+     */
+    private fun recoverFromStall(stall: OffloadStallSentinel.Stall) {
+        Log.w(DIRECT_LOG_TAG, "playback stall detected ($stall); rebuilding player without offload")
+        AudioOffloadSuspension.suspend(appContext)
+        stallSentinel.reset()
+        val items = (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
+        val resumeIndex = player.currentMediaItemIndex
+        val resumeAt = player.currentPosition.coerceAtLeast(0L)
+        val wasPlaying = player.playWhenReady
+        val brokenPlayer = player
+        player = buildPlayer().also { fresh ->
+            fresh.setMediaItems(items, resumeIndex, resumeAt)
+            fresh.playWhenReady = wasPlaying
+            fresh.prepare()
+        }
+        setPreferredAudioOutput(PreferredAudioOutputPreference.get(appContext))
+        brokenPlayer.release()
+        // No handler re-post here: watchdogTick's tail owns the single cadence. Posting
+        // from both paths accumulates parallel timers (the exact cause of the rebuild storm).
+    }
+
     init {
         setPreferredAudioOutput(PreferredAudioOutputPreference.get(appContext))
+        watchdogHandler.postDelayed(watchdogTick, OFFLOAD_WATCHDOG_INTERVAL_MS)
     }
 
     override val events: Flow<PlaybackBackendEvent> = _events.asSharedFlow()
@@ -393,6 +451,7 @@ internal class DirectManifestPlaybackBackend(
     }
 
     override fun release() {
+        watchdogHandler.removeCallbacks(watchdogTick)
         lookAheadJob?.cancel()
         cancelManifestRequests()
         player.setWakeMode(C.WAKE_MODE_NONE)
@@ -759,3 +818,4 @@ private fun sha256Short(value: String): String = MessageDigest.getInstance("SHA-
     .take(12)
 
 private const val DIRECT_LOG_TAG = "Untidy/DirectPlayback"
+private const val OFFLOAD_WATCHDOG_INTERVAL_MS = 2000L

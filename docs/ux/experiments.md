@@ -227,6 +227,35 @@ notes: this RETRACTS the shipping value of the beta.6 "28x CPU reduction"
   (its tiny CPU number partly reflects the stall). CPU savings must not ship
   as silent audio; re-enable offload only behind UX-023's audibility watchdog.
 
+## EXP-012 — stall-sentinel: offload stays ON until proven broken per device (UX-023, supersedes EXP-011)
+
+finding: UX-021/UX-023 | commit: in git log below
+problem: EXP-011's global offload-off sacrifices real battery savings (offload is
+  the cheapest audio path; user requirement: best battery for the requested
+  quality, silently per-device). The device-specific bug (wedged Samsung HE-AAC
+  offload) must not be paid for by every device.
+hypothesis: default AUDIO_OFFLOAD_MODE_ENABLED; OffloadStallSentinel samples
+  player state every 2 s while isPlaying; a 40 s window with frozen buffered
+  position + >=15 s position crawl (or an 8 s position plateau while claiming
+  to play) proves the pipeline is dead -> AudioOffloadSuspension persists the
+  verdict per device and the backend REBUILDS the ExoPlayer (renderer offload
+  settings bind only at player creation — in-place TrackSelectionParameters
+  updates do nothing, first attempt failed exactly that way).
+verification (physical watch, offload enabled at start): play wedges ~10 s in;
+  exactly ONE `ConsumptionStalled; rebuilding player without offload` at T0+48 s;
+  audio_flinger shows the rebuilt player on plain PCM 44.1k (0x000 flags);
+  no further watchdog events; USER: "Smooth." Suspension pref persists so later
+  items never wedge again.
+verdict: **ACCEPT**
+notes: two self-inflicted storms documented here so they never return:
+  (1) adjacent-sample stall rule false-positived on healthy progressive
+  playback (buffered legitimately freezes while draining a segment) ->
+  windowed semantics;
+  (2) recoverFromStall re-posting the watchdog alongside the tick's own
+  re-post accumulated parallel timers -> rebuild storm every 2 s; single
+  cadence owner = watchdogTick tail. JVM tests pin both behaviors
+  (segment-drain must not fire; plateau/loading/paused/end guards).
+
 ## Reverted / inconclusive
 
 ### EXP-007 — UX-013 search-strand fix (never implemented: finding withdrawn)
