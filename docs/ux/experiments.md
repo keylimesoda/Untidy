@@ -29,8 +29,18 @@ before (measured): tap produces no feedback (evidence
   2026-11-01-emul-onboard-{before,after}-done.png; logcat
   "auth endpoint token/device-flow 400 authorization_pending, poll result=
   AuthorizationPending, elapsed=209s"); Done surface 358x72px=36dp tall.
-after: TBD on wear6 this session.
-verdict: PENDING
+after (measured, wear6 2026-11-01): pending screen shows
+  "Waiting — updates once you enter the code" + pulsing indicator and
+  **0 clickable nodes** anywhere on screen (uiautomator; before: 1 inert
+  clickable). Tap at former Done position → no-op possible, no affordance
+  (evidence 2026-11-01-emul-after-onboard-fix.png). Error branch
+  (bogus http_proxy): "Connection issue - try again" + Retry clickable at
+  358x96px = **48dp** (evidence 2026-11-01-emul-onboard-error-retry.png);
+  Retry re-run after network restore produced fresh code + live polling
+  (2026-11-01-emul-onboard-retry-recovered.png, logcat elapsed=4s/7s).
+  Auth-success auto-navigation code untouched (no device re-verify: requires
+  completed sign-in — see UX-009).
+verdict: **ACCEPT** (emulator; correctness preserved, dead affordance removed)
 
 ## EXP-002 — progressive slow_down backoff (UX-007)
 
@@ -44,8 +54,14 @@ falsifier: unit tests show non-monotonic or over-bounded growth.
 plan: interval = previous interval + 5 on slow_down (bounded, e.g. <= 60s);
   unit-test sequences of 1, 2, 5 consecutive slow_down responses.
 before: unit-test-visible (existing tests cover single slow_down only).
-after: TBD.
-verdict: PENDING
+after: 4 new JVM tests in `core/auth/src/test/.../DeviceAuthPollingTest.kt`
+  — sequence 5→10→15→20→25 on repeated slow_down (was stuck at 10),
+  never-shortens, 60s cap; all green via `:core:auth:testDebugUnitTest`.
+  Helper isolated in DeviceAuthPolling.kt (pure; auth file has
+  static-init Android deps unusable in plain JVM tests — discovered when the
+  first test version threw ExceptionInInitializerError).
+verdict: **ACCEPT** (unit-verified; slow_down sequences need live server
+  throttling to observe on-device and were NOT exercised)
 
 ## EXP-003 — settings account chip affordance (UX-002)
 
@@ -61,8 +77,12 @@ invariants: account identity stays visible; Erase/sign-out flow unchanged.
 falsifier: any needed account action becomes unreachable.
 verification: needs signed-in emulator for device re-check; code+unit check
   now, device re-check when UX-009 fixture exists -> accept-provisionally.
-before/after: TBD
-verdict: PENDING
+before: measured clickable=true inert chip on signed-in watch
+  (watch-10-settings.xml, "TIDAL account / User #38971465" 398x111px).
+after: code renders non-clickable status Row (Surface bg, dot, same labels);
+  compiles; device re-check of signed-in Settings blocked by UX-009.
+verdict: **ACCEPT-PROVISIONALLY** (objective code+build evidence; signed-in
+  device confirmation pending auth fixture — do not mark fully accepted)
 
 ## Reverted / inconclusive
 

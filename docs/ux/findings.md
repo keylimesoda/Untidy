@@ -10,13 +10,13 @@ Status ∈ open / accepted / reverted / inconclusive / blocked(<reason>).
 
 | UX | Sev | Conf | Evidence | Summary | Effort | Blocked by |
 |---|---|---|---|---|---|---|
-| UX-001 | P2 | high | measured+observed | Onboarding: dead-tap Done + 36dp + redundant | low | — |
-| UX-002 | P2 | high | measured+observed | Settings account chips: clickable dead affordance | low | device-verify needs auth |
+| UX-001 | P2 | high | measured+observed | Onboarding: dead-tap Done + 36dp + redundant — **ACCEPTED EXP-001** | low | — |
+| UX-002 | P2 | high | measured+observed | Settings account chips: clickable dead affordance — **ACCEPT-PROVISIONALLY EXP-003** | low | device-verify needs auth |
 | UX-003 | P2 | high | observed | "Erase account" says erase, does sign-out | low | device-verify needs auth |
 | UX-004 | P2 | high | measured+observed | Track Context has no Like; favs require playback | low-med | device-verify needs auth |
 | UX-005 | P2 | medium | measured | Recent downloaded track: "Album/Artist unavailable" | ? | needs triage |
 | UX-006 | P2 | high | observed | Download shows fake static 5% progress | med | needs auth+download |
-| UX-007 | P2 | high | observed | OAuth slow_down polling not progressive | low | — |
+| UX-007 | P2 | high | observed | OAuth slow_down polling not progressive — **ACCEPTED EXP-002** | low | — |
 | UX-008 | P2 | med | observed | wear-ongoing unused; notification denial ignored; no return affordance | med-high | needs auth |
 | UXC-001 | P1 | high | observed | Playback+queue lost on process death | med | needs auth to verify |
 | UXC-002 | P1 | high | observed | Failed refresh strands "signed-in" unusable session | med | — (unit-testable) |

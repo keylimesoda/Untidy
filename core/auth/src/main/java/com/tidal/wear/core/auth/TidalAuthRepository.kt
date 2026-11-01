@@ -399,7 +399,7 @@ class DefaultTidalAuthRepository private constructor(
                     TokenResult.AuthorizationPending -> consecutiveTransients = 0
                     is TokenResult.SlowDown -> {
                         consecutiveTransients = 0
-                        interval = result.intervalSeconds
+                        interval = nextSlowDownIntervalSeconds(interval, result.intervalSeconds)
                     }
                     is TokenResult.TransientError -> {
                         consecutiveTransients += 1

@@ -39,6 +39,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.tidal.sdk:auth:0.11.2")
+    testImplementation("junit:junit:4.13.2")
 }
 
 fun String.kotlinLiteral(): String = buildString {
