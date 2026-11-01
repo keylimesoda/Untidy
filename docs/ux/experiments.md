@@ -184,6 +184,49 @@ notes: debug variant has no catalog client credentials ("client credentials
   the MainActivity branch must handle that (first attempt that relied on
   Anonymous was wrong and was corrected in-session).
 
+## EXP-010 — connect Bluetooth from the "Play on" picker (UX-022)
+
+finding: UX-022 | commit: in git log below
+problem: picker enumerated only AudioManager.getDevices(GET_DEVICES_OUTPUTS) —
+  paired-but-disconnected headsets (user's Buds4 Pro / AirPods Max, bonded but
+  not connected) had no path; user had to connect via another player first.
+hypothesis: launch the system media-output switcher (Google's documented Wear
+  path, Horologist pattern mirrored — no new dependency); fall back to
+  ACTION_BLUETOOTH_SETTINGS.
+plan: MediaOutputSwitcherLauncher (system-app-only resolution, JVM-tested
+  policy); picker gains caption + cyan "Connect Bluetooth headphones" row
+  shown whenever no BT output is connected.
+verification (physical watch): ActionsSheet -> Play on shows caption+row;
+  tap launched Samsung `OutputSwitcherJetpackInvocation` listing AirPods Max,
+  Ric's Buds4 Pro, Watch Speaker; tapping Buds4 Pro CONNECTED it —
+  STREAM_MUSIC `Devices: bt_a2dp(80)`. evidence/2026-11-01-watch-exp010-
+  output-switcher.png (+ picker-with-buds.png).
+verdict: **ACCEPT**
+notes: `resolve-activity` on this watch does NOT find the panel action (no
+  DEFAULT category) — must use queryIntentActivities like Horologist does.
+
+## EXP-011 — offload disabled app-wide (UX-021)
+
+finding: UX-021 | commit: in git log below
+problem: user never heard any audio on beta.7. Forced
+  AUDIO_OFFLOAD_MODE_ENABLED pushed TIDAL low-quality HE-AAC through the
+  compressed-offload path; on SM-R955U that path stalled ~14 s in:
+  media.audio_flinger showed OFFLOAD thread (HE-AAC_V1 -> A2DP) with
+  "1 Tracks of which 0 are active", Total writes 81, last HAL write 194678 ms
+  ago — while media_session kept state=PLAYING and position advancing.
+  Speaker route earlier showed the same 0x800 compress-offload flags track.
+hypothesis: audibility bug in Samsung's offload pipeline for HE-AAC;
+  software decode is the audible path.
+plan: PlaybackPowerPolicy -> AUDIO_OFFLOAD_MODE_DISABLED (gapless still
+  required); policy test updated.
+verification (physical watch, buds connected): same downloaded HE-AAC track
+  plays and USER HEARS IT at position 17 s with normal MIXER decode.
+verdict: **ACCEPT**
+notes: this RETRACTS the shipping value of the beta.6 "28x CPU reduction"
+  line — that measurement profiled a pipeline that goes silent after ~14 s
+  (its tiny CPU number partly reflects the stall). CPU savings must not ship
+  as silent audio; re-enable offload only behind UX-023's audibility watchdog.
+
 ## Reverted / inconclusive
 
 ### EXP-007 — UX-013 search-strand fix (never implemented: finding withdrawn)

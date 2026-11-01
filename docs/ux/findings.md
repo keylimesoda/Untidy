@@ -47,6 +47,9 @@ Status ∈ open / accepted / reverted / inconclusive / blocked(<reason>).
 | UX-018 | P3 | med | measured | Liked-tracks list rows lack artwork (v2 batch album resource carries no image URL) | low | EXP-006 |
 | UX-019 | P3 | low | measured | Albums/Artists/Playlists library rows also legacy-capped at 50 — same truncation class as UX-017 for other kinds | med | — |
 | UX-020 | P1 | high | measured+fixed (emulator) | Server-dead session stayed "signed in": stale "Library unavailable / Tap to retry" forever, no re-auth prompt (prefs-only hasUsableSession + Initializing no-op in nav). Fixed: permanent refresh rejection clears session and nav routes to fresh device code | done | EXP-008 |
+| UX-021 | P0 | high | measured+fixed (watch) | Silent-but-progressing playback: forced HE-AAC compressed offload stalled on SM-R955U after ~14 s on BOTH speaker and A2DP routes (flinger: offload thread "0 active" tracks, last HAL write 194 s ago) while Media3 kept position/PLAYING advancing. Fixed: offload DISABLED app-wide; user-verified audible on buds | done | EXP-011 |
+| UX-022 | P1 | high | measured+fixed (watch) | "Play on" picker only listed CONNECTED outputs — paired-but-disconnected headphones unreachable. Fixed: caption + "Connect Bluetooth headphones" row launching the system media-output switcher (Samsung OutputSwitcherJetpackInvocation resolved via queryIntentActivities; BT-settings fallback). Watch-verified: panel listed AirPods Max + Buds4 Pro, tap connected, route flipped to bt_a2dp | done | EXP-010 |
+| UX-023 | P2 | med | measured | Media3 reports PLAYING and advances position while the audio renderer is stalled — UI lies about audibility. Candidate: playback audibility watchdog (track timestamps frozen while position advances -> soft-decode fallback or visible error) | med | — |
 
 ## Detail (non-obvious only; lens transcripts hold full text — history://)
 

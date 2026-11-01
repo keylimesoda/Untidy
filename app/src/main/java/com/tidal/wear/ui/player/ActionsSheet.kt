@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -78,6 +79,7 @@ fun ActionsSheet(
     onHandleClick: (() -> Unit)? = null,
 ) {
     var confirmRemoveDownload by remember { mutableStateOf(false) }
+    val appContext = LocalContext.current
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var showOutputPicker by remember { mutableStateOf(false) }
     val quality = remember(deliveredAudioFormat) { deliveredAudioFormat.toQualityGemPresentation() }
@@ -228,6 +230,12 @@ fun ActionsSheet(
             requestedOutputId = requestedOutputId,
             onOutputSelected = { id ->
                 onOutputSelected(id)
+                showOutputPicker = false
+            },
+            onConnectBluetooth = {
+                // System switcher owns pairing/connection; the device callback refreshes
+                // this list once the headset is connected, and routing follows system choice.
+                MediaOutputSwitcherLauncher.launch(appContext)
                 showOutputPicker = false
             },
             onBack = { showOutputPicker = false },

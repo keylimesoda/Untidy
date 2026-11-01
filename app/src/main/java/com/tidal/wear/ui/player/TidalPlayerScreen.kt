@@ -975,8 +975,14 @@ private fun TidalPlayerAmbient(
     }
 }
 
+internal data class AudioOutputUiState(
+    val outputs: List<AudioOutputOption>,
+    /** True when any Bluetooth/BLE output is CONNECTED; paired-but-disconnected never counts. */
+    val bluetoothConnected: Boolean,
+)
+
 @Composable
-internal fun rememberAudioOutputOptions(requestedDeviceId: Int?): List<AudioOutputOption> {
+internal fun rememberAudioOutputOptions(requestedDeviceId: Int?): AudioOutputUiState {
     val context = LocalContext.current
     val audioManager = remember(context) { context.getSystemService(AudioManager::class.java) }
     var outputGeneration by remember(audioManager) { mutableIntStateOf(0) }
@@ -995,12 +1001,12 @@ internal fun rememberAudioOutputOptions(requestedDeviceId: Int?): List<AudioOutp
         onDispose { audioManager.unregisterAudioDeviceCallback(callback) }
     }
     return remember(audioManager, outputGeneration, requestedDeviceId) {
-        audioManager.audioOutputOptions(requestedDeviceId)
+        audioManager.audioOutputUiState(requestedDeviceId)
     }
 }
 
-private fun AudioManager?.audioOutputOptions(requestedDeviceId: Int?): List<AudioOutputOption> {
-    val audioManager = this ?: return emptyList()
+private fun AudioManager?.audioOutputUiState(requestedDeviceId: Int?): AudioOutputUiState {
+    val audioManager = this ?: return AudioOutputUiState(emptyList(), bluetoothConnected = false)
     val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
         .filter { it.type.isWearOutputType() }
         .distinctBy { "${it.type}:${it.productName}" }
@@ -1017,28 +1023,37 @@ private fun AudioManager?.audioOutputOptions(requestedDeviceId: Int?): List<Audi
         routedDeviceId = routedDeviceId,
         availableDeviceIds = devices.mapTo(mutableSetOf()) { it.id },
     )
-    return devices.map { device ->
-        AudioOutputOption(
-            id = device.id,
-            label = device.outputLabel(),
-            selected = device.id == selectedId,
-        )
-    }
+    return AudioOutputUiState(
+        outputs = devices.map { device ->
+            AudioOutputOption(
+                id = device.id,
+                label = device.outputLabel(),
+                selected = device.id == selectedId,
+            )
+        },
+        bluetoothConnected = devices.any { it.type.isBluetoothOutputType() },
+    )
 }
 
-private fun Int.isWearOutputType(): Boolean = when (this) {
+private fun Int.isBluetoothOutputType(): Boolean = when (this) {
     AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
     AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
     AudioDeviceInfo.TYPE_BLE_HEADSET,
     AudioDeviceInfo.TYPE_BLE_SPEAKER,
     AudioDeviceInfo.TYPE_BLE_BROADCAST,
-    AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-    AudioDeviceInfo.TYPE_WIRED_HEADSET,
-    AudioDeviceInfo.TYPE_USB_HEADSET,
-    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
     -> true
     else -> false
 }
+
+private fun Int.isWearOutputType(): Boolean =
+    isBluetoothOutputType() || when (this) {
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+        AudioDeviceInfo.TYPE_USB_HEADSET,
+        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+        -> true
+        else -> false
+    }
 
 private fun AudioDeviceInfo.outputLabel(): String {
     val product = productName?.toString()?.takeIf { it.isNotBlank() }

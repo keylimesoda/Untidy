@@ -74,6 +74,25 @@
   shared_prefs/untidy_recent_history.xml` (and `untidy_player.xml`,
   `tidal_auth.xml` for tokens when replaying API calls with curl).
 
+## Audio verification rule (learned 2026-11-01, UX-021)
+
+- **Audio features are verified by hearing them.** CPU/utilization metrics can
+  profile a pipeline that silently stalls: HE-AAC compressed offload on the
+  SM-R955U showed perfect-looking playback (PLAYING, advancing position) while
+  `media.audio_flinger` reported the OFFLOAD thread with "0 active" tracks and
+  no HAL writes for minutes.
+- Ground-truth instruments: `dumpsys media.audio_flinger` (per-thread
+  "N Tracks of which M are active", `Total writes`, `Last write occurred`,
+  `Frames written`, Signal power history), `dumpsys audio`
+  (AudioPlaybackConfiguration state + deviceId route), `media_session`
+  PlaybackState. Compare frames-written growth vs position while playing.
+- Test BOTH routes (built-in speaker AND A2DP) and the disconnect/reconnect
+  transition; Samsung route switching: system panel
+  `com.samsung.android.wearable.media.sessions/.OutputSwitcherJetpackInvocation`
+  (also tap a connected entry there to disconnect).
+- `input keyevent 24/25` adjusts STREAM_MUSIC; media-volume per-device table
+  in `dumpsys audio` shows the route-specific levels.
+
 ## Session-death testing recipe (debug builds)
 
 - Force an expired+dead refresh token: BACK UP `shared_prefs/tidal_auth.xml`

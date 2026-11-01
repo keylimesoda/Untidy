@@ -27,9 +27,11 @@ import com.tidal.wear.ui.theme.TidalColors
 internal fun AudioOutputPicker(
     requestedOutputId: Int?,
     onOutputSelected: (Int?) -> Unit,
+    onConnectBluetooth: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val outputs = rememberAudioOutputOptions(requestedOutputId)
+    val outputState = rememberAudioOutputOptions(requestedOutputId)
+    val outputs = outputState.outputs
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val view = LocalView.current
     ScalingLazyColumn(
@@ -70,6 +72,29 @@ internal fun AudioOutputPicker(
                     onClick = {
                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                         onOutputSelected(output.id)
+                    },
+                )
+            }
+        }
+        if (!outputState.bluetoothConnected) {
+            item(key = "connect-bluetooth-caption") {
+                Text(
+                    "Paired headphones must be connected before they can play",
+                    color = TidalColors.OnSurfaceMuted,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                )
+            }
+            item(key = "connect-bluetooth") {
+                ActionRow(
+                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    label = "Connect Bluetooth headphones",
+                    rightIndicator = null,
+                    iconTint = TidalColors.Cyan,
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        onConnectBluetooth()
                     },
                 )
             }
