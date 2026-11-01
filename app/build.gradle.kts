@@ -14,8 +14,8 @@ android {
         applicationId = "com.tidal.wear"
         minSdk = 33
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.6.0-beta.6"
+        versionCode = 12
+        versionName = "0.6.0-beta.7"
 
         val tidalProperties = Properties().apply {
             val file = rootProject.layout.projectDirectory.file(".dev-secrets\\tidal-app.properties").asFile
