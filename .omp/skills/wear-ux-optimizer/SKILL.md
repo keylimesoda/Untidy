@@ -126,6 +126,12 @@ Final validation reviewer independent from the implementer where feasible.
 evaluation per audit: navigation, information presentation, interaction,
 animation, state & recovery, efficiency.
 
+## Device automation traps (read before touching a device)
+
+`references/automation-notes.md` — watch auto-sleep, swipe-type capture on
+input surfaces, emulator network-failure trick, density conversions,
+uiautomator clickable-vs-text nodes, pm clear side effects. Keep appending.
+
 ## Self-improvement of the system
 
 After each group of iterations: which reviewers found real problems, false
