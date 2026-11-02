@@ -49,6 +49,8 @@ internal sealed interface PlaybackBackendEvent {
         val format: DeliveredAudioFormat?,
     ) : PlaybackBackendEvent
     data class Error(val code: String, val throwable: Throwable?) : PlaybackBackendEvent
+    /** Backend swapped the Player instance (stall recovery); session must rebind. */
+    data object PlayerReplaced : PlaybackBackendEvent
     data class Other(val name: String) : PlaybackBackendEvent
 }
 

@@ -84,12 +84,15 @@ internal class DirectManifestPlaybackBackend(
     private val resolvedManifestsByPlayerIndex = mutableMapOf<Int, ResolvedManifest>()
     // Rebuilt (never reconfigured in place) when the stall sentinel proves this device's
     // offload pipeline is broken: renderer offload settings only bind at player creation.
+    private val lastOffloadedPlayback = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var rebuildsForCurrentItem = 0
     private var player: ExoPlayer = buildPlayer()
 
     private fun buildPlayer(): ExoPlayer = ExoPlayer.Builder(appContext)
         .setAudioAttributes(AudioAttributes.DEFAULT, true)
         .build()
         .also { exo ->
+            lastOffloadedPlayback.set(false)
             exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
                 .setAudioOffloadPreferences(
                     playbackAudioOffloadPreferences(AudioOffloadSuspension.isSuspended(appContext)),
@@ -97,6 +100,7 @@ internal class DirectManifestPlaybackBackend(
                 .build()
             exo.addAudioOffloadListener(object : ExoPlayer.AudioOffloadListener {
                 override fun onOffloadedPlayback(offloadedPlayback: Boolean) {
+                    lastOffloadedPlayback.set(offloadedPlayback)
                     Log.d(DIRECT_LOG_TAG, "audio offloaded=$offloadedPlayback")
                 }
                 override fun onSleepingForOffloadChanged(sleepingForOffload: Boolean) {
@@ -131,6 +135,7 @@ internal class DirectManifestPlaybackBackend(
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                     // Buffered/position continuity is per item; never carry stall history.
                     stallSentinel.reset()
+                    rebuildsForCurrentItem = 0
                     val mediaId = mediaItem?.mediaId.orEmpty()
                     // A selected Format belongs to the previous item until ExoPlayer reports the
                     // new item's tracks. Clear it at the transition so consumers cannot display
@@ -196,6 +201,10 @@ internal class DirectManifestPlaybackBackend(
                         durationMs = player.duration,
                         isPlaying = true,
                         isLoading = player.isLoading,
+                        // Consumption semantics only apply while the DSP offload path is
+                        // actually active: software position is the renderer clock and a
+                        // bandwidth-limited stream legitimately drains a frozen buffer.
+                        usesOffload = lastOffloadedPlayback.get(),
                     ),
                 )
                 if (verdict != OffloadStallSentinel.Stall.None) recoverFromStall(verdict)
@@ -212,6 +221,11 @@ internal class DirectManifestPlaybackBackend(
      * current item and pin this device off offload so every later item starts audible.
      */
     private fun recoverFromStall(stall: OffloadStallSentinel.Stall) {
+        if (rebuildsForCurrentItem >= MAX_REBUILDS_PER_ITEM) {
+            Log.w(DIRECT_LOG_TAG, "playback stall ($stall) but rebuild budget exhausted for this item; holding")
+            return
+        }
+        rebuildsForCurrentItem += 1
         Log.w(DIRECT_LOG_TAG, "playback stall detected ($stall); rebuilding player without offload")
         AudioOffloadSuspension.suspend(appContext)
         stallSentinel.reset()
@@ -227,6 +241,10 @@ internal class DirectManifestPlaybackBackend(
         }
         setPreferredAudioOutput(PreferredAudioOutputPreference.get(appContext))
         brokenPlayer.release()
+        // The MediaSession binds to a specific Player instance (wrapped by the service's
+        // queue forwarding player); after a rebuild it mirrors a RELEASED player unless the
+        // service rebinds — that orphaned the now-playing UI mid-queue (EXP-014).
+        _events.tryEmit(PlaybackBackendEvent.PlayerReplaced)
         // No handler re-post here: watchdogTick's tail owns the single cadence. Posting
         // from both paths accumulates parallel timers (the exact cause of the rebuild storm).
     }
@@ -819,3 +837,6 @@ private fun sha256Short(value: String): String = MessageDigest.getInstance("SHA-
 
 private const val DIRECT_LOG_TAG = "Untidy/DirectPlayback"
 private const val OFFLOAD_WATCHDOG_INTERVAL_MS = 2000L
+
+/** Rebuild attempts per media item before holding; guards against pathological storms. */
+private const val MAX_REBUILDS_PER_ITEM = 2

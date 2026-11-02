@@ -98,9 +98,16 @@
 - Shared prefs readable for ground truth: `run-as com.tidal.wear cat
   shared_prefs/untidy_recent_history.xml` (and `untidy_player.xml`,
   `tidal_auth.xml` for tokens when replaying API calls with curl).
+- MediaSession binds to a specific Player instance: if the backend RELEASES and
+  replaces its ExoPlayer, the session (and every controller on it) silently
+  mirrors the dead player. Tell: PlaybackState `updated=` timestamp frozen while
+  audio still audible, session NONE/PAUSED while media is heard. Any player
+  swap MUST rebind the session (Untidy: PlayerReplaced event -> setPlayer).
+- `input keyevent 121/126` (media keys) is dropped by Samsung SM_R955U input
+  routing; use `cmd media_session dispatch pause|play` to exercise session
+  commands from adb.
 
 ## Audio verification rule (learned 2026-11-01, UX-021)
-
 - **Audio features are verified by hearing them.** CPU/utilization metrics can
   profile a pipeline that silently stalls: HE-AAC compressed offload on the
   SM-R955U showed perfect-looking playback (PLAYING, advancing position) while

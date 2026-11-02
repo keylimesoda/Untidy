@@ -13,16 +13,29 @@ package com.tidal.wear.core.playback
  * Signatures (sampled every 2 s while `isPlaying` — a genuinely buffering player
  * reports `isPlaying == false`, so ordinary network stalls never qualify):
  *
- *  - consumption stall: across a full [windowSamples]-sample window the buffered
- *    position never grew, while position advanced by at least [minPositionAdvanceMs]
- *    and still had feed expected before the end;
+ *  - consumption stall (ONLY for samples where [Sample.usesOffload] is true):
+ *    across a full [windowSamples]-sample window the buffered position never grew,
+ *    while position advanced by at least [minPositionAdvanceMs] and still had
+ *    feed expected before the end;
  *  - render plateau: position frozen for [plateauSamples] consecutive samples while
  *    the player still claims to be playing, far from the end.
  *
  * A window, not adjacent-sample deltas: healthy progressive playback legitimately
  * holds a frozen buffered position for many seconds while draining a segment
  * (the first revision of this sentinel treated that as a stall and rebuilt
- * players every few seconds — a seek storm). Pure state machine; JVM-tested.
+ * players every few seconds — a seek storm).
+ *
+ * Why the consumption rule is offload-only (EXP-014, 2026-11-01 22:31): on the
+ * software path a bandwidth-limited-but-healthy stream shows the IDENTICAL
+ * signature (buffered frozen while position drains a shrinking buffer at real
+ * time). A genuinely dead software loader cannot hide: position reaches
+ * bufferedPosition and `isLoading` resets the window; a dead software renderer
+ * freezes position and the render plateau catches it. Only the offload path can
+ * advance position past a frozen feed while producing no sound, so only the
+ * offload path may fire consumption rebuilds. Ungated, this misfired twice on
+ * a healthy 20-track LTE stream and orphaned the media session.
+ *
+ * Pure state machine; JVM-tested.
  */
 class OffloadStallSentinel(
     private val windowSamples: Int = 20,
@@ -36,6 +49,7 @@ class OffloadStallSentinel(
         val durationMs: Long,
         val isPlaying: Boolean,
         val isLoading: Boolean,
+        val usesOffload: Boolean = true,
     )
 
     enum class Stall { None, ConsumptionStalled, RenderPlateau }
@@ -78,7 +92,7 @@ class OffloadStallSentinel(
 
         window.addLast(sample)
         while (window.size > windowSamples) window.removeFirst()
-        if (window.size == windowSamples && endIsFarEnough) {
+        if (window.size == windowSamples && endIsFarEnough && window.all { it.usesOffload }) {
             val first = window.first()
             val last = window.last()
             val bufferedNeverGrew = window.toList().zipWithNext().all { (a, b) ->

@@ -96,8 +96,9 @@ class TidalMediaService : MediaLibraryService() {
                         Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.code}", event.throwable)
                         PlaybackRequestStatus.fail(event.throwable?.let(::playbackFailureMessage)
                             ?: "Playback stopped. Try again.")
-                        player.pause()
+                        sessionPlayer?.pause()
                     }
+                    is PlaybackBackendEvent.PlayerReplaced -> rebindSessionPlayer()
                     is PlaybackBackendEvent.Other -> if (event.name.contains("Error", ignoreCase = true)) {
                         Log.e(PLAYER_LOG_TAG, "backend playback error event: ${event.name}")
                     }
@@ -125,6 +126,27 @@ class TidalMediaService : MediaLibraryService() {
         )
             .setSessionActivity(playerActivityPendingIntent())
             .build()
+    }
+
+    /**
+     * Stall recovery swapped the backend Player instance (EXP-014): re-wrap the current
+     * backend player and rebind the session, otherwise the now-playing UI and system
+     * media controls keep mirroring the released player while audio continues unheard-of
+     * by the mirror.
+     */
+    private fun rebindSessionPlayer() {
+        val base = playbackBackend?.sessionPlayer ?: return
+        val fresh = LogicalQueueForwardingPlayer(
+            player = base,
+            queueSize = { currentQueue.size },
+            queueIndex = { currentQueueIndex },
+            onNext = ::skipToNextInQueue,
+            onPrevious = ::skipToPreviousInQueue,
+            onSeekToQueueIndex = ::jumpToQueueIndex,
+        )
+        sessionPlayer = fresh
+        session?.setPlayer(fresh)
+        Log.i(PLAYER_LOG_TAG, "media session rebound to rebuilt playback player")
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = session

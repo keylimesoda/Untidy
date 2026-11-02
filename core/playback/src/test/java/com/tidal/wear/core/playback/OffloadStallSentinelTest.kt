@@ -6,13 +6,14 @@ import org.junit.Test
 class OffloadStallSentinelTest {
     private val duration = 240_000L
 
-    private fun sample(pos: Long, buffered: Long, playing: Boolean = true, loading: Boolean = false) =
+    private fun sample(pos: Long, buffered: Long, playing: Boolean = true, loading: Boolean = false, usesOffload: Boolean = true) =
         OffloadStallSentinel.Sample(
             positionMs = pos,
             bufferedMs = buffered,
             durationMs = duration,
             isPlaying = playing,
             isLoading = loading,
+            usesOffload = usesOffload,
         )
 
     // Production cadence: 2 s samples; defaults = 40 s frozen-buffer window, 15 s crawl.
@@ -109,5 +110,44 @@ class OffloadStallSentinelTest {
         repeat(windowSamples * 2) {
             assertEquals(OffloadStallSentinel.Stall.None, sentinel.observe(sample(236_000, 236_500)))
         }
+    }
+
+    // EXP-014: the SM-R955U 22:31 storm. A bandwidth-limited SOFTWARE stream has
+    // exactly the offload-wedge signature (frozen buffered + advancing position
+    // while the loader still owes bytes) but is merely draining a shrinking
+    // buffer at real time. Consumption must be gated on actual offload state.
+    private fun frozenBufferCrawl(usesOffload: Boolean): OffloadStallSentinel.Stall {
+        val sentinel = OffloadStallSentinel()
+        var verdict = OffloadStallSentinel.Stall.None
+        for (i in 0..windowSamples) {
+            verdict = sentinel.observe(sample(pos = i * 2_000L, buffered = 60_000, usesOffload = usesOffload))
+        }
+        return verdict
+    }
+
+    @Test fun `offload consumption signature still fires when offload is active`() {
+        assertEquals(OffloadStallSentinel.Stall.ConsumptionStalled, frozenBufferCrawl(usesOffload = true))
+    }
+
+    @Test fun `identical signature on the software path never consumption-stalls`() {
+        assertEquals(OffloadStallSentinel.Stall.None, frozenBufferCrawl(usesOffload = false))
+    }
+
+    @Test fun `window with any software sample cannot consumption-stall`() {
+        val sentinel = OffloadStallSentinel()
+        var verdict = OffloadStallSentinel.Stall.None
+        for (i in 0..windowSamples) {
+            val offload = i < windowSamples / 2 // half the window predates the software switch
+            verdict = sentinel.observe(sample(pos = i * 2_000L, buffered = 60_000, usesOffload = offload))
+        }
+        assertEquals(OffloadStallSentinel.Stall.None, verdict)
+    }
+
+    @Test fun `software render death is still caught by the plateau`() {
+        val sentinel = OffloadStallSentinel()
+        repeat(plateauSamples) {
+            assertEquals(OffloadStallSentinel.Stall.None, sentinel.observe(sample(80_000, 120_000, usesOffload = false)))
+        }
+        assertEquals(OffloadStallSentinel.Stall.RenderPlateau, sentinel.observe(sample(80_000, 120_000, usesOffload = false)))
     }
 }
