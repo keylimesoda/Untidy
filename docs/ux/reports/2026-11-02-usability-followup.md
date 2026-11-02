@@ -1,0 +1,5 @@
+# Usability follow-up
+
+The user prioritizes clear workflows, consistency and recovery; performance is one dimension. The watch speaker may be used for playback checks and release builds for performance comparisons.
+
+Review identified false track-download progress, offline Library copy that could claim nonexistent downloads, a no-op offline retry, and Library requests able to outlive a network transition. EXP-019 replaces the fictional percentage with an indeterminate label and disables the in-flight action. EXP-020 shows a loading state for the local count, removes the redundant availability claim, and disables retry while offline. EXP-021 makes requests children of the keyed Compose effect. Release installation, online Library smoke, debug assembly and app unit tests succeeded; active-download, offline and interruption scenarios still require device exercise. The queued-download state still returns to Download after a transient message and has not been fixed. Search retry preserving the query and misleading queued Wi-Fi wording are follow-up candidates, not verified findings.

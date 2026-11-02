@@ -60,7 +60,7 @@ import com.tidal.wear.core.playback.DeliveredAudioFormat
 sealed interface DownloadState {
     data object Unavailable : DownloadState
     data object NotDownloaded : DownloadState
-    data class Downloading(val progress: Float) : DownloadState
+    data object Downloading : DownloadState
     data object Downloaded : DownloadState
 }
 
@@ -159,7 +159,7 @@ fun ActionsSheet(
                         downloadState != DownloadState.NotDownloaded -> TidalColors.Cyan
                         else -> TidalColors.White
                     },
-                    enabled = downloadAvailable,
+                    enabled = downloadAvailable && downloadState != DownloadState.Downloading,
                     onClick = {
                         if (downloadState == DownloadState.Downloaded) {
                             confirmRemoveDownload = true
@@ -289,7 +289,7 @@ private fun ActionStatusLine(text: String) {
 private fun downloadLabel(state: DownloadState): String = when (state) {
     DownloadState.Unavailable -> "Download unavailable"
     DownloadState.NotDownloaded -> "Download"
-    is DownloadState.Downloading -> "Downloading ${(state.progress * 100).toInt()}%"
+    DownloadState.Downloading -> "Downloading…"
     DownloadState.Downloaded -> "Downloaded"
 }
 

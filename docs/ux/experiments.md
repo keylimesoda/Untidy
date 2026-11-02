@@ -357,3 +357,27 @@ falsifier: tap fails to dismiss or the new control obscures sheet actions.
 
 verification: debug build and app unit tests pass; release installed on watch. Direct launch of PlayerActivity was denied because it is not exported. User confirmed the X works on the watch.
 verdict: accept.
+
+## EXP-019 — honest in-flight track download (UX-006)
+problem: player shows a fixed, fabricated 5% and allows a tap that does nothing during an in-flight download.
+hypothesis: show “Downloading…” without a percentage and disable the in-flight action; retain completion and failure behavior.
+invariants: completed downloads remain removable; failed or queued work keeps existing behavior; no claim that queued-state recovery is fixed.
+falsifier: completion/removal breaks or an actual measured percentage is lost.
+
+## EXP-020 — truthful offline Library state
+problem: Library briefly reports zero before local downloads load and claims “Downloads available” even with none; the offline status row offers a retry that cannot succeed while offline.
+hypothesis: represent the local count as unknown while loading, remove redundant offline availability claims, and make offline status informational while keeping On this watch actionable.
+invariants: saved tracks remain accessible offline and online errors retain retry; zero, nonzero and loading counts are distinct.
+falsifier: saved downloads cannot be reached or retry is lost for online failures.
+
+## EXP-021 — cancel obsolete Library loads
+problem: retry or connectivity changes leave earlier requests running in a separate remembered scope; an older response can overwrite a newer offline or retry state.
+hypothesis: make both local and network loads children of the keyed effect so key changes cancel obsolete work.
+invariants: cancellation propagates; offline downloads still load; online failures remain retryable; no partial stale results overwrite a newer state.
+falsifier: latest request is cancelled unexpectedly or an older request can still publish after a network change.
+
+EXP-019 verification: debug build and app unit tests pass; release installed on physical watch. An active download was not exercised; waiting-for-network still reverts to Download after a transient toast and remains open. Verdict: inconclusive pending in-flight journey.
+
+EXP-020 verification: debug build and app unit tests pass; release installed and online Library displayed local count 0, 46 playlists and 50 albums on watch. Offline zero/nonzero and loading states were not exercised. Verdict: inconclusive pending offline journeys.
+
+EXP-021 verification: debug build and app unit tests pass; online Library loaded on watch. Connectivity-change and out-of-order-response paths were not exercised. Verdict: inconclusive pending interruption test.

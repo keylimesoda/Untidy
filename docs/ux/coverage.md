@@ -60,3 +60,7 @@ Settings + scrolled, Track Context + scrolled, ux013 picker state
 Physical watch: system picker update installed; user reports AirPods Max connects and plays. Selected-device label refresh, picker cancellation, and actions-sheet close control remain unverified. App debug build and unit tests pass. A subsequent release with the close control was installed; direct shell launch of the non-exported player activity was denied.
 
 User confirmed the actions-sheet X works (EXP-017). EXP-018 release on physical watch: Library displayed 46 playlists and 264 liked tracks after the parallel batch change; three API completion marker trials recorded in the performance ledger. Playback audibility during those trials remains awaiting user confirmation.
+
+## 2026-11-02 usability follow-up
+
+Release with EXP-019–021 installed on SM-R955U. Online Library displayed 0 downloaded tracks, 46 playlists and 50 albums. In-flight download, offline zero/nonzero, and interrupted/retried request paths remain untested; the build and app unit tests passed.

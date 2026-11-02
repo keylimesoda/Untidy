@@ -154,9 +154,9 @@ fun TidalPlayerScreen(
         val track = currentTrack
         when {
             track?.isDownloadEligible() != true -> Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
-            downloadState is DownloadState.Downloading -> Unit
+            downloadState == DownloadState.Downloading -> Unit
             else -> {
-                downloadState = DownloadState.Downloading(0.05f)
+                downloadState = DownloadState.Downloading
                 scope.launch {
                     when (offlineDownloader.downloadTrack(track)) {
                         OfflineDownloadResult.Downloaded -> {
