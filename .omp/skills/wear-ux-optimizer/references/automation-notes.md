@@ -5,6 +5,10 @@
 - Auto-sleeps fast; batch an entire journey into ONE adb script (wakeup →
   start → actions → captures), never interleave slow parsing between taps.
   Parse dumps AFTER captures.
+- Screen timeout is ~7 s: a successful interactive probe does NOT leave the
+  screen up for the NEXT adb call. Wake (keyevent 224) INSIDE the batch
+  immediately before each dump/tap sequence, with a wake-retry loop; any
+  "probe then batch" split across tool calls races sleep and dies.
 - `am start -W` right after `force-stop` gives real cold `TotalTime`; a
   second start resumes (`TotalTime: 0`) — not a relaunch.
 - `uiautomator dump` → "null root node" means the screen is asleep: wake
@@ -12,6 +16,10 @@
 - Home scroll position PERSISTS across app exit/re-entry and across screens
   returning to home: always re-dump and locate rows before tapping; never
   reuse stale coordinates.
+- Overscroll-capture: swiping up on content already at its BOTTOM can open the
+  global Actions sheet (Personalized mixes / On this watch / Settings...)
+  instead of scrolling — looks like a scroll in the log, changes the screen.
+  Reset to TOP with swipe-down drags first, then scroll up with count limits.
 - Scroll deterministically: ~119-122px rows; use slow drags (duration 800ms)
   rather than flings; a mis-mapped gesture nets zero movement.
 - Three BACK presses from the keyboard chain keyboard→search→home→APP EXIT.
@@ -35,9 +43,26 @@
 
 ## Evidence discipline
 
+- uiautomator dump can fail SILENTLY (null root) while the old XML file stays
+  on /sdcard — a subsequent `cat` then parses STALE content and finds phantom
+  targets from a previous screen. Always `rm` + re-dump + `[ -s file ]`
+  before parsing, per capture.
+- One device, one owner: NEVER run two adb jobs against the watch
+  concurrently — a force-stop loop cold-starting in parallel silently killed
+  a playback battery card mid-window (caught by the NOPLAY guard; wasted 1
+  card attempt). Serialize device-touching jobs explicitly.
 - uiautomator: only `clickable="true"` node bounds are touch targets; text
   node bounds inside them are NOT the target (nearly mis-reported the
   onboarding Done target as 64x30px from a text node).
+- Text matchers: match SUBSTRINGS, never `==` on track/title text — real
+  titles carry articles/prefixes ("The Memory of Trees"); an exact-match
+  finder silently yields empty targets and aborts healthy scenarios.
+- Track Context Play affordance DEPENDS ON SESSION STATE: live media session
+  → transport icons with content-desc "Play"/"Previous"/"Next"; dead session
+  → TEXT button "Play"+"Start this track" (content-desc empty, Compose nodes
+  report clickable=false — tap the text-node center, it's inside the touch
+  target). Journey finders must handle BOTH shapes or they die after any
+  force-stop.
 - Lens/agent contracts: never pass numbers as fact — mark them "reported,
   unverified" or make the lens re-measure from source/screenshots; a
   subagent labeled a coordinator's wrong number "measured".
