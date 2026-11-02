@@ -89,15 +89,24 @@ fun rememberDeferredRowArtwork(
             return@LaunchedEffect
         }
 
-        val loaded = withContext(Dispatchers.IO) {
-            val request = ImageRequest.Builder(appContext)
-                .data(url)
-                .allowHardware(false)
-                .size(requestSize)
-                .memoryCacheKey("row:$key")
-                .diskCacheKey(url)
-                .build()
-            (appContext.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
+        val (loaded, loadError) = withContext(Dispatchers.IO) {
+            try {
+                val request = ImageRequest.Builder(appContext)
+                    .data(url)
+                    .allowHardware(false)
+                    .size(requestSize)
+                    .memoryCacheKey("row:$key")
+                    .diskCacheKey(url)
+                    .build()
+                val result = appContext.imageLoader.execute(request)
+                when (result) {
+                    is coil.request.SuccessResult -> (result.drawable as? BitmapDrawable)?.bitmap to null
+                    is coil.request.ErrorResult -> null to result.throwable
+                    else -> null to null
+                }
+            } catch (t: Throwable) {
+                null to t
+            }
         }
         if (loaded != null) {
             val rowArtwork = RowArtwork(
@@ -107,6 +116,8 @@ fun rememberDeferredRowArtwork(
             putRowArtwork(key, rowArtwork)
             bitmap = rowArtwork.bitmap
         } else {
+            val reason = loadError?.let { "${it.javaClass.simpleName}:${it.message}" } ?: "no-drawable"
+            android.util.Log.w("Untidy/ART", "row art failed url=$url error=$reason")
             bitmap = null
         }
     }

@@ -84,6 +84,7 @@ import com.tidal.wear.core.playback.offline.OfflineTrackDownloader
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
 import com.tidal.wear.playback.NowPlayingStateHolder
+import com.tidal.wear.recent.RecentItem
 import com.tidal.wear.recent.RecentItemType
 import com.tidal.wear.recent.RecentRepository
 import com.tidal.wear.ui.recent.RecentScreen
@@ -218,7 +219,8 @@ private fun TidalWearApp(
             val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
             val hasUsableSession by authRepository.isAuthenticated.collectAsState(initial = true)
             val releaseVersionPreference by settingsRepository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
-            val recentItems by recentRepository.items.collectAsState(initial = emptyList())
+            val storedRecentItems by recentRepository.items.collectAsState(initial = emptyList())
+            val recentItems = rememberFreshRecentArtwork(storedRecentItems, apiClient)
             val homeShelfContent = selectHomeShelfContent(
                 downloadedTracks = appContext.readOfflineDownloadedTracks(),
                 recentItems = recentItems,
@@ -805,7 +807,45 @@ private fun HomeFooter() {
 private fun TidalTrack?.metadataLine(): String = listOf(
     this?.title.orEmpty(),
     this?.artist.orEmpty(),
-).filter { it.isNotBlank() }.joinToString(" \u00B7 ").ifBlank { "TIDAL" }
+).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "TIDAL" }
+
+// TIDAL artwork hrefs are short-lived (issued per response; observed expiring
+// inside an hour). Persisted recents embed the URL captured at play time, so
+// anything older than the trust window gets re-resolved by id, once per session.
+private const val ARTWORK_TRUST_WINDOW_MS = 30 * 60 * 1000L
+
+@Composable
+private fun rememberFreshRecentArtwork(items: List<RecentItem>, apiClient: TidalApiClient): List<RecentItem> {
+    var enriched by remember(apiClient) { mutableStateOf(items) }
+    val memo = remember(apiClient) { mutableMapOf<String, String>() }
+    LaunchedEffect(items, apiClient) {
+        val now = System.currentTimeMillis()
+        var resolved = items
+        enriched = items
+        items.forEachIndexed { index, item ->
+            val key = "${item.type.wireName}:${item.id}"
+            memo[key]?.let { url ->
+                resolved = resolved.toMutableList().also { it[index] = item.copy(artworkUrl = url) }
+                enriched = resolved
+                return@forEachIndexed
+            }
+            if (!item.artworkUrl.isNullOrBlank() && now - item.lastPlayedAt <= ARTWORK_TRUST_WINDOW_MS) return@forEachIndexed
+            val fresh = when (item.type) {
+                RecentItemType.Track -> apiClient.trackArtwork(item.id)
+                RecentItemType.Album -> apiClient.albumArtwork(item.id)
+                RecentItemType.Playlist -> apiClient.playlistArtwork(item.id)
+            }
+            if (!fresh.isNullOrBlank()) {
+                memo[key] = fresh
+                resolved = resolved.toMutableList().also { it[index] = item.copy(artworkUrl = fresh) }
+                enriched = resolved
+            } else {
+                android.util.Log.d("Untidy/REC", "art re-resolve empty type=${item.type.wireName} id=${item.id}")
+            }
+        }
+    }
+    return enriched
+}
 
 private fun Context.startTrackPlayback(track: TidalTrack): Boolean {
     if (!canStartLiveOrDownloadedPlayback(track.id)) return false

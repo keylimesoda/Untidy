@@ -256,6 +256,78 @@ notes: two self-inflicted storms documented here so they never return:
   cadence owner = watchdogTick tail. JVM tests pin both behaviors
   (segment-drain must not fire; plateau/loading/paused/end guards).
 
+## EXP-013 — pause-path matrix across every transport surface (UX-025 triage)
+
+finding: UX-025 (user report "pause acting up") | scripts/perf/pause_repro.sh
+method: cold playback, then exercise + verify each path against session state
+and position: on-screen transport pause/resume (foreground), backgrounded
+resume + pause, `cmd media_session dispatch play|pause` (what buds/sysui use).
+results: on-screen pause -> PAUSED(2)+frozen position+resume exact (fg and bg);
+session commands -> play/pause/hold/resume all exact; `input keyevent 121/126`
+-> NO-OP on SM_R955U (Samsung input routing drops injected media keys — harness
+trap, documented, use cmd media_session dispatch instead).
+verdict: diagnostic complete — production paths healthy; root cause was the
+EXP-014 rebuild orphaning the session mirror, not pause wiring.
+
+## EXP-014 — consumption-stall gated on actual offload + session rebind after rebuild (UX-025/UX-026)
+
+finding: UX-025 (Now-Playing decoupled: frozen title/position while audio
+  played), UX-026 (sentinel misfire on healthy software streams) | commit 511019e
+evidence (user session 22:29-22:33): 20-track LTE queue logged TWO
+  `ConsumptionStalled; rebuilding` events ~78 s apart while audio was healthy —
+  software decode (suspended), so rebuilds were pure churn; each rebuild
+  released the ExoPlayer the MediaSession wrapper was bound to -> mirror froze
+  on the previous track (session NONE/stale `updated=`), audio continued on the
+  replacement. "Pause acting up" and "Play icon while playing" = same corpse.
+change: Sample.usesOffload (from ExoPlayer AudioOffloadListener actual state);
+  consumption rule requires whole window offload-active. Software-path true
+  failures stay covered: dead loader -> position reaches buffered -> isLoading
+  guard resets window; dead renderer -> RenderPlateau (path-independent).
+  Backend emits PlayerReplaced; service re-wraps + session.setPlayer.
+  MAX_REBUILDS_PER_ITEM=2, reset per transition.
+tests: 4 new sentinel cases (misfire signature pinned: software=None,
+  offload=stall, mixed window=None, software plateau=fire); 157 green.
+verification (physical watch, user-driven): playlist playback after fix —
+  icons, titles, queue advance all correct across the 80s queue ("Seems to be
+  playing correctly, yeah. Icons and all"); clean-room sample: transport shows
+  Pause from t+2s, six consecutive PLAYING samples.
+verdict: **ACCEPT**
+
+## EXP-015 — artwork pipeline re-platformed to TIDAL coverArt relationships (UX-027)
+finding: UX-027 | commit: this commit
+hypothesis: grey artwork = expired persisted URLs (initial guess, WRONG).
+root cause (measured live 2026-11-01 evening, curl + in-app logcat):
+- TIDAL v2 payloads carry NO image fields (tracks/albums/playlists attributes
+  stripped of imageId/cover); relationship endpoints 400 any nested include
+  except whitelisted paths; `coverArt`→`artworks` resources serve pre-built
+  size-qualified CDN hrefs (`/images/{uuid-slashes}/{W}x{W}.jpg`).
+- Legacy unsigned keys (`{uuid}.jpg`) = S3 AccessDenied (403) app-wide.
+- Fresh v1 inline ids (album cover/picture) STILL construct 200 responses
+  (18/18 sampled) but older ones die: hrefs/ids observed live at 22:50 and
+  dead by 23:28 (17432a5a); playlist href rotated between fetches
+  (4c07d9c5→753dfc35) and the old one 403s within ~10 min. 1 req/min probe:
+  fresh href alive >=20 min. Burst 403 hypothesis REJECTED (40/40 parallel
+  = 200). UA blocking REJECTED (all UAs identical behavior).
+- EXP-006's liked path (v2 batch) had no album relation at all -> guaranteed grey.
+change: include params (track/albums/playlist/album/track+playlist batches);
+relationship-hop resolution in toTrack/toPlaylist/toAlbum (+coverArtUrl/
+artworkFileUrl helpers, prefer >=requested size); hydrateTrackArt batch refill
+(relationship endpoints serve imageless tracks); batched enrichPlaylistArt
+(filter[id] cap 20 measured: 25=400); recents re-resolve by id with 30-min
+trust window (rememberFreshRecentArtwork); player one-shot art re-probe per
+composition (rememberRestoredTrackArtwork); Coil failure logging (row loader
+now catches what used to be a throwing drawable access on ErrorResult).
+tests: CoverArtPayloadTest (5): relationship-hop resolution for track/album/
+playlist, file size selection, legacy identity still constructs. All suites green.
+verification (physical SM-R955U): Recent screen track cover + 1994! playlist
+cover; Liked list rows (264 hydrated, zero 'row art failed'); library
+playlists `enriched found=46 total=46`; player shows full-size cover mid-play.
+lessons (-> automation-notes/wear-guidelines refs):
+- Never persist TIDAL artwork URLs as identity; ids only, URLs are TTL'd.
+- Library root art surfaces refresh per open; batch endpoints save the watch
+  ~15 round-trips per screen (each TLS call ~1.5 s on-device).
+verdict: **ACCEPT**
+
 ## Reverted / inconclusive
 
 ### EXP-007 — UX-013 search-strand fix (never implemented: finding withdrawn)

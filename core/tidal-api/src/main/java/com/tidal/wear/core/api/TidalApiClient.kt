@@ -185,6 +185,7 @@ interface TidalApiService {
     suspend fun playlist(
         @Path("id") id: String,
         @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "coverArt",
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
@@ -223,6 +224,7 @@ interface TidalApiService {
     suspend fun album(
         @Path("id") id: String,
         @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "coverArt",
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
@@ -240,6 +242,7 @@ interface TidalApiService {
     suspend fun track(
         @Path("id") id: String,
         @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "artists,albums,albums.coverArt",
         @Header("accept") accept: String = JSON_API_ACCEPT,
     ): JsonElement
 
@@ -247,7 +250,17 @@ interface TidalApiService {
     suspend fun tracksByIds(
         @Query("filter[id]") ids: String,
         @Query("countryCode") countryCode: String,
-        @Query("include") include: String = "artists,albums",
+        @Query("include") include: String = "artists,albums,albums.coverArt",
+        @Query("page[limit]") pageLimit: Int? = null,
+        @Query("page[cursor]") pageCursor: String? = null,
+        @Header("accept") accept: String = JSON_API_ACCEPT,
+    ): JsonElement
+
+    @GET("playlists")
+    suspend fun playlistsByIds(
+        @Query("filter[id]") ids: String,
+        @Query("countryCode") countryCode: String,
+        @Query("include") include: String = "coverArt",
         @Query("page[limit]") pageLimit: Int? = null,
         @Query("page[cursor]") pageCursor: String? = null,
         @Header("accept") accept: String = JSON_API_ACCEPT,
@@ -538,8 +551,15 @@ class TidalApiClient(
                 if (it is HttpException && it.code() !in setOf(401, 403, 404)) throw it
                 legacyFavorites("v2-${it.safeReason()}")
             },
-        )
-    suspend fun playlist(id: String): TidalPlaylist? = service.playlist(id, countryCode).dataObjects().firstOrNull()?.toPlaylist()
+        ).let { result ->
+            if (result.playlists.none { it.artworkUrl.isNullOrBlank() }) result
+            else result.copy(playlists = enrichPlaylistArt(result.playlists))
+        }
+    suspend fun playlist(id: String): TidalPlaylist? {
+        val root = service.playlist(id, countryCode)
+        val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+        return root.dataObjects().firstOrNull()?.toPlaylist(includedByKey)
+    }
 
     suspend fun editablePlaylists(): List<TidalPlaylist> {
         val userId = authRepository.accountInfo.first()?.userId?.takeIf { it.isNotBlank() }
@@ -548,8 +568,8 @@ class TidalApiClient(
                 val root = service.userCollectionPlaylistItems(userId, countryCode, include = "playlists")
                 val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
                 root.dataObjects().mapNotNull { item ->
-                    includedByKey[item.resourceKey()]?.toPlaylist()
-                        ?: item.toPlaylist()
+                    includedByKey[item.resourceKey()]?.toPlaylist(includedByKey)
+                        ?: item.toPlaylist(includedByKey)
                         ?: item.id?.let { playlist(it) }
                 }
             }.onFailure { Log.d(API_LOG_TAG, "editable playlists user collection failed reason=${it.safeReason()}") }
@@ -557,9 +577,11 @@ class TidalApiClient(
         } else {
             emptyList()
         }
-        return (userPlaylists + favorites().playlists)
-            .filter { it.id.isNotBlank() && it.title.isNotBlank() }
-            .distinctBy { it.id }
+        return enrichPlaylistArt(
+            (userPlaylists + favorites().playlists)
+                .filter { it.id.isNotBlank() && it.title.isNotBlank() }
+                .distinctBy { it.id },
+        )
     }
 
     suspend fun createPlaylist(name: String, description: String = "Created by Untidy on Wear OS"): TidalPlaylist {
@@ -603,23 +625,22 @@ class TidalApiClient(
     }
 
     suspend fun playlistTracks(id: String): List<TidalTrack> {
-        val root = try {
-            service.playlistItems(id, countryCode, include = "items,items.albums,items.artists")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (t: Throwable) {
-            Log.d(API_LOG_TAG, "playlist items expanded include failed reason=${t.safeReason()}")
-            service.playlistItems(id, countryCode)
-        }
+        // Relationship endpoints accept only single-level includes (measured 2026-11:
+        // nested "items.albums" is rejected with 400), so tracks arrive without
+        // album context and get their artwork hydrated through the batch lookup.
+        val root = service.playlistItems(id, countryCode)
         val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
-        val tracks = root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }.distinctBy { it.id }
+        val tracks = hydrateTrackArt(
+            root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }.distinctBy { it.id },
+        )
         if (tracks.isNotEmpty() && tracks.none { !it.artworkUrl.isNullOrBlank() }) {
             Log.d(API_LOG_TAG, "playlist tracks art missing tracks=${tracks.size} payloadImageKeys=${root.imageKeySummary()} imageValueCount=${root.imageValueCount()}")
         }
         return tracks
     }
     suspend fun album(id: String): TidalAlbum? = try {
-        service.album(id, countryCode).dataObjects().firstOrNull()?.toAlbum()
+        val root = service.album(id, countryCode)
+        root.dataObjects().firstOrNull()?.toAlbum(root.includedObjects().associateBy { it.resourceKey() })
     } catch (e: CancellationException) {
         throw e
     } catch (t: Throwable) {
@@ -673,7 +694,6 @@ class TidalApiClient(
                 countryCode = countryCode,
                 pageLimit = ALBUM_TRACK_PAGE_SIZE,
                 pageCursor = cursor,
-                include = "items,items.albums,items.artists",
             )
             val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
             tracks += root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }
@@ -683,7 +703,7 @@ class TidalApiClient(
                 ?: break
             cursor = nextCursor
         }
-        return tracks.distinctBy { it.id }
+        return hydrateTrackArt(tracks.distinctBy { it.id })
     }
 
     suspend fun isFavoriteTrack(trackId: String): Boolean {
@@ -823,7 +843,101 @@ class TidalApiClient(
         return ids
     }
 
-    suspend fun track(id: String): TidalTrack? = service.track(id, countryCode).dataObjects().firstOrNull()?.toTrack()
+    suspend fun track(id: String): TidalTrack? {
+        val root = service.track(id, countryCode)
+        return root.dataObjects().firstOrNull()?.toTrack(root.includedObjects().associateBy { it.resourceKey() })
+    }
+
+    // Artwork hrefs are time-limited (issued per response); long-lived surfaces
+    // (persisted recents, restored queues) must re-resolve by id, not reuse the
+    // stored URL.
+    suspend fun trackArtwork(trackId: String): String? = runCatching { track(trackId)?.artworkUrl }.getOrNull()
+
+    suspend fun playlistArtwork(playlistId: String): String? = runCatching { playlist(playlistId)?.artworkUrl }
+        .onFailure { t ->
+            if (t !is CancellationException) Log.d(API_LOG_TAG, "playlistArtwork failed id=$playlistId reason=${t.safeReason()}")
+        }
+        .getOrNull()
+
+    suspend fun albumArtwork(albumId: String): String? = runCatching { album(albumId)?.artworkUrl }.getOrNull()
+
+    suspend fun artistArtwork(artistId: String): String? = runCatching { artist(artistId)?.artworkUrl }.getOrNull()
+
+    /**
+     * Post-2026: relationship endpoints serve tracks without image data, so list
+     * screens batch-refill artwork through /v2/tracks?filter[id]= (include defaults
+     * to albums + albums.coverArt). Hydration is capped: rows past the cap keep the
+     * initial-letter tile, which is strictly better than stalling the screen.
+     */
+    private suspend fun hydrateTrackArt(tracks: List<TidalTrack>): List<TidalTrack> {
+        val missing = tracks.filter { it.artworkUrl.isNullOrBlank() }
+            .map { it.id }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(TRACK_ART_HYDRATE_CAP)
+        if (missing.isEmpty()) return tracks
+        val artById = HashMap<String, String>()
+        missing.chunked(FAVORITE_TRACK_BATCH_SIZE).forEach { chunk ->
+            runCatching {
+                val root = service.tracksByIds(
+                    ids = chunk.joinToString(","),
+                    countryCode = countryCode,
+                    pageLimit = chunk.size,
+                )
+                val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+                root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }.forEach { track ->
+                    track.artworkUrl?.takeIf { it.isNotBlank() }?.let { artById[track.id] = it }
+                }
+            }.onFailure { t ->
+                if (t is CancellationException) throw t
+                Log.d(API_LOG_TAG, "track art hydrate failed size=${chunk.size} reason=${t.safeReason()}")
+            }
+        }
+        return tracks.map { track ->
+            if (track.artworkUrl.isNullOrBlank()) artById[track.id]?.let { track.copy(artworkUrl = it) } ?: track
+            else track
+        }
+    }
+
+    private val playlistArtCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** v2 playlists (and legacy favourites listings) carry no image fields; the
+     *  artwork lives in each playlist's coverArt relationship. The batch lookup
+     *  caps at 20 ids (measured 2026-11: 25 ids -> HTTP 400), so enrichment costs
+     *  a handful of requests instead of one per playlist. */
+    private suspend fun enrichPlaylistArt(playlists: List<TidalPlaylist>): List<TidalPlaylist> {
+        val missing = playlists
+            .filter { it.artworkUrl.isNullOrBlank() && it.id.isNotBlank() }
+            .map { it.id }
+            .distinct()
+            .filter { !playlistArtCache.containsKey(it) }
+        missing.chunked(FAVORITE_TRACK_BATCH_SIZE).forEach { chunk ->
+            runCatching {
+                val root = service.playlistsByIds(
+                    ids = chunk.joinToString(","),
+                    countryCode = countryCode,
+                    pageLimit = chunk.size,
+                )
+                val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+                root.dataObjects().mapNotNull { it.toPlaylist(includedByKey) }.forEach { playlist ->
+                    playlist.artworkUrl?.takeIf { it.isNotBlank() }?.let { playlistArtCache[playlist.id] = it }
+                }
+            }.onFailure { t ->
+                if (t is CancellationException) throw t
+                Log.d(API_LOG_TAG, "playlist art batch failed size=${chunk.size} reason=${t.safeReason()}")
+            }
+            chunk.forEach { playlistArtCache.putIfAbsent(it, playlistArtCache[it].orEmpty()) }
+        }
+        val enriched = playlists.count { !it.artworkUrl.isNullOrBlank() }
+        Log.d(API_LOG_TAG, "playlist art enriched found=${maxOf(enriched, playlists.count { !it.artworkUrl.isNullOrBlank() && !it.id.isBlank() && playlistArtCache[it.id]?.isNotBlank() == true })} total=${playlists.size}")
+        return playlists.map { playlist ->
+            if (playlist.artworkUrl.isNullOrBlank()) {
+                playlistArtCache[playlist.id]?.takeIf { it.isNotBlank() }?.let { playlist.copy(artworkUrl = it) } ?: playlist
+            } else {
+                playlist
+            }
+        }
+    }
 
     /**
      * Full liked-tracks listing from the v2 collection relationship (the live store;
@@ -1053,7 +1167,7 @@ class TidalApiClient(
         val resources = relationships.relationshipResourceKeys(relationshipName)
             .mapNotNull { includedByKey[it] }
         val playlists = resources
-            .mapNotNull { it.toPlaylist() }
+            .mapNotNull { it.toPlaylist(includedByKey) }
             .distinctBy { it.id }
         if (playlists.isNotEmpty() && playlists.none { !it.artworkUrl.isNullOrBlank() }) {
             Log.d(API_LOG_TAG, "discover playlist art absent section=$title count=${playlists.size} attrKeys=${resources.map { it.attributes.keysSummary() }.distinct().take(3).joinToString(",")} imageKeys=${JsonArray(resources).imageKeySummary()}")
@@ -1115,9 +1229,11 @@ class TidalApiClient(
                 artists = parseLegacyFavoriteObjects(legacyService.favoriteArtists(userId, countryCode, token = clientId))
                     .mapNotNull { it.toLegacyArtist() }
                     .distinctBy { it.id },
-                playlists = parseLegacyFavoriteObjects(legacyService.favoritePlaylists(userId, countryCode, token = clientId))
-                    .mapNotNull { it.toLegacyPlaylist() }
-                    .distinctBy { it.id },
+                playlists = enrichPlaylistArt(
+                    parseLegacyFavoriteObjects(legacyService.favoritePlaylists(userId, countryCode, token = clientId))
+                        .mapNotNull { it.toLegacyPlaylist() }
+                        .distinctBy { it.id },
+                ),
             ).also {
                 // tracks may come from v2 (favoriteTracksV2); albums/artists/playlists stay legacy.
                 Log.d(API_LOG_TAG, "library fallback ok tracks=${it.tracks.size} albums=${it.albums.size} artists=${it.artists.size} playlists=${it.playlists.size}")
@@ -1503,7 +1619,7 @@ internal fun parseV2Search(element: JsonElement): TidalSearchResult {
         tracks = resources.mapNotNull { it.toTrack(resourcesByKey) }.distinctBy { it.id },
         albums = resources.mapNotNull { it.toAlbum() }.distinctBy { it.id },
         artists = resources.mapNotNull { it.toArtist() }.distinctBy { it.id },
-        playlists = resources.mapNotNull { it.toPlaylist() }.distinctBy { it.id },
+        playlists = resources.mapNotNull { it.toPlaylist(resourcesByKey) }.distinctBy { it.id },
     )
 }
 
@@ -1594,7 +1710,7 @@ private fun JsonObject.toTrack(): TidalTrack? {
     return toTrack(emptyMap())
 }
 
-private fun JsonObject.toTrack(includedByKey: Map<String, JsonObject>): TidalTrack? {
+internal fun JsonObject.toTrack(includedByKey: Map<String, JsonObject>): TidalTrack? {
     if (!typeMatches("track", "tracks")) return null
     val attrs = attributes
     val albumKey = relationshipResourceKeys("album", "albums").firstOrNull()
@@ -1612,14 +1728,15 @@ private fun JsonObject.toTrack(includedByKey: Map<String, JsonObject>): TidalTra
             ?: albumAttrs?.string("artistName", "artist")
             ?: "",
         album = attrs.string("albumTitle", "album") ?: albumAttrs?.string("title", "name") ?: "",
-        artworkUrl = attrs.imageUrl(320) ?: albumAttrs?.imageUrl(320) ?: album?.imageUrl(320),
+        artworkUrl = coverArtUrl(album, includedByKey)
+            ?: attrs.imageUrl(320) ?: albumAttrs?.imageUrl(320) ?: album?.imageUrl(320),
         durationMs = attrs.long("duration", "durationMs")?.let { if (it < 10_000) it * 1000L else it } ?: 0L,
         albumId = album?.id.orEmpty(),
         artistId = artist?.id.orEmpty(),
     )
 }
 
-private fun JsonObject.toAlbum(): TidalAlbum? {
+internal fun JsonObject.toAlbum(includedByKey: Map<String, JsonObject> = emptyMap()): TidalAlbum? {
     if (!typeMatches("album", "albums")) return null
     val attrs = attributes
     val releaseType = albumReleaseType(
@@ -1633,7 +1750,7 @@ private fun JsonObject.toAlbum(): TidalAlbum? {
         id = id ?: return null,
         title = title,
         artist = attrs.string("artistName", "artist") ?: "",
-        artworkUrl = attrs.imageUrl(320),
+        artworkUrl = coverArtUrl(this, includedByKey) ?: attrs.imageUrl(320),
         releaseType = releaseType,
         releaseDate = attrs.string("releaseDate", "releaseDateTime", "releaseYear") ?: "",
         trackCount = attrs.int("numberOfTracks", "trackCount", "numberOfItems") ?: 0,
@@ -1651,14 +1768,14 @@ private fun JsonObject.toArtist(): TidalArtist? {
     )
 }
 
-private fun JsonObject.toPlaylist(): TidalPlaylist? {
+internal fun JsonObject.toPlaylist(includedByKey: Map<String, JsonObject> = emptyMap()): TidalPlaylist? {
     if (!typeMatches("playlist", "playlists")) return null
     val attrs = attributes
     return TidalPlaylist(
         id = id ?: return null,
         title = attrs.string("title", "name") ?: return null,
         creator = attrs.string("creatorName", "ownerName", "creator") ?: "",
-        artworkUrl = attrs.imageUrl(320),
+        artworkUrl = coverArtUrl(this, includedByKey) ?: attrs.imageUrl(320),
     )
 }
 
@@ -1882,6 +1999,30 @@ private fun String.looksLikeImageUrl(): Boolean {
         lower.endsWith(".webp")
 }
 
+// Post-2026 TIDAL image policy: legacy inline imageId/cover values still resolve as
+// identity keys, but the CDN only serves size-qualified paths (see tidalResourceImageUrl).
+// v2 resources carry no inline ids at all; their art lives behind a `coverArt`
+// relationship to an `artworks` resource whose files[] hold pre-built CDN URLs.
+internal fun JsonObject?.artworkFileUrl(size: Int = 320): String? {
+    val files = ((this?.get("attributes") as? JsonObject) ?: this)?.get("files") as? JsonArray ?: return null
+    var best: Pair<Long, String>? = null
+    var largest: Pair<Long, String>? = null
+    for (entry in files.filterIsInstance<JsonObject>()) {
+        val href = entry.string("href", "url")?.takeIf { it.isNotBlank() } ?: continue
+        val width = (entry["meta"] as? JsonObject)?.long("width") ?: 0L
+        if (largest == null || width > largest.first) largest = width to href
+        if (width >= size && (best == null || width < best.first)) best = width to href
+    }
+    return (best ?: largest)?.second
+}
+
+internal fun coverArtUrl(resource: JsonObject?, includedByKey: Map<String, JsonObject>, size: Int = 320): String? {
+    // Two names force the resource-level vararg overload (the single-arg overload
+    // expects a relationships object, not a resource).
+    val key = resource?.relationshipResourceKeys("coverArt", "coverArts")?.firstOrNull() ?: return null
+    return includedByKey[key].artworkFileUrl(size)
+}
+
 private fun tidalResourceImageUrl(id: String, size: Int): String {
     val normalized = id.trim().replace('-', '/')
     val supported = listOf(80, 160, 320, 640, 1280).firstOrNull { it >= size } ?: 320
@@ -1929,6 +2070,7 @@ private const val API_LOG_TAG = "Untidy/API"
 private const val ALBUM_TRACK_PAGE_SIZE = 50
 private const val FAVORITE_TRACK_PAGE_SIZE = 50
 private const val FAVORITE_TRACK_BATCH_SIZE = 20
+private const val TRACK_ART_HYDRATE_CAP = 200
 private const val LEGACY_ALBUM_TRACK_PAGE_SIZE = 50
 private const val LEGACY_ALBUM_TRACK_MAX_PAGES = 4
 private const val LEGACY_ALBUM_TRACK_MAX_TRACKS = 100

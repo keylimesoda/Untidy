@@ -121,11 +121,12 @@ fun TidalPlayerScreen(
     onOpenArtist: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
-    val albumArt = if (isAmbient) null else rememberAlbumArt(state.track)
-    val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.OnSurfaceMuted
     val context = LocalContext.current
     val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
     val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
+    val artTrack = rememberRestoredTrackArtwork(state.track, apiClient)
+    val albumArt = if (isAmbient) null else rememberAlbumArt(artTrack)
+    val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.OnSurfaceMuted
     val currentTrack = state.track
     var downloadState by remember(currentTrack?.id) {
         mutableStateOf(context.initialDownloadState(currentTrack))
@@ -1094,3 +1095,23 @@ private fun playerLayoutScale(): Float {
 
 
 
+
+// Media-session queue extras outlive artwork hrefs (which expire within an hour),
+// so a restored player session shows stale/blank art. Re-resolve the current
+// track's artwork once per player composition; live playback queues are already
+// fresh and only re-probe when their artwork is missing.
+@Composable
+private fun rememberRestoredTrackArtwork(track: TidalTrack?, apiClient: TidalApiClient): TidalTrack? {
+    var freshUrl by remember(apiClient) { mutableStateOf<String?>(null) }
+    var probedId by remember(apiClient) { mutableStateOf<String?>(null) }
+    LaunchedEffect(track?.id) {
+        val id = track?.id?.takeIf { it.isNotBlank() && it != "tidal-current" } ?: return@LaunchedEffect
+        if (id == probedId) return@LaunchedEffect
+        if (!track.artworkUrl.isNullOrBlank() && probedId != null) return@LaunchedEffect
+        probedId = id
+        apiClient.trackArtwork(id)?.takeIf { it.isNotBlank() }?.let { freshUrl = it }
+    }
+    val current = track ?: return null
+    val replacement = freshUrl?.takeIf { it.isNotBlank() && it != current.artworkUrl && current.id == probedId }
+    return if (replacement != null) current.copy(artworkUrl = replacement) else current
+}

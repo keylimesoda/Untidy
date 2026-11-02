@@ -142,3 +142,19 @@
 - `scripts/run-wear-emulator.sh` boots `-no-snapshot-load` (no wipe): once
   signed in, the emulator KEEPS auth across boots; `adb install -r` keeps
   data; `pm clear` destroys it (re-auth needed).
+
+## Wake/retry driver (use it, don't re-improvise)
+
+`scripts/ux_drive.py tap|shot|swipe|texts` — one process, wake-before-dump,
+4x dump retry on "null root node" (ambient mode / animation), auto-scroll to
+find target text. Ad-hoc `input tap` against a dimmed screen silently lands
+nowhere: the ~7 s timeout ambient-dims mid-sequence and uiautomator then
+returns empty trees; screenshots of ambient show dark chrome, not the app.
+Always re-wake (keyevent 224) immediately before dump AND before screenshot.
+
+## Watch network reality check
+
+Every TLS call from the watch costs ~1-2 s (batch endpoints are worth ~15x
+that per screen). Artwork CDN 403s from the watch were URL expiry, not
+network: never debug watch CDN failures before re-probing the exact URL from
+the host minutes later.
