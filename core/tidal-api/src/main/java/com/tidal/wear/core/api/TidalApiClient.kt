@@ -15,6 +15,9 @@ import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalSection
 import com.tidal.wear.core.model.TidalTrack
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
@@ -947,29 +950,35 @@ class TidalApiClient(
     suspend fun favoriteTracksV2(): List<TidalTrack> {
         val ids = favoriteTrackRelationshipIds()
         if (ids.isEmpty()) return emptyList()
-        val out = ArrayList<TidalTrack>(ids.size)
         // The v2 filter[id] accepts at most 20 values and SILENTLY drops the rest
         // (measured 2026-11-01: 100 ids -> 20 tracks, no error), so chunk to 20 and
         // page each chunk in case page limits apply.
-        ids.chunked(FAVORITE_TRACK_BATCH_SIZE).forEach { chunk ->
-            var cursor: String? = null
-            val seenCursors = mutableSetOf<String>()
-            while (true) {
-                val root = service.tracksByIds(
-                    ids = chunk.joinToString(","),
-                    countryCode = countryCode,
-                    pageLimit = chunk.size,
-                    pageCursor = cursor,
-                )
-                val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
-                out += root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }
-                cursor = root.nextPageCursor()
-                    ?.takeIf { it.isNotBlank() }
-                    ?.takeIf { seenCursors.add(it) }
-                    ?: break
-            }
+        return coroutineScope {
+            ids.chunked(FAVORITE_TRACK_BATCH_SIZE).chunked(3).flatMap { group ->
+                group.map { chunk ->
+                    async {
+                        val out = mutableListOf<TidalTrack>()
+                        var cursor: String? = null
+                        val seenCursors = mutableSetOf<String>()
+                        while (true) {
+                            val root = service.tracksByIds(
+                                ids = chunk.joinToString(","),
+                                countryCode = countryCode,
+                                pageLimit = chunk.size,
+                                pageCursor = cursor,
+                            )
+                            val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
+                            out += root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }
+                            cursor = root.nextPageCursor()
+                                ?.takeIf { it.isNotBlank() }
+                                ?.takeIf { seenCursors.add(it) }
+                                ?: break
+                        }
+                        out
+                    }
+                }.awaitAll().flatten()
+            }.distinctBy { it.id }
         }
-        return out.distinctBy { it.id }
     }
     suspend fun artist(id: String): TidalArtist? = try {
         val v2Artist = service.artist(id, countryCode).dataObjects().firstOrNull()?.toArtist()

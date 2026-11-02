@@ -69,3 +69,12 @@ run DISCONNECTED: reset -> `adb disconnect` -> wait -> reconnect -> dump
 (first attempt aborted cleanly: scroll-persisted home hid the target card;
 NOPLAY_ABORT guard fired before any contaminated number was recorded —
 retried scroll-resilient).
+
+## EXP-018 — bounded concurrent liked-track batches (UX-029; in progress)
+
+Baseline: beta.9 local release on SM-R955U, 2026-11-02, three tap-to-`library fallback ok` log samples: 8.6, 7.3, 6.1 s (median 7.3, worst 8.6); 264 tracks and 46 playlists on final sample. Watch charging, 96%, 42.3 C observed after trials, AirPods Max connected, playback active. This is a log milestone proxy, not UI-frame timing. Prior ~24 s single run was under different conditions.
+Hypothesis: fetch the existing 20-ID batches in groups of three concurrently while preserving pagination and order; reduce median and worst completion without changing track count or fallback.
+Invariants: complete paginated results, stable ordering, cancellation and failure propagation; bounded request concurrency; no changes to favorites writes or audio routing.
+Falsifier: incomplete results, request errors, degraded playback, or no repeatable benefit. Same watch, release build, route, charging and playback state for comparison; record thermal differences and do not claim battery improvement.
+Candidate: release installed on same watch; AirPods Max, same track restarted after install, playback active and charging. Three matching log-marker trials: 6.1, 5.0, 5.0 s (median 5.0, worst 6.1), each reporting 264 tracks, 50 albums, 17 artists and 46 playlists. Library UI displayed 264 and 46. Watch reported 92% and 41.5 C after candidate trials (baseline 96%, 42.3 C after baseline); those differing conditions and three samples limit confidence. AudioFlinger showed an active Untidy PCM track and a write 34 ms before inspection; this alone does not establish audibility or absence of dropouts.
+Verdict: provisional: API marker improved in this small run; no battery claim. Needs a longer real-world observation and audible playback confirmation. User-visible frame timing was not measured.

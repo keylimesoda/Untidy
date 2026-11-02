@@ -26,3 +26,7 @@
 Every baseline row: build variant, versionCode, battery level at start,
 temperature, network path, route, screen state sequence. Missing condition =
 row is provisional.
+
+## 2026-11-02 Library fallback (watch, release)
+
+Tap to `library fallback ok` log marker, n=3 each, charging with playback and AirPods Max: before 8.6 / 7.3 / 6.1 s (median 7.3, worst 8.6); bounded-parallel candidate 6.1 / 5.0 / 5.0 s (median 5.0, worst 6.1). The app was reinstalled and the same track restarted between sets; battery/temperature reported 96%/42.3 C and 92%/41.5 C after respective sets. This marker is not UI-frame timing; see EXP-018 for limits.

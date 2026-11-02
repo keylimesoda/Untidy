@@ -52,3 +52,5 @@ would help). Prior power data: `docs/reviews/hardware-power-2026-09-07.md`
 
 No TalkBack walkthrough yet. Icon-only control semantics audit pending
 (UXW-004 text sizes; UXC-010 notification-denial path).
+
+Library fallback completion log marker, physical watch, n=3: before median 7.3 s / worst 8.6 s; EXP-018 candidate median 5.0 s / worst 6.1 s. This is not a UI-frame measure; conditions and caveats are in `docs/perf/experiments.md`.

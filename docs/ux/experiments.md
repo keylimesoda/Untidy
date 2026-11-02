@@ -355,5 +355,5 @@ expected improvement: clear one-tap dismissal without system gesture ambiguity.
 invariants: close returns to player; existing sheet actions and Back remain available; target at least 48dp.
 falsifier: tap fails to dismiss or the new control obscures sheet actions.
 
-verification: debug build and app unit tests pass; release installed on watch. Direct launch of PlayerActivity was denied because it is not exported. Dismissal still needs an interactive watch check.
-verdict: inconclusive pending device exercise.
+verification: debug build and app unit tests pass; release installed on watch. Direct launch of PlayerActivity was denied because it is not exported. User confirmed the X works on the watch.
+verdict: accept.
