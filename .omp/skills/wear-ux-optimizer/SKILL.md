@@ -164,5 +164,8 @@ record the limitation, never claim an unrun test passed.
 - `docs/ux/` — README, architecture, workflows, navigation, findings,
   scorecard, experiments, decisions, coverage, `reports/`, `evidence/`
 - `.omp/skills/wear-ux-optimizer/` — this skill
+- Battery/responsiveness work routes to sibling skill `wear-perf-optimizer`
+  (`docs/perf/`); perf-category findings (UX-021/023/024) carry their
+  measurement cross-checks across both ledgers.
 - Journey/fixture code goes in the existing test structure; work-item tracking
   stays in `docs/work-items/` (mirror accepted findings there).
