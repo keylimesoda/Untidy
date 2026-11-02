@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
@@ -30,11 +31,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -49,7 +53,6 @@ import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.dialog.Dialog
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import com.tidal.wear.core.playback.DeliveredAudioFormat
@@ -81,7 +84,11 @@ fun ActionsSheet(
     var confirmRemoveDownload by remember { mutableStateOf(false) }
     val appContext = LocalContext.current
     var actionMessage by remember { mutableStateOf<String?>(null) }
-    var showOutputPicker by remember { mutableStateOf(false) }
+    LaunchedEffect(requestedOutputId) {
+        if (requestedOutputId != null) onOutputSelected(null)
+    }
+    val outputState = rememberAudioOutputOptions(null)
+    val currentOutput = outputState.outputs.firstOrNull { it.selected }?.label
     val quality = remember(deliveredAudioFormat) { deliveredAudioFormat.toQualityGemPresentation() }
     val listState = rememberTransformingLazyColumnState()
     fun runAction(action: () -> String?) {
@@ -94,18 +101,13 @@ fun ActionsSheet(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp)
-                .height(38.dp)
+                .height(48.dp)
+                .semantics { contentDescription = "Close actions" }
                 .clickable(enabled = onHandleClick != null) { onHandleClick?.invoke() },
-            contentAlignment = Alignment.TopCenter,
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 5.dp)
-                    .size(width = 28.dp, height = 3.dp)
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(TidalColors.White.copy(alpha = if (forceHandleArmed) 0.76f else 0.42f)),
-            )
+            Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(24.dp),
+                tint = TidalColors.White.copy(alpha = if (forceHandleArmed) 1f else 0.8f))
         }
         TransformingLazyColumn(
             state = listState,
@@ -206,10 +208,14 @@ fun ActionsSheet(
             item {
                 ActionRow(
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    label = "Play on",
+                    label = "Audio output",
+                    subtitle = currentOutput,
                     rightIndicator = null,
                     iconTint = TidalColors.White,
-                    onClick = { showOutputPicker = true },
+                    onClick = {
+                        onOutputSelected(null)
+                        if (!MediaOutputSwitcherLauncher.launch(appContext)) actionMessage = "Output settings unavailable"
+                    },
                 )
             }
             item { ActionRow(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist", null, TidalColors.White, onClick = { runAction(onAddToPlaylist) }) }
@@ -220,27 +226,7 @@ fun ActionsSheet(
             }
         }
     }
-    // A separate Wear window owns Back and swipe-to-dismiss. The action sheet stays composed
-    // underneath, preserving its scroll position when the picker closes.
-    Dialog(
-        showDialog = showOutputPicker,
-        onDismissRequest = { showOutputPicker = false },
-    ) {
-        AudioOutputPicker(
-            requestedOutputId = requestedOutputId,
-            onOutputSelected = { id ->
-                onOutputSelected(id)
-                showOutputPicker = false
-            },
-            onConnectBluetooth = {
-                // System switcher owns pairing/connection; the device callback refreshes
-                // this list once the headset is connected, and routing follows system choice.
-                MediaOutputSwitcherLauncher.launch(appContext)
-                showOutputPicker = false
-            },
-            onBack = { showOutputPicker = false },
-        )
-    }
+
 }
 
 data class AudioOutputOption(
@@ -315,6 +301,7 @@ internal fun ActionRow(
     iconTint: Color,
     enabled: Boolean = true,
     selected: Boolean = false,
+    subtitle: String? = null,
     onClick: () -> Unit,
 ) {
     Row(
@@ -330,17 +317,21 @@ internal fun ActionRow(
     ) {
         Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp), tint = iconTint)
         Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.caption1,
-            fontSize = if (label.startsWith("Downloading")) 12.sp else 14.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (enabled) TidalColors.White else TidalColors.OnSurfaceMuted,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Start,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.caption1,
+                fontSize = if (label.startsWith("Downloading")) 12.sp else 14.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (enabled) TidalColors.White else TidalColors.OnSurfaceMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle != null) {
+                Text(text = subtitle, fontSize = 11.sp, color = TidalColors.OnSurfaceMuted,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
         Box(modifier = Modifier.width(20.dp), contentAlignment = Alignment.Center) {
             if (rightIndicator != null) {
                 Icon(imageVector = rightIndicator, contentDescription = null, modifier = Modifier.size(20.dp), tint = TidalColors.Cyan)

@@ -338,3 +338,22 @@ UX-013 withdrawn in findings.md. Lesson stored in skill references.
 
 (none yet — reverted experiments are the highest-value anti-recurrence data;
 record them here, not in findings prose)
+
+## EXP-016 — system-owned audio output selection (in progress)
+problem: Play on inserts an app picker before the system picker and can persist a player-specific device preference that conflicts with system routing.
+hypothesis: clear the legacy preference and open the system switcher directly; show the system media route on the action row.
+expected improvement: one fewer selection screen; system choice remains authoritative.
+invariants: preserve playback, system picker fallback and Back behavior; do not claim a route when unknown.
+falsifier: system choice cannot change playback route or the displayed route is stale or misleading.
+verification: debug build and app unit tests pass; installed on physical watch. User reports the system picker change restored AirPods Max playback. Device-label refresh and cancellation have not been independently exercised.
+verdict: accept provisionally; follow-up route refresh and cancellation checks remain.
+
+## EXP-017 — explicit close control in actions sheet (UX-028)
+problem: the sheet's drag handle suggests a swipe, which can open the watch launcher instead of dismissing the sheet (user observation, UX-028).
+hypothesis: replace the handle with a labeled close button, retaining the existing callback.
+expected improvement: clear one-tap dismissal without system gesture ambiguity.
+invariants: close returns to player; existing sheet actions and Back remain available; target at least 48dp.
+falsifier: tap fails to dismiss or the new control obscures sheet actions.
+
+verification: debug build and app unit tests pass; release installed on watch. Direct launch of PlayerActivity was denied because it is not exported. Dismissal still needs an interactive watch check.
+verdict: inconclusive pending device exercise.

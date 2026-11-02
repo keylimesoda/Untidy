@@ -54,3 +54,7 @@ Settings + scrolled, Track Context + scrolled, ux013 picker state
 2. Benchmark module (Macrobenchmark) — `testing-setup` skill installed for this.
 3. androidTest/journey harness — repo has zero instrumented tests.
 4. Rotary + ambient + font-scale matrix on wear6.
+
+## 2026-11-02 audio output follow-up
+
+Physical watch: system picker update installed; user reports AirPods Max connects and plays. Selected-device label refresh, picker cancellation, and actions-sheet close control remain unverified. App debug build and unit tests pass. A subsequent release with the close control was installed; direct shell launch of the non-exported player activity was denied.

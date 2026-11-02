@@ -9,6 +9,9 @@ import android.media.AudioManager
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.animation.AnimatedVisibility
@@ -987,6 +990,14 @@ internal fun rememberAudioOutputOptions(requestedDeviceId: Int?): AudioOutputUiS
     val context = LocalContext.current
     val audioManager = remember(context) { context.getSystemService(AudioManager::class.java) }
     var outputGeneration by remember(audioManager) { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) outputGeneration += 1
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     DisposableEffect(audioManager) {
         if (audioManager == null) return@DisposableEffect onDispose {}
         val callback = object : AudioDeviceCallback() {
