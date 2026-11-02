@@ -306,8 +306,9 @@ root cause (measured live 2026-11-01 evening, curl + in-app logcat):
   (18/18 sampled) but older ones die: hrefs/ids observed live at 22:50 and
   dead by 23:28 (17432a5a); playlist href rotated between fetches
   (4c07d9c5→753dfc35) and the old one 403s within ~10 min. 1 req/min probe:
-  fresh href alive >=20 min. Burst 403 hypothesis REJECTED (40/40 parallel
-  = 200). UA blocking REJECTED (all UAs identical behavior).
+  fresh href alive the full 40 min (40/40 samples 200). Burst 403 hypothesis
+  REJECTED (40/40 parallel = 200). UA blocking REJECTED (all UAs identical
+  behavior).
 - EXP-006's liked path (v2 batch) had no album relation at all -> guaranteed grey.
 change: include params (track/albums/playlist/album/track+playlist batches);
 relationship-hop resolution in toTrack/toPlaylist/toAlbum (+coverArtUrl/
