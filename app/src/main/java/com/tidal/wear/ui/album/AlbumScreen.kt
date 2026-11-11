@@ -67,6 +67,8 @@ import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -92,12 +94,20 @@ fun AlbumScreen(
         loading = true
         error = null
         try {
-            val loadedAlbum = withContext(Dispatchers.IO) { runCatching { apiClient.album(albumId) }.getOrNull() }
+            // Album metadata and tracks are independent requests. Start them together to
+            // avoid a serial network waterfall; coroutineScope still cancels both when the
+            // screen leaves or a retry starts.
+            val (loadedAlbum, loadedTracks) = coroutineScope {
+                val albumDeferred = async(Dispatchers.IO) {
+                    runCatching { apiClient.album(albumId) }.getOrNull()
+                }
+                val tracksDeferred = async(Dispatchers.IO) { apiClient.albumTracks(albumId) }
+                albumDeferred.await() to tracksDeferred.await()
+            }
             val displayAlbum = loadedAlbum?.copy(
                 artist = loadedAlbum.artist.ifBlank { initialAlbum?.artist.orEmpty() },
                 artworkUrl = loadedAlbum.artworkUrl ?: initialAlbum?.artworkUrl,
             ) ?: initialAlbum
-            val loadedTracks = withContext(Dispatchers.IO) { apiClient.albumTracks(albumId) }
             val fallbackArtwork = loadedTracks.firstOrNull { !it.artworkUrl.isNullOrBlank() }?.artworkUrl
                 ?: displayAlbum?.artworkUrl
             val fallbackArtist = displayAlbum?.artist?.takeIf { it.isNotBlank() }

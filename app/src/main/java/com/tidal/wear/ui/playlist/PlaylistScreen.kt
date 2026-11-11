@@ -54,8 +54,9 @@ import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 fun PlaylistScreen(
@@ -76,12 +77,20 @@ fun PlaylistScreen(
         loading = true
         error = null
         try {
-            val loadedPlaylist = withContext(Dispatchers.IO) { runCatching { apiClient.playlist(playlistId) }.getOrNull() }
+            // Playlist metadata and tracks are independent requests. Start them together to
+            // avoid a serial network waterfall; coroutineScope still cancels both when the
+            // screen leaves or a retry starts.
+            val (loadedPlaylist, loadedTracks) = coroutineScope {
+                val playlistDeferred = async(Dispatchers.IO) {
+                    runCatching { apiClient.playlist(playlistId) }.getOrNull()
+                }
+                val tracksDeferred = async(Dispatchers.IO) { apiClient.playlistTracks(playlistId) }
+                playlistDeferred.await() to tracksDeferred.await()
+            }
             val displayPlaylist = loadedPlaylist?.copy(
                 creator = loadedPlaylist.creator.ifBlank { initialPlaylist?.creator.orEmpty() },
                 artworkUrl = loadedPlaylist.artworkUrl ?: initialPlaylist?.artworkUrl,
             ) ?: initialPlaylist
-            val loadedTracks = withContext(Dispatchers.IO) { apiClient.playlistTracks(playlistId) }
             val fallbackArtwork = displayPlaylist?.artworkUrl
             val fallbackTitle = displayPlaylist?.title.orEmpty()
             val fallbackCreator = displayPlaylist?.creator.orEmpty()
