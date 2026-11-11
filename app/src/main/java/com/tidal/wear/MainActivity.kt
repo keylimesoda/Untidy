@@ -3,6 +3,7 @@ package com.tidal.wear
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -80,6 +81,7 @@ import com.tidal.wear.core.playback.PlaybackActions
 import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
 import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
+import com.tidal.wear.core.playback.offline.DownloadedTrackSummary
 import com.tidal.wear.core.playback.offline.OfflineTrackDownloader
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
@@ -108,8 +110,10 @@ import com.tidal.wear.ui.search.SearchScreen
 import com.tidal.wear.ui.settings.SettingsRepository
 import com.tidal.wear.ui.settings.SettingsScreen
 import com.tidal.wear.ui.theme.TidalColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 private val HomePrimarySurface = Color(0xFF1A1A1A)
 private val HomeSecondarySurface = Color(0xFF1A1A1A)
@@ -154,9 +158,20 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_ROUTE = "com.tidal.wear.extra.ROUTE"
         const val EXTRA_RETURN_TO_PLAYER = "com.tidal.wear.extra.RETURN_TO_PLAYER"
+        private const val NOTIFICATION_PERMISSION_PREFS = "untidy_notification_permission"
+        private const val KEY_NOTIFICATION_PERMISSION_ASKED = "asked"
     }
 
     private fun requestNotificationPermissionIfNeeded() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val prefs = getSharedPreferences(NOTIFICATION_PERMISSION_PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, false)) return
+        // Record the prompt before launching so a recreated Activity cannot ask again.
+        prefs.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_ASKED, true).apply()
         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
@@ -219,11 +234,23 @@ private fun TidalWearApp(
             val hasUsableSession by authRepository.isAuthenticated.collectAsState(initial = true)
             val releaseVersionPreference by settingsRepository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
             val recentItems by recentRepository.items.collectAsState(initial = emptyList())
-            val homeShelfContent = selectHomeShelfContent(
-                downloadedTracks = appContext.readOfflineDownloadedTracks(),
-                recentItems = recentItems,
-            )
+            // Reading the offline shelf scans SharedPreferences and sorts every downloaded
+            // track, so keep it out of the composition body and load it on IO when Home is shown.
+            var downloadedTracks by remember { mutableStateOf(emptyList<DownloadedTrackSummary>()) }
             var currentRoute by remember { mutableStateOf<String?>(null) }
+            LaunchedEffect(currentRoute) {
+                if (currentRoute == Routes.Home) {
+                    downloadedTracks = withContext(Dispatchers.IO) {
+                        appContext.readOfflineDownloadedTracks()
+                    }
+                }
+            }
+            val homeShelfContent = remember(downloadedTracks, recentItems) {
+                selectHomeShelfContent(
+                    downloadedTracks = downloadedTracks,
+                    recentItems = recentItems,
+                )
+            }
             var currentBackStackEntryId by remember { mutableStateOf<String?>(null) }
             // A route is only a destination pattern, so it cannot distinguish two artist
             // (or album) entries. Keep the concrete entry created for a player handoff.
