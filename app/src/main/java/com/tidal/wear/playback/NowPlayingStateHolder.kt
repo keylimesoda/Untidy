@@ -92,6 +92,13 @@ class NowPlayingStateHolder(
     val state: StateFlow<NowPlayingUiState> = _state.asStateFlow()
 
     private val json = Json { ignoreUnknownKeys = true }
+    /**
+     * The serialized logical queue can hold 100+ tracks and Media3 emits event bursts for
+     * state changes, seeks, and transitions. Decoding it is only necessary when the raw
+     * payload actually changes, so remember the last successfully parsed one.
+     */
+    private var lastQueuePayload: String? = null
+    private var lastQueueItems: List<TidalTrack> = emptyList()
     private var controllerFuture: ListenableFuture<MediaController>
     private var controller: MediaController? = null
     private var positionJob: Job? = null
@@ -284,7 +291,14 @@ class NowPlayingStateHolder(
 
     private fun parseQueueSnapshot(extras: android.os.Bundle?): PlaybackQueueSnapshot {
         val payload = extras?.getString(PlaybackActions.EXTRA_QUEUE_PAYLOAD).orEmpty()
-        val items = runCatching { json.decodeFromString<List<TidalTrack>>(payload) }.getOrDefault(emptyList())
+        val items = if (payload == lastQueuePayload) {
+            lastQueueItems
+        } else {
+            runCatching { json.decodeFromString<List<TidalTrack>>(payload) }.getOrNull()?.also {
+                lastQueuePayload = payload
+                lastQueueItems = it
+            } ?: emptyList()
+        }
         val currentIndex = extras?.getInt(PlaybackActions.EXTRA_QUEUE_INDEX, -1) ?: -1
         return PlaybackQueueSnapshot(items = items, currentIndex = currentIndex)
     }
