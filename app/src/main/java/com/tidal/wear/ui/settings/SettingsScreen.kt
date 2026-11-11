@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -42,6 +43,7 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.ReleaseVersionPreference
+import com.tidal.wear.core.playback.offline.DownloadedTrackSummary
 import com.tidal.wear.core.playback.offline.offlineDownloadsStorageBytes
 import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
 import com.tidal.wear.core.playback.offline.removeAllOfflineTrackDownloads
@@ -49,7 +51,9 @@ import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.components.tidalSecondaryChipColors
 import com.tidal.wear.ui.theme.TidalColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -68,8 +72,15 @@ fun SettingsScreen(
     var confirmErase by remember { mutableStateOf(false) }
     var confirmRemoveDownloads by remember { mutableStateOf(false) }
     var downloadsRefreshTick by remember { mutableIntStateOf(0) }
-    val downloadedTracks = remember(downloadsRefreshTick) { context.readOfflineDownloadedTracks() }
-    val downloadsStorageBytes = remember(downloadsRefreshTick) { context.offlineDownloadsStorageBytes() }
+    var downloadedTracks by remember { mutableStateOf<List<DownloadedTrackSummary>>(emptyList()) }
+    var downloadsStorageBytes by remember { mutableStateOf(0L) }
+    LaunchedEffect(downloadsRefreshTick) {
+        val (tracks, storageBytes) = withContext(Dispatchers.IO) {
+            context.readOfflineDownloadedTracks() to context.offlineDownloadsStorageBytes()
+        }
+        downloadedTracks = tracks
+        downloadsStorageBytes = storageBytes
+    }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(
