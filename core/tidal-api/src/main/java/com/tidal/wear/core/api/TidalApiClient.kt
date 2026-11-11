@@ -434,35 +434,36 @@ class TidalApiClient(
 ) {
     private val locale: String = Locale.getDefault().toLanguageTag().takeIf { it.isNotBlank() } ?: "en-US"
     private val json = Json { ignoreUnknownKeys = true }
-    private val service: TidalApiService
-    private val legacyService: TidalLegacyApiService
-    private val desktopService: TidalDesktopApiService
-    private val favoriteTrackCache = FavoriteTrackCache()
-    private val favoriteAlbumCache = FavoriteTrackCache()
-
-    init {
-        // Retrofit clients share this OkHttp instance so the v2, v1, and desktop
-        // endpoints reuse the same dispatcher and connection pool.
-        val client = authenticatedClient()
-        service = Retrofit.Builder()
+    // Retrofit clients share this OkHttp instance so the v2, v1, and desktop
+    // endpoints reuse the same dispatcher and connection pool. Services are
+    // lazy so cold start only pays for the endpoint the first screen uses.
+    private val client: OkHttpClient by lazy { authenticatedClient() }
+    private val service: TidalApiService by lazy {
+        Retrofit.Builder()
             .baseUrl("https://openapi.tidal.com/v2/")
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(TidalApiService::class.java)
-        legacyService = Retrofit.Builder()
+    }
+    private val legacyService: TidalLegacyApiService by lazy {
+        Retrofit.Builder()
             .baseUrl("https://api.tidal.com/v1/")
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(TidalLegacyApiService::class.java)
-        desktopService = Retrofit.Builder()
+    }
+    private val desktopService: TidalDesktopApiService by lazy {
+        Retrofit.Builder()
             .baseUrl("https://listen.tidal.com/")
             .client(client)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(TidalDesktopApiService::class.java)
     }
+    private val favoriteTrackCache = FavoriteTrackCache()
+    private val favoriteAlbumCache = FavoriteTrackCache()
 
     private fun authenticatedClient(): OkHttpClient = com.tidal.wear.core.auth.TidalOkHttp.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)

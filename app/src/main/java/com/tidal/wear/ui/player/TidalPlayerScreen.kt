@@ -294,7 +294,7 @@ private fun TidalPlayerNonAmbient(
         }
         val validTrackId = trackId ?: return@LaunchedEffect
         likeLoading = true
-        runCatching { apiClient.isFavoriteTrack(validTrackId) }
+        runCatching { withContext(Dispatchers.IO) { apiClient.isFavoriteTrack(validTrackId) } }
             .onSuccess { liked = it; navigation.favoriteTrackId = validTrackId }
             .onFailure { likeError = "Like unavailable" }
         likeLoading = false
@@ -391,7 +391,7 @@ private fun TidalPlayerNonAmbient(
                         likeLoading = true
                         likeError = null
                         scope.launch {
-                            runCatching { apiClient.setFavoriteTrack(trackId, target) }
+                            runCatching { withContext(Dispatchers.IO) { apiClient.setFavoriteTrack(trackId, target) } }
                                 .onSuccess { persisted ->
                                     liked = persisted
                                     if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {

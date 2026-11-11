@@ -17,12 +17,20 @@ object PlaybackCommandTokenProvider {
     private const val PREFS = "tidal_playback_command_guard"
     private const val KEY_TOKEN = "command_token"
 
+    @Volatile
+    private var cachedToken: String? = null
+
     @Synchronized
     fun token(context: Context): String {
+        cachedToken?.let { return it }
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.getString(KEY_TOKEN, null)?.takeIf { it.isNotBlank() }?.let { return it }
+        prefs.getString(KEY_TOKEN, null)?.takeIf { it.isNotBlank() }?.let {
+            cachedToken = it
+            return it
+        }
         val generated = UUID.randomUUID().toString()
         prefs.edit().putString(KEY_TOKEN, generated).apply()
+        cachedToken = generated
         return generated
     }
 
