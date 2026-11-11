@@ -18,9 +18,17 @@ android {
         versionName = "0.6.0-beta.8"
 
         val tidalProperties = Properties().apply {
-            val file = rootProject.layout.projectDirectory.file(".dev-secrets\\tidal-app.properties").asFile
+            // Cross-platform path via java.io.File resolution (was a Windows
+            // backslash literal, which silently never resolves on Linux/macOS).
+            val file = rootProject.file(".dev-secrets/tidal-app.properties")
             if (file.isFile) {
                 file.inputStream().use(::load)
+            } else {
+                logger.warn(
+                    "WARNING [tidal-secrets]: secrets file not found at ${file.absolutePath}. " +
+                        "TIDAL_CLIENT_ID/TIDAL_CLIENT_SECRET/TIDAL_REDIRECT_URI will compile as EMPTY strings and sign-in will fail. " +
+                        "Create .dev-secrets/tidal-app.properties with tidal.clientid=..., tidal.clientsecret=..., tidal.redirecturi=...",
+                )
             }
         }
         buildConfigField("String", "TIDAL_CLIENT_ID", (tidalProperties.getProperty("tidal.clientid") ?: "").kotlinLiteral())

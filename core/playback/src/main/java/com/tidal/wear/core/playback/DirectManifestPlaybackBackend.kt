@@ -66,7 +66,7 @@ internal class DirectManifestPlaybackBackend(
     private val authRepository: TidalAuthRepository,
 ) : PlaybackBackend {
     private val appContext = context.applicationContext
-    private val httpClient = OkHttpClient.Builder()
+    private val httpClient = com.tidal.wear.core.auth.TidalOkHttp.newBuilder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)

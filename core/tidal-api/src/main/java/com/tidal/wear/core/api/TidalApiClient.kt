@@ -462,7 +462,7 @@ class TidalApiClient(
             .create(TidalDesktopApiService::class.java)
     }
 
-    private fun authenticatedClient(): OkHttpClient = OkHttpClient.Builder()
+    private fun authenticatedClient(): OkHttpClient = com.tidal.wear.core.auth.TidalOkHttp.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
             .callTimeout(15, TimeUnit.SECONDS)

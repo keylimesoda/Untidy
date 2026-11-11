@@ -36,7 +36,7 @@ class OfflineTrackDownloader(
     private val authRepository: TidalAuthRepository,
 ) {
     private val appContext = context.applicationContext
-    private val client = OkHttpClient.Builder()
+    private val client = com.tidal.wear.core.auth.TidalOkHttp.newBuilder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(30, TimeUnit.SECONDS)
