@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +37,9 @@ import com.tidal.wear.core.playback.offline.removeOfflineTrackDownload
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloadRepairRequired
 import com.tidal.wear.core.playback.offline.repairOfflineTrackDownload
 import com.tidal.wear.ui.components.TidalResultChip
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
@@ -51,7 +54,16 @@ fun DownloadsScreen(
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 1)
     val scheduler = remember(context) { OfflineDownloadScheduler(context.applicationContext) }
     val activeTracks by remember(scheduler) { scheduler.observeActiveTracks() }.collectAsState(initial = emptyList())
-    var tracks by remember(activeTracks) { mutableStateOf(context.readOfflineDownloadedTracks()) }
+    // WorkManager emits progress repeatedly while a download runs. Only re-scan the downloaded
+    // track prefs when the queued set changes (start, completion, cancellation).
+    val activeDownloadKey = remember(activeTracks) { activeTracks.map { it.id }.toSet() }
+    var tracks by remember(activeDownloadKey) { mutableStateOf(context.readOfflineDownloadedTracks()) }
+    var repairFlags by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+    LaunchedEffect(tracks, activeDownloadKey) {
+        repairFlags = withContext(Dispatchers.IO) {
+            tracks.associate { row -> row.id to context.isOfflineTrackDownloadRepairRequired(row.id) }
+        }
+    }
 
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(
@@ -82,7 +94,7 @@ fun DownloadsScreen(
                 item { EmptyDownloadsChip() }
             } else {
                 tracks.forEach { row ->
-                    val needsRepair = context.isOfflineTrackDownloadRepairRequired(row.id)
+                    val needsRepair = repairFlags[row.id] == true
                     item {
                         TidalResultChip(
                             label = row.title,
