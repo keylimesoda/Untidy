@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +36,7 @@ import com.tidal.wear.core.playback.offline.removeOfflineTrackDownload
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloadRepairRequired
 import com.tidal.wear.core.playback.offline.repairOfflineTrackDownload
 import com.tidal.wear.ui.components.TidalResultChip
+import kotlinx.coroutines.launch
 import com.tidal.wear.ui.components.WearListPadding
 import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
@@ -45,6 +47,7 @@ fun DownloadsScreen(
     onPlayTrack: (TidalTrack) -> Unit,
 ) {
     var confirmRemove by remember { mutableStateOf<DownloadedTrackSummary?>(null) }
+    val scope = rememberCoroutineScope()
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 1)
     val scheduler = remember(context) { OfflineDownloadScheduler(context.applicationContext) }
     val activeTracks by remember(scheduler) { scheduler.observeActiveTracks() }.collectAsState(initial = emptyList())
@@ -93,8 +96,10 @@ fun DownloadsScreen(
                         item {
                             Chip(
                                 onClick = {
-                                    context.repairOfflineTrackDownload(row.toTrack())
-                                    Toast.makeText(context, "Repair queued", Toast.LENGTH_SHORT).show()
+                                    scope.launch {
+                                        context.repairOfflineTrackDownload(row.toTrack())
+                                        Toast.makeText(context, "Repair queued", Toast.LENGTH_SHORT).show()
+                                    }
                                 },
                                 label = { Text("Repair download") },
                                 secondaryLabel = { Text("Keeps existing cached audio") },

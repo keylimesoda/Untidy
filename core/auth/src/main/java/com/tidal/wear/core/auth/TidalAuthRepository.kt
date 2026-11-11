@@ -106,7 +106,10 @@ class TidalDeviceAuth(
     private val clientId: String,
     private val clientSecret: String,
     private val scopes: String,
-    private val httpClient: OkHttpClient = OkHttpClient.Builder()
+    // Derive from the shared pool (BATT-H1): a private OkHttpClient here kept
+    // OkHttp's desktop defaults (5 idle sockets, 5 min keep-alive) warm during
+    // every ~5s device-auth poll, defeating TidalOkHttp's radio-sleep design.
+    private val httpClient: OkHttpClient = TidalOkHttp.newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build(),

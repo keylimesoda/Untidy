@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,7 @@ import com.tidal.wear.ui.components.rotaryScrollableWithFocus
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -68,6 +70,7 @@ fun PlaylistScreen(
     var loading by remember(playlistId) { mutableStateOf(true) }
     var error by remember(playlistId) { mutableStateOf<String?>(null) }
     var retryTick by remember(playlistId) { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(playlistId, retryTick) {
         loading = true
@@ -163,12 +166,15 @@ fun PlaylistScreen(
                         secondary = offlinePresentation.detail,
                         accent = accent,
                         onClick = {
-                            val result = offlineDownloader.enqueueTracks(tracks)
-                            Toast.makeText(
-                                context,
-                                if (result.scheduled > 0) "Playlist download queued" else "Already saved on watch",
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            // BATT-H4: enqueue suspends off the UI thread for its DataStore read.
+                            scope.launch {
+                                val result = offlineDownloader.enqueueTracks(tracks)
+                                Toast.makeText(
+                                    context,
+                                    if (result.scheduled > 0) "Playlist download queued" else "Already saved on watch",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
                         },
                     )
                 }

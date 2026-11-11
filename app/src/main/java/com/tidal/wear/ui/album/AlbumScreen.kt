@@ -215,12 +215,15 @@ fun AlbumScreen(
                         secondary = offlinePresentation.detail,
                         accent = accent,
                         onClick = {
-                            val result = offlineDownloader.enqueueTracks(tracks)
-                            Toast.makeText(
-                                context,
-                                if (result.scheduled > 0) "Album download queued" else "Already saved on watch",
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            // BATT-H4: enqueue suspends off the UI thread for its DataStore read.
+                            scope.launch {
+                                val result = offlineDownloader.enqueueTracks(tracks)
+                                Toast.makeText(
+                                    context,
+                                    if (result.scheduled > 0) "Album download queued" else "Already saved on watch",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
                         },
                     )
                 }

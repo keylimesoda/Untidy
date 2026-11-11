@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /** A single persistent Wear download lane backed by a deterministic FIFO track queue. */
@@ -31,7 +31,10 @@ class OfflineDownloadScheduler(context: Context) {
     private val appContext = context.applicationContext
     private val workManager = WorkManager.getInstance(appContext)
 
-    fun enqueue(tracks: List<TidalTrack>): OfflineBatchScheduleResult {
+    suspend fun enqueue(tracks: List<TidalTrack>): OfflineBatchScheduleResult = withContext(Dispatchers.IO) {
+        // BATT-H4: the LTE-pref read used to be a runBlocking of the DataStore
+        // cold disk-read on the click-handler's thread (freezing the tap that
+        // matters most); as a suspend fun it now suspends off the UI thread.
         tracks.filter { it.id.isNotBlank() }.forEach(appContext::saveOfflineTrackMetadata)
         val records = tracks.toOfflineDownloadRecords()
         val scheduled = appContext.enqueueOfflineDownloadRecords(records)
@@ -40,10 +43,10 @@ class OfflineDownloadScheduler(context: Context) {
                 OfflineDownloadWorkPolicy.QUEUE_WORK_NAME,
                 // A trailing worker closes the enqueue-vs-finish race without interrupting I/O.
                 ExistingWorkPolicy.APPEND_OR_REPLACE,
-                queueRequest(downloadOverLteEnabled = currentDownloadOverLteEnabled()),
+                queueRequest(downloadOverLteEnabled = appContext.downloadOverLteEnabled.first()),
             )
         }
-        return OfflineBatchScheduleResult(requested = records.size, scheduled = scheduled.size)
+        OfflineBatchScheduleResult(requested = records.size, scheduled = scheduled.size)
     }
 
     /**
@@ -111,10 +114,6 @@ class OfflineDownloadScheduler(context: Context) {
         .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
         .addTag(OfflineDownloadWorkPolicy.ALL_DOWNLOADS_TAG)
         .build()
-
-    private fun currentDownloadOverLteEnabled(): Boolean = runBlocking(Dispatchers.IO) {
-        appContext.downloadOverLteEnabled.first()
-    }
 }
 
 data class OfflineBatchScheduleResult(val requested: Int, val scheduled: Int)

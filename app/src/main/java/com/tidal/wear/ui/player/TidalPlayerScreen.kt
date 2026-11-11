@@ -554,9 +554,11 @@ private fun TidalPlayerNonAmbient(
                     retryLabel = if (PlayerRecoveryPolicy.needsDownloadRepair(state.error)) "Repair" else "Retry",
                     onRetry = {
                         if (PlayerRecoveryPolicy.needsDownloadRepair(state.error) && loadedTrack != null) {
-                            context.repairOfflineTrackDownload(loadedTrack)
-                            Toast.makeText(context, "Repair queued. Check Downloads for progress.", Toast.LENGTH_LONG).show()
-                            onOpenHome()
+                            scope.launch {
+                                context.repairOfflineTrackDownload(loadedTrack)
+                                Toast.makeText(context, "Repair queued. Check Downloads for progress.", Toast.LENGTH_LONG).show()
+                                onOpenHome()
+                            }
                         } else viewModel.retryPlayback()
                     },
                     onHome = onOpenHome,

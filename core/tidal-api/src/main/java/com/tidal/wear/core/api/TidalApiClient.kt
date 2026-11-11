@@ -15,6 +15,8 @@ import com.tidal.wear.core.model.TidalSearchResult
 import com.tidal.wear.core.model.TidalSection
 import com.tidal.wear.core.model.TidalTrack
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
@@ -468,8 +470,16 @@ class TidalApiClient(
             .callTimeout(15, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val originalRequest = chain.request()
-                val token = runBlocking { authRepository.getAccessToken() }
-                val clientId = runBlocking { authRepository.getClientIdForApi() }
+                // BATT-H2: one coroutine, not two runBlocking hops per request —
+                // each hop parked an OkHttp dispatcher thread and, on token
+                // refresh, held it across the network call too.
+                val (token, clientId) = runBlocking {
+                    coroutineScope {
+                        val tokenJob = async { authRepository.getAccessToken() }
+                        val clientIdJob = async { authRepository.getClientIdForApi() }
+                        tokenJob.await() to clientIdJob.await()
+                    }
+                }
                 val request = originalRequest.newBuilder()
                     .header("accept", originalRequest.header("accept") ?: defaultApiAccept(originalRequest.url.host))
                     .header("X-Tidal-Token", clientId)
@@ -667,7 +677,8 @@ class TidalApiClient(
         val tracks = mutableListOf<TidalTrack>()
         val seenCursors = mutableSetOf<String>()
         var cursor: String? = null
-        while (true) {
+        var pageCount = 0
+        while (pageCount++ < V2_ALBUM_TRACKS_MAX_PAGES) { // BATT-L3: cap runaway cursors
             val root = service.albumItems(
                 id = id,
                 countryCode = countryCode,
@@ -784,7 +795,8 @@ class TidalApiClient(
         val ids = mutableSetOf<String>()
         val seenCursors = mutableSetOf<String>()
         var cursor: String? = null
-        while (true) {
+        var pageCount = 0
+        while (pageCount++ < V2_CURSOR_MAX_PAGES) { // BATT-L3: cap runaway cursors
             val root = service.userCollectionAlbumItems(
                 id = "me",
                 countryCode = countryCode,
@@ -806,7 +818,8 @@ class TidalApiClient(
         val ids = mutableSetOf<String>()
         val seenCursors = mutableSetOf<String>()
         var cursor: String? = null
-        while (true) {
+        var pageCount = 0
+        while (pageCount++ < V2_CURSOR_MAX_PAGES) { // BATT-L3: cap runaway cursors
             val root = service.userCollectionTrackItems(
                 id = "me",
                 countryCode = countryCode,
@@ -840,7 +853,8 @@ class TidalApiClient(
         ids.chunked(FAVORITE_TRACK_BATCH_SIZE).forEach { chunk ->
             var cursor: String? = null
             val seenCursors = mutableSetOf<String>()
-            while (true) {
+            var pageCount = 0
+            while (pageCount++ < V2_CURSOR_MAX_PAGES) { // BATT-L3: cap runaway cursors
                 val root = service.tracksByIds(
                     ids = chunk.joinToString(","),
                     countryCode = countryCode,
@@ -1935,4 +1949,9 @@ private const val LEGACY_ALBUM_TRACK_MAX_TRACKS = 100
 private const val ARTIST_ALBUM_PREVIEW_LIMIT = 12
 private const val ARTIST_ALBUM_PAGE_SIZE = 25
 private const val ARTIST_ALBUM_MAX_PAGES = 8
-private const val FAVORITE_TRACK_CACHE_TTL_MILLIS = 30_000L
+// BATT-H3: 30 s re-fetched the full relationship pagination on every track
+// change while browsing; likes/unlikes made elsewhere are picked up on the
+// next expiry or explicit write (favoriteTrackCache.update).
+private const val FAVORITE_TRACK_CACHE_TTL_MILLIS = 5 * 60_000L
+private const val V2_CURSOR_MAX_PAGES = 25
+private const val V2_ALBUM_TRACKS_MAX_PAGES = 60

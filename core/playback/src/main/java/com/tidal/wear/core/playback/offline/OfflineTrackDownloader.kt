@@ -126,7 +126,7 @@ class OfflineTrackDownloader(
      * Schedules collection downloads in WorkManager. This survives navigation and process death;
      * direct [downloadTrack] remains for the existing single-track action sheet flow.
      */
-    fun enqueueTracks(tracks: List<TidalTrack>): OfflineBatchScheduleResult =
+    suspend fun enqueueTracks(tracks: List<TidalTrack>): OfflineBatchScheduleResult =
         OfflineDownloadScheduler(appContext).enqueue(tracks)
 
     fun observeCollectionSummary(tracks: List<TidalTrack>) =

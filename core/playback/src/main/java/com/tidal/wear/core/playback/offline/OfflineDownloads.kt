@@ -230,7 +230,7 @@ fun Context.removeOfflineTrackDownload(trackId: String): Boolean {
  * Schedules a replacement for a legacy/incomplete local copy without removing its cache first.
  * The old descriptor and bytes remain available for diagnostics until a new download completes.
  */
-fun Context.repairOfflineTrackDownload(track: TidalTrack): OfflineBatchScheduleResult {
+suspend fun Context.repairOfflineTrackDownload(track: TidalTrack): OfflineBatchScheduleResult {
     if (track.id.isBlank() || !isOfflineTrackDownloadRepairRequired(track.id)) {
         return OfflineBatchScheduleResult(requested = 0, scheduled = 0)
     }
