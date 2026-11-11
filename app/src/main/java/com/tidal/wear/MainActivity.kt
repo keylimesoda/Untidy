@@ -82,6 +82,7 @@ import com.tidal.wear.core.playback.PlaybackCommandTokenProvider
 import com.tidal.wear.core.playback.PlaybackQueueStore
 import com.tidal.wear.core.playback.TidalMediaService
 import com.tidal.wear.core.playback.offline.DownloadedTrackSummary
+import com.tidal.wear.core.playback.offline.OfflineDownloadScheduler
 import com.tidal.wear.core.playback.offline.OfflineTrackDownloader
 import com.tidal.wear.core.playback.offline.isOfflineTrackDownloaded
 import com.tidal.wear.core.playback.offline.readOfflineDownloadedTracks
@@ -238,7 +239,13 @@ private fun TidalWearApp(
             // track, so keep it out of the composition body and load it on IO when Home is shown.
             var downloadedTracks by remember { mutableStateOf(emptyList<DownloadedTrackSummary>()) }
             var currentRoute by remember { mutableStateOf<String?>(null) }
-            LaunchedEffect(currentRoute) {
+            // Re-read when a download starts/finishes so the shelf updates in place
+            // without the raw queue-emission storm the old composition read caused.
+            val homeDownloadScheduler = remember(appContext) { OfflineDownloadScheduler(appContext) }
+            val homeActiveDownloads by homeDownloadScheduler.observeActiveTracks()
+                .collectAsState(initial = emptyList())
+            val homeDownloadTick = homeActiveDownloads.size
+            LaunchedEffect(currentRoute, homeDownloadTick) {
                 if (currentRoute == Routes.Home) {
                     downloadedTracks = withContext(Dispatchers.IO) {
                         appContext.readOfflineDownloadedTracks()
