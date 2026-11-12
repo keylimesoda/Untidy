@@ -1428,7 +1428,7 @@
     "id": "UNTIDY-046",
     "title": "Fix core:playback unit-test failure: UnsupportedClassVersionError on TIDAL SDK AudioQuality",
     "type": "bug",
-    "status": "in-progress",
+    "status": "done",
     "priority": "P1",
     "area": "playback",
     "owner": "Ric",
