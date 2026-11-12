@@ -1,0 +1,70 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MagicNumber:AudioTierResolver.kt$AudioTierResolver$128</ID>
+    <ID>MagicNumber:AudioTierResolver.kt$AudioTierResolver$1411</ID>
+    <ID>MagicNumber:AudioTierResolver.kt$AudioTierResolver$160</ID>
+    <ID>MagicNumber:AudioTierResolver.kt$AudioTierResolver$192</ID>
+    <ID>MagicNumber:AudioTierResolver.kt$AudioTierResolver$256</ID>
+    <ID>MagicNumber:AudioTierResolver.kt$AudioTierResolver$96</ID>
+    <ID>MagicNumber:DeliveredAudioFormat.kt$16</ID>
+    <ID>MagicNumber:DeliveredAudioFormat.kt$24</ID>
+    <ID>MagicNumber:DeliveredAudioFormat.kt$32</ID>
+    <ID>MagicNumber:DeliveredAudioFormat.kt$8</ID>
+    <ID>MagicNumber:DirectManifestPlaybackBackend.kt$1000f</ID>
+    <ID>MagicNumber:DirectManifestPlaybackBackend.kt$12</ID>
+    <ID>MagicNumber:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$10</ID>
+    <ID>MagicNumber:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$1000f</ID>
+    <ID>MagicNumber:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$15</ID>
+    <ID>MagicNumber:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$20</ID>
+    <ID>MagicNumber:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$240</ID>
+    <ID>MagicNumber:OfflineDownloadScheduler.kt$OfflineDownloadScheduler$30</ID>
+    <ID>MagicNumber:OfflineTrackDownloader.kt$12</ID>
+    <ID>MagicNumber:OfflineTrackDownloader.kt$OfflineTrackDownloader$10</ID>
+    <ID>MagicNumber:OfflineTrackDownloader.kt$OfflineTrackDownloader$15</ID>
+    <ID>MagicNumber:OfflineTrackDownloader.kt$OfflineTrackDownloader$30</ID>
+    <ID>MagicNumber:OfflineTrackDownloader.kt$OfflineTrackDownloader$403</ID>
+    <ID>MagicNumber:OfflineTrackDownloader.kt$OfflineTrackDownloader$404</ID>
+    <ID>MagicNumber:OfflineTrackDownloader.kt$OfflineTrackDownloader$406</ID>
+    <ID>MagicNumber:PlaybackBackend.kt$120</ID>
+    <ID>MagicNumber:PlaybackBackend.kt$TidalSdkPlaybackBackend$1000f</ID>
+    <ID>MagicNumber:PlaybackQueueResolutionPolicy.kt$LogicalQueueCommandPolicy$1_500L</ID>
+    <ID>MagicNumber:PlaybackQueueResolutionPolicy.kt$LogicalQueueCommandPolicy$500L</ID>
+    <ID>MagicNumber:TidalMediaService.kt$TidalMediaService$1000f</ID>
+    <ID>MaximumLineLength:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$ </ID>
+    <ID>MaximumLineLength:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend.&lt;no name provided&gt;$ </ID>
+    <ID>MaximumLineLength:DirectManifestPlaybackBackend.kt$private</ID>
+    <ID>MaximumLineLength:OfflineDownloadScheduler.kt$OfflineDownloadQueueWorker$ </ID>
+    <ID>MaximumLineLength:OfflineDownloadWorkPolicyTest.kt$OfflineDownloadWorkPolicyTest$ </ID>
+    <ID>MaximumLineLength:OfflineDownloads.kt$ </ID>
+    <ID>MaximumLineLength:OfflineTrackDownloader.kt$OfflineTrackDownloader$ </ID>
+    <ID>MaximumLineLength:OfflineUnitPresentation.kt$ </ID>
+    <ID>MaximumLineLength:OffloadStallSentinelTest.kt$OffloadStallSentinelTest$ </ID>
+    <ID>MaximumLineLength:PlaybackBackend.kt$TidalSdkPlaybackBackend$ </ID>
+    <ID>MaximumLineLength:PlaybackServiceForegroundPolicyTest.kt$PlaybackServiceForegroundPolicyTest$ </ID>
+    <ID>MaximumLineLength:TidalMediaService.kt$TidalMediaService$ </ID>
+    <ID>MaximumLineLength:TidalMediaService.kt$TidalMediaService.&lt;no name provided&gt;$ </ID>
+    <ID>ReturnCount:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$private fun appendLookAheadAfter(playerIndex: Int, generation: Long = queueGeneration)</ID>
+    <ID>ReturnCount:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$private fun downloadedTrackCache(trackId: String): SimpleCache?</ID>
+    <ID>ReturnCount:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$private fun fetchPlaybackManifest(trackId: String): ResolvedManifest</ID>
+    <ID>ReturnCount:OfflineDownloadScheduler.kt$OfflineDownloadQueueWorker$override suspend fun doWork(): Result</ID>
+    <ID>ReturnCount:OfflineDownloadScheduler.kt$internal fun Context.hasAllowedOfflineDownloadNetwork(downloadOverLteEnabled: Boolean): Boolean</ID>
+    <ID>ReturnCount:OfflineDownloads.kt$internal fun Context.offlinePlaybackDescriptor(trackId: String): OfflinePlaybackDescriptor?</ID>
+    <ID>ReturnCount:OfflineDownloads.kt$private fun File.directorySizeBytes(): Long</ID>
+    <ID>ReturnCount:OffloadStallSentinel.kt$OffloadStallSentinel$fun observe(sample: Sample): Stall</ID>
+    <ID>ReturnCount:PlaybackCommandTokenProvider.kt$PlaybackCommandTokenProvider$@Synchronized fun token(context: Context): String</ID>
+    <ID>ReturnCount:PlaybackQueueStore.kt$PlaybackQueueStore$fun startIndexFor(tracks: List&lt;TidalTrack&gt;, requestedStartIndex: Int): Int</ID>
+    <ID>ReturnCount:TidalMediaService.kt$TidalMediaService$override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int</ID>
+    <ID>ReturnCount:TidalMediaService.kt$TidalMediaService$private fun isNetworkAvailable(): Boolean</ID>
+    <ID>ReturnCount:TidalMediaService.kt$TidalMediaService$private fun playQueue(queueId: String, queuePayload: String, startIndex: Int): Boolean</ID>
+    <ID>ReturnCount:TidalMediaService.kt$TidalMediaService$private fun recoverAfterMediaEnd(context: PlaybackDiagnosticContext)</ID>
+    <ID>ReturnCount:TidalMediaService.kt$private fun Intent.toTrackOrNull(): TidalTrack?</ID>
+    <ID>ThrowsCount:DirectManifestPlaybackBackend.kt$private fun String.toDesktopPlaybackManifest(trackId: String): ResolvedManifest</ID>
+    <ID>ThrowsCount:OfflineTrackDownloader.kt$OfflineTrackDownloader$private fun fetchDownloadManifestFormat(trackId: String, token: String, clientId: String, formats: List&lt;String&gt;): DownloadManifest</ID>
+    <ID>UnusedParameter:DirectManifestPlaybackBackend.kt$DirectManifestPlaybackBackend$clientId: String</ID>
+    <ID>UnusedPrivateMember:DirectManifestPlaybackBackend.kt$private fun Player.getMediaItemAtOrNull(index: Int): MediaItem?</ID>
+    <ID>UnusedPrivateMember:TidalMediaService.kt$TidalMediaService$private fun hasNextInQueue(): Boolean</ID>
+    <ID>WildcardImport:PlaybackRequestStatusTest.kt$import org.junit.Assert.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

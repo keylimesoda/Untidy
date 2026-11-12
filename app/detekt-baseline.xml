@@ -1,0 +1,151 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LoopWithTooManyJumpStatements:RecentRepository.kt$for</ID>
+    <ID>MagicNumber:ActionsSheet.kt$0.86f</ID>
+    <ID>MagicNumber:ActionsSheet.kt$0.94f</ID>
+    <ID>MagicNumber:ActionsSheet.kt$0xFFFF8A80</ID>
+    <ID>MagicNumber:ActionsSheet.kt$100</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$0.86f</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$0.94f</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$0xFFFF8A80</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$1_200</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$401</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$403</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$404</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$409</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$429</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$500</ID>
+    <ID>MagicNumber:AddToPlaylistSheet.kt$599</ID>
+    <ID>MagicNumber:AlbumArtLoader.kt$160</ID>
+    <ID>MagicNumber:AlbumArtLoader.kt$256</ID>
+    <ID>MagicNumber:AlbumArtLoader.kt$96</ID>
+    <ID>MagicNumber:AlbumArtLoader.kt$&lt;no name provided&gt;$1024</ID>
+    <ID>MagicNumber:AlbumArtLoader.kt$&lt;no name provided&gt;$4</ID>
+    <ID>MagicNumber:AlbumPalette.kt$AlbumPalette$0.42f</ID>
+    <ID>MagicNumber:AlbumPalette.kt$AlbumPalette$0.72f</ID>
+    <ID>MagicNumber:AlbumPalette.kt$AlbumPalette$3</ID>
+    <ID>MagicNumber:AlbumScreen.kt$0.28f</ID>
+    <ID>MagicNumber:AlbumScreen.kt$0.45f</ID>
+    <ID>MagicNumber:AlbumScreen.kt$150</ID>
+    <ID>MagicNumber:AlbumScreen.kt$160</ID>
+    <ID>MagicNumber:AlbumScreen.kt$200</ID>
+    <ID>MagicNumber:ArtistScreen.kt$0.45f</ID>
+    <ID>MagicNumber:ArtistScreen.kt$160</ID>
+    <ID>MagicNumber:DiscoverScreen.kt$12</ID>
+    <ID>MagicNumber:DiscoverScreen.kt$5</ID>
+    <ID>MagicNumber:DiscoverScreen.kt$6</ID>
+    <ID>MagicNumber:DiscoverScreen.kt$8</ID>
+    <ID>MagicNumber:LibraryScreen.kt$1200</ID>
+    <ID>MagicNumber:LinearTrackProgress.kt$1_000L</ID>
+    <ID>MagicNumber:LinearTrackProgress.kt$60</ID>
+    <ID>MagicNumber:MainActivity.kt$0x80FFFFFF</ID>
+    <ID>MagicNumber:MainActivity.kt$0xFF1A1A1A</ID>
+    <ID>MagicNumber:NowPlayingStateHolder.kt$NowPlayingStateHolder$500</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$10</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$12</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$160</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$180</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$20</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$240</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$30</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$5</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService$8</ID>
+    <ID>MagicNumber:OfflineProofService.kt$OfflineProofService.&lt;no name provided&gt;$180</ID>
+    <ID>MagicNumber:OnboardingScreen.kt$50</ID>
+    <ID>MagicNumber:OnboardingScreen.kt$650</ID>
+    <ID>MagicNumber:PlayerActivity.kt$PlayerActivity.&lt;no name provided&gt;$4</ID>
+    <ID>MagicNumber:PlaylistArtwork.kt$0.24f</ID>
+    <ID>MagicNumber:PlaylistArtwork.kt$0.45f</ID>
+    <ID>MagicNumber:PlaylistArtwork.kt$160</ID>
+    <ID>MagicNumber:PlaylistArtwork.kt$3</ID>
+    <ID>MagicNumber:PlaylistArtwork.kt$4</ID>
+    <ID>MagicNumber:PlaylistScreen.kt$0.28f</ID>
+    <ID>MagicNumber:PlaylistScreen.kt$160</ID>
+    <ID>MagicNumber:QualityGemPresentation.kt$16</ID>
+    <ID>MagicNumber:QualityGemPresentation.kt$1_000</ID>
+    <ID>MagicNumber:QualityGemPresentation.kt$1_000.0</ID>
+    <ID>MagicNumber:QualityGemPresentation.kt$48_000</ID>
+    <ID>MagicNumber:QueueSheet.kt$0.82f</ID>
+    <ID>MagicNumber:QueueSheet.kt$0.88f</ID>
+    <ID>MagicNumber:QueueSheet.kt$0.94f</ID>
+    <ID>MagicNumber:QueueSheet.kt$0x4DFFFFFF</ID>
+    <ID>MagicNumber:SearchResultRanking.kt$3</ID>
+    <ID>MagicNumber:SearchScreen.kt$0.28f</ID>
+    <ID>MagicNumber:SearchScreen.kt$1200</ID>
+    <ID>MagicNumber:SearchScreen.kt$4</ID>
+    <ID>MagicNumber:SearchScreen.kt$6</ID>
+    <ID>MagicNumber:SearchScreen.kt$96</ID>
+    <ID>MagicNumber:SettingsScreen.kt$1_000.0</ID>
+    <ID>MagicNumber:SettingsScreen.kt$1_000L</ID>
+    <ID>MagicNumber:SettingsScreen.kt$1_000_000.0</ID>
+    <ID>MagicNumber:SettingsScreen.kt$1_000_000L</ID>
+    <ID>MagicNumber:SettingsScreen.kt$1_000_000_000.0</ID>
+    <ID>MagicNumber:SettingsScreen.kt$1_000_000_000L</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0x1AFFFFFF</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0xB3FFFFFF</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0xCCFFFFFF</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0xFF000000</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0xFF00FFFF</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0xFF1A1A1A</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0xFF2A2A2A</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0xFFFFAA00</ID>
+    <ID>MagicNumber:TidalColors.kt$TidalColors$0xFFFFFFFF</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$0.05f</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$0.22f</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$0.86f</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$0xFFFF8A80</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$1.25f</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$150</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$192f</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$1_200</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$1_500</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$200</ID>
+    <ID>MagicNumber:TidalPlayerScreen.kt$300</ID>
+    <ID>MagicNumber:TidalResultChip.kt$0.28f</ID>
+    <ID>MagicNumber:TidalResultChip.kt$0.62f</ID>
+    <ID>MagicNumber:TidalResultChip.kt$96</ID>
+    <ID>MagicNumber:TrackContextScreen.kt$128</ID>
+    <ID>MagicNumber:VolumeOverlay.kt$0.66f</ID>
+    <ID>MagicNumber:VolumeOverlay.kt$150</ID>
+    <ID>MagicNumber:VolumeOverlay.kt$300</ID>
+    <ID>MagicNumber:VolumeOverlay.kt$50</ID>
+    <ID>MaximumLineLength:ActionsSheet.kt$ </ID>
+    <ID>MaximumLineLength:AddToPlaylistSheet.kt$ </ID>
+    <ID>MaximumLineLength:AlbumScreen.kt$ </ID>
+    <ID>MaximumLineLength:ArtistScreen.kt$ </ID>
+    <ID>MaximumLineLength:DiscoverScreen.kt$ </ID>
+    <ID>MaximumLineLength:DownloadsScreen.kt$ </ID>
+    <ID>MaximumLineLength:HomeReadyItemsTest.kt$HomeReadyItemsTest$ </ID>
+    <ID>MaximumLineLength:LibraryScreen.kt$ </ID>
+    <ID>MaximumLineLength:MainActivity.kt$ </ID>
+    <ID>MaximumLineLength:NowPlayingStateHolder.kt$NowPlayingStateHolder$ </ID>
+    <ID>MaximumLineLength:OfflineProofActivity.kt$OfflineProofActivity$ </ID>
+    <ID>MaximumLineLength:OfflineProofService.kt$OfflineProofService$ </ID>
+    <ID>MaximumLineLength:OfflineProofService.kt$OfflineProofService.&lt;no name provided&gt;$ </ID>
+    <ID>MaximumLineLength:OnboardingScreen.kt$ </ID>
+    <ID>MaximumLineLength:PlayerActivity.kt$PlayerActivity$ </ID>
+    <ID>MaximumLineLength:PlaylistScreen.kt$ </ID>
+    <ID>MaximumLineLength:QualityGemPresentation.kt$ </ID>
+    <ID>MaximumLineLength:QueueSheet.kt$ </ID>
+    <ID>MaximumLineLength:RecentScreen.kt$ </ID>
+    <ID>MaximumLineLength:SearchResultRanking.kt$ </ID>
+    <ID>MaximumLineLength:SearchScreen.kt$ </ID>
+    <ID>MaximumLineLength:SettingsScreen.kt$ </ID>
+    <ID>MaximumLineLength:TidalPlayerScreen.kt$ </ID>
+    <ID>MaximumLineLength:TrackContextScreen.kt$ </ID>
+    <ID>ReturnCount:NetworkStatus.kt$fun Context.isNetworkAvailable(): Boolean</ID>
+    <ID>ReturnCount:OfflineProofService.kt$OfflineProofService$private fun decodeDataDashManifest(manifest: String): String</ID>
+    <ID>ReturnCount:OfflineProofService.kt$OfflineProofService$private fun downloadManifestNetworkDisabledReplayProbe( trackId: String, countryCode: String, token: String, clientId: String, ): JsonObject</ID>
+    <ID>ReturnCount:QualityGemPresentation.kt$internal fun DeliveredAudioFormat?.toQualityGemPresentation(): QualityGemPresentation?</ID>
+    <ID>ReturnCount:SearchResultRanking.kt$fun topSearchResults( result: TidalSearchResult, query: String, limit: Int = 6, ): List&lt;SearchResultItem&gt;</ID>
+    <ID>UnusedParameter:ArtistScreen.kt$onOpenArtist: (TidalArtist) -&gt; Unit</ID>
+    <ID>UnusedParameter:ArtistScreen.kt$onOpenPlaylist: (TidalPlaylist) -&gt; Unit</ID>
+    <ID>UnusedParameter:OfflineProofService.kt$OfflineProofService$countryCode: String</ID>
+    <ID>UnusedParameter:PlayerRecoveryPolicy.kt$PlayerRecoveryPolicy$trackId: String</ID>
+    <ID>UnusedParameter:TidalPlayerScreen.kt$accent: Color</ID>
+    <ID>UnusedPrivateMember:AddToPlaylistSheet.kt$@Composable private fun DisabledPlaylistRow( icon: ImageVector, title: String, subtitle: String, )</ID>
+    <ID>UnusedPrivateMember:OfflineProofService.kt$OfflineProofService$private fun postJsonProbe( name: String, url: String, token: String, clientId: String, body: JsonObject, summarize: (JsonObject?) -&gt; JsonObject, ): JsonObject</ID>
+  </CurrentIssues>
+</SmellBaseline>

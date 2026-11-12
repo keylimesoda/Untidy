@@ -1,0 +1,31 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MagicNumber:AuthSessionExpiry.kt$400</ID>
+    <ID>MagicNumber:AuthSessionExpiry.kt$401</ID>
+    <ID>MagicNumber:AuthSessionExpiry.kt$403</ID>
+    <ID>MagicNumber:DeviceAuthPolling.kt$5L</ID>
+    <ID>MagicNumber:DeviceAuthPolling.kt$60L</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$DefaultTidalAuthRepository$1000L</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$DefaultTidalAuthRepository$30L</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$DefaultTidalAuthRepository$5</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$DefaultTidalAuthRepository$5L</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$DeviceAuthSession$1000L</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$StoredCredentialsProvider$1000L</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$TidalDeviceAuth$1000L</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$TidalDeviceAuth$15</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$TidalDeviceAuth$20</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$TidalDeviceAuth$500</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$TidalDeviceAuth$599</ID>
+    <ID>MagicNumber:TidalAuthRepository.kt$TidalDeviceAuth$5L</ID>
+    <ID>MaximumLineLength:TidalAuthRepository.kt$ </ID>
+    <ID>MaximumLineLength:TidalAuthRepository.kt$DefaultTidalAuthRepository$ </ID>
+    <ID>MaximumLineLength:TidalAuthRepository.kt$StoredCredentialsProvider$ </ID>
+    <ID>MaximumLineLength:TidalAuthRepository.kt$TidalDeviceAuth$ </ID>
+    <ID>MaximumLineLength:TidalAuthRepository.kt$private</ID>
+    <ID>ReturnCount:TidalAuthRepository.kt$DefaultTidalAuthRepository$override suspend fun ensureClientCredentialsToken(): String?</ID>
+    <ID>ReturnCount:TidalAuthRepository.kt$DefaultTidalAuthRepository$override suspend fun getAccessToken(): String?</ID>
+    <ID>ReturnCount:TidalAuthRepository.kt$StoredCredentialsProvider$override suspend fun getCredentials(apiErrorSubStatus: String?): AuthResult&lt;Credentials&gt;</ID>
+  </CurrentIssues>
+</SmellBaseline>

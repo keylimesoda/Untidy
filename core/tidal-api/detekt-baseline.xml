@@ -1,0 +1,55 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LoopWithTooManyJumpStatements:TidalApiClient.kt$TidalApiClient$while</ID>
+    <ID>MagicNumber:TidalApiClient.kt$1000L</ID>
+    <ID>MagicNumber:TidalApiClient.kt$10_000</ID>
+    <ID>MagicNumber:TidalApiClient.kt$1280</ID>
+    <ID>MagicNumber:TidalApiClient.kt$16</ID>
+    <ID>MagicNumber:TidalApiClient.kt$160</ID>
+    <ID>MagicNumber:TidalApiClient.kt$24</ID>
+    <ID>MagicNumber:TidalApiClient.kt$320</ID>
+    <ID>MagicNumber:TidalApiClient.kt$404</ID>
+    <ID>MagicNumber:TidalApiClient.kt$409</ID>
+    <ID>MagicNumber:TidalApiClient.kt$640</ID>
+    <ID>MagicNumber:TidalApiClient.kt$640L</ID>
+    <ID>MagicNumber:TidalApiClient.kt$80</ID>
+    <ID>MagicNumber:TidalApiClient.kt$TidalApiClient$10</ID>
+    <ID>MagicNumber:TidalApiClient.kt$TidalApiClient$12</ID>
+    <ID>MagicNumber:TidalApiClient.kt$TidalApiClient$15</ID>
+    <ID>MagicNumber:TidalApiClient.kt$TidalApiClient$3</ID>
+    <ID>MagicNumber:TidalApiClient.kt$TidalApiClient$401</ID>
+    <ID>MagicNumber:TidalApiClient.kt$TidalApiClient$403</ID>
+    <ID>MagicNumber:TidalApiClient.kt$TidalApiClient$404</ID>
+    <ID>MaximumLineLength:AlbumPaginationTest.kt$AlbumPaginationTest$ </ID>
+    <ID>MaximumLineLength:TidalApiClient.kt$ </ID>
+    <ID>MaximumLineLength:TidalApiClient.kt$TidalApiClient$ </ID>
+    <ID>MaximumLineLength:TidalApiClient.kt$internal</ID>
+    <ID>MaximumLineLength:TidalApiClient.kt$private</ID>
+    <ID>ReturnCount:TidalApiClient.kt$TidalApiClient$suspend fun albumTracks(id: String): List&lt;TidalTrack&gt;</ID>
+    <ID>ReturnCount:TidalApiClient.kt$TidalApiClient$suspend fun discoverSections(): List&lt;TidalDiscoverSection&gt;</ID>
+    <ID>ReturnCount:TidalApiClient.kt$TidalApiClient$suspend fun search(query: String): TidalSearchResult</ID>
+    <ID>ReturnCount:TidalApiClient.kt$internal fun JsonElement.nextPageCursor(): String?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonElement.allRelationshipItemIds(): List&lt;String&gt;</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.bool(vararg names: String): Boolean?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.directImageUrl(size: Int = 320): String?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.imageUrl(size: Int = 320): String?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.toAlbum(): TidalAlbum?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.toArtist(): TidalArtist?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.toLegacyAlbum(defaultReleaseType: TidalAlbumReleaseType = TidalAlbumReleaseType.Unknown): TidalAlbum?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.toLegacyArtist(): TidalArtist?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.toLegacyPlaylist(): TidalPlaylist?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.toLegacyTrack(): TidalTrack?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.toPlaylist(): TidalPlaylist?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun JsonObject.toTrack(includedByKey: Map&lt;String, JsonObject&gt;): TidalTrack?</ID>
+    <ID>ReturnCount:TidalApiClient.kt$private fun albumReleaseType(vararg values: String?): TidalAlbumReleaseType</ID>
+    <ID>ThrowsCount:TidalApiClient.kt$TidalApiClient$private suspend fun legacyFavorites(reason: String): TidalSearchResult</ID>
+    <ID>ThrowsCount:TidalApiClient.kt$TidalApiClient$private suspend fun userMixSection( title: String, subtitle: String, load: suspend () -&gt; JsonElement, loadItems: suspend (String) -&gt; JsonElement, ): TidalDiscoverSection?</ID>
+    <ID>ThrowsCount:TidalApiClient.kt$TidalApiClient$suspend fun addTrackToPlaylist(playlistId: String, trackId: String): AddTrackToPlaylistOutcome</ID>
+    <ID>ThrowsCount:TidalApiClient.kt$TidalApiClient$suspend fun setFavoriteAlbum(albumId: String, favorite: Boolean): Boolean</ID>
+    <ID>ThrowsCount:TidalApiClient.kt$TidalApiClient$suspend fun setFavoriteTrack(trackId: String, favorite: Boolean): Boolean</ID>
+    <ID>UseCheckOrError:TidalApiClient.kt$TidalApiClient$throw IllegalStateException("Create playlist response missing playlist")</ID>
+    <ID>UseCheckOrError:TidalApiClient.kt$TidalApiClient$throw IllegalStateException("TIDAL account unavailable")</ID>
+  </CurrentIssues>
+</SmellBaseline>

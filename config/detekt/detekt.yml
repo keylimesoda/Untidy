@@ -1,0 +1,206 @@
+# Conservative detekt configuration for UNTIDY-043.
+#
+# Only the rulesets requested for this gate are enabled. Everything else is
+# disabled so the baseline stays small and the gate does not overlap with the
+# ktlint/Spotless formatting check. Rule thresholds/budgets are left at their
+# detekt defaults.
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+comments:
+  active: false
+
+complexity:
+  active: false
+
+empty-blocks:
+  active: false
+
+exceptions:
+  active: false
+
+naming:
+  active: false
+
+performance:
+  active: false
+
+coroutines:
+  active: true
+
+potential-bugs:
+  active: true
+
+style:
+  active: true
+  # The formatting ruleset's MaximumLineLength below is the single line-length
+  # check; keeping style>MaxLineLength disabled avoids duplicate findings.
+  MaxLineLength:
+    active: false
+
+# The formatting ruleset is normally handled by Spotless/ktlint. We enable only
+# MaximumLineLength here because it is the detekt rule that understands
+# `ignoreBackTickedIdentifier` (useful for long backticked test names).
+formatting:
+  active: true
+  AnnotationOnSeparateLine:
+    active: false
+  AnnotationSpacing:
+    active: false
+  ArgumentListWrapping:
+    active: false
+  BlockCommentInitialStarAlignment:
+    active: false
+  ChainWrapping:
+    active: false
+  ClassName:
+    active: false
+  CommentSpacing:
+    active: false
+  CommentWrapping:
+    active: false
+  ContextReceiverMapping:
+    active: false
+  DiscouragedCommentLocation:
+    active: false
+  EnumEntryNameCase:
+    active: false
+  EnumWrapping:
+    active: false
+  Filename:
+    active: false
+  FinalNewline:
+    active: false
+  FunKeywordSpacing:
+    active: false
+  FunctionName:
+    active: false
+  FunctionReturnTypeSpacing:
+    active: false
+  FunctionSignature:
+    active: false
+  FunctionStartOfBodySpacing:
+    active: false
+  FunctionTypeReferenceSpacing:
+    active: false
+  IfElseBracing:
+    active: false
+  IfElseWrapping:
+    active: false
+  ImportOrdering:
+    active: false
+  Indentation:
+    active: false
+  KdocWrapping:
+    active: false
+  MaximumLineLength:
+    active: true
+    maxLineLength: 120
+    ignoreBackTickedIdentifier: true
+  ModifierListSpacing:
+    active: false
+  ModifierOrdering:
+    active: false
+  MultiLineIfElse:
+    active: false
+  MultilineExpressionWrapping:
+    active: false
+  NoBlankLineBeforeRbrace:
+    active: false
+  NoBlankLineInList:
+    active: false
+  NoBlankLinesInChainedMethodCalls:
+    active: false
+  NoConsecutiveBlankLines:
+    active: false
+  NoConsecutiveComments:
+    active: false
+  NoEmptyClassBody:
+    active: false
+  NoEmptyFirstLineInClassBody:
+    active: false
+  NoEmptyFirstLineInMethodBlock:
+    active: false
+  NoLineBreakAfterElse:
+    active: false
+  NoLineBreakBeforeAssignment:
+    active: false
+  NoMultipleSpaces:
+    active: false
+  NoSemicolons:
+    active: false
+  NoSingleLineBlockComment:
+    active: false
+  NoTrailingSpaces:
+    active: false
+  NoUnitReturn:
+    active: false
+  NoUnusedImports:
+    active: false
+  NoWildcardImports:
+    active: false
+  NullableTypeSpacing:
+    active: false
+  PackageName:
+    active: false
+  ParameterListSpacing:
+    active: false
+  ParameterListWrapping:
+    active: false
+  ParameterWrapping:
+    active: false
+  PropertyName:
+    active: false
+  PropertyWrapping:
+    active: false
+  SpacingAroundAngleBrackets:
+    active: false
+  SpacingAroundColon:
+    active: false
+  SpacingAroundComma:
+    active: false
+  SpacingAroundCurly:
+    active: false
+  SpacingAroundDot:
+    active: false
+  SpacingAroundDoubleColon:
+    active: false
+  SpacingAroundKeyword:
+    active: false
+  SpacingAroundOperators:
+    active: false
+  SpacingAroundParens:
+    active: false
+  SpacingAroundRangeOperator:
+    active: false
+  SpacingAroundUnaryOperator:
+    active: false
+  SpacingBetweenDeclarationsWithAnnotations:
+    active: false
+  SpacingBetweenDeclarationsWithComments:
+    active: false
+  SpacingBetweenFunctionNameAndOpeningParenthesis:
+    active: false
+  StringTemplate:
+    active: false
+  StringTemplateIndent:
+    active: false
+  TrailingCommaOnCallSite:
+    active: false
+  TrailingCommaOnDeclarationSite:
+    active: false
+  TryCatchFinallySpacing:
+    active: false
+  TypeArgumentListSpacing:
+    active: false
+  TypeParameterListSpacing:
+    active: false
+  UnnecessaryParenthesesBeforeTrailingLambda:
+    active: false
+  Wrapping:
+    active: false
