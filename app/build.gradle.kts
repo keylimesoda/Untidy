@@ -7,6 +7,17 @@ plugins {
     id("io.github.takahirom.roborazzi")
 }
 
+val releaseKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").orNull
+val hasReleaseSigning = listOf(
+    releaseKeystorePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.tidal.wear"
     compileSdk = 35
@@ -39,14 +50,30 @@ android {
         buildConfigField("String", "TIDAL_SCOPES", (tidalProperties.getProperty("tidal.scopes") ?: defaultTidalScopes).kotlinLiteral())
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // Local installable release; replace with Play Store signing for distribution.
-            signingConfig = signingConfigs.getByName("debug")
+            // Local builds retain the debug certificate when no release key is
+            // configured. Tagged release workflows require the stable release key.
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
         create("benchmark") {
             // Release-like, non-debuggable target for Macrobenchmark. No baseline

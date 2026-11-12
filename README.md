@@ -19,7 +19,9 @@
 
 The current baseline is a **physical-watch validated prerelease snapshot**:
 
-- Tag/release: [`v0.6.0-beta.6`](https://github.com/keylimesoda/Untidy/releases/tag/v0.6.0-beta.6)
+- Tag/release: [`v0.6.0-beta.8`](https://github.com/keylimesoda/Untidy/releases/tag/v0.6.0-beta.8)
+- Download APK: [`Untidy-orchestrated-0.6.0-beta.8.apk`](https://github.com/keylimesoda/Untidy/releases/download/v0.6.0-beta.8/Untidy-orchestrated-0.6.0-beta.8.apk)
+- Release signing and automated GitHub APK publishing: [`docs/releasing.md`](docs/releasing.md)
 - Device: Samsung Galaxy Watch6 LTE (`SM-R955U`)
 - Evidence: navigation, mixed search, output routing, online/offline playback, favorites, and screen-off AAC/FLAC behavior were exercised on hardware.
 
