@@ -15,13 +15,21 @@
   <img src="docs/assets/readme/hero-strip.png" alt="Untidy Wear OS screenshots: Home, Search results, Now Playing, and Recent" width="900">
 </p>
 
+## Publication paused
+
+Future APK publication is blocked pending TIDAL authorization and release-policy review.
+The current device-login path uses an obfuscated first-party credential not registered
+to this project; the maintainer has no TIDAL sign-off. This cleanup preserves auth
+behavior and existing releases. See [publication policy and owner actions](docs/releasing.md).
+GitHub Actions secrets cannot protect credentials compiled into an APK.
+
 ## Current snapshot
 
 The current baseline is a **physical-watch validated prerelease snapshot**:
 
 - Tag/release: [`v0.6.0-beta.8`](https://github.com/keylimesoda/Untidy/releases/tag/v0.6.0-beta.8)
 - Download APK: [`Untidy-orchestrated-0.6.0-beta.8.apk`](https://github.com/keylimesoda/Untidy/releases/download/v0.6.0-beta.8/Untidy-orchestrated-0.6.0-beta.8.apk)
-- Release signing and automated GitHub APK publishing: [`docs/releasing.md`](docs/releasing.md)
+- Publication pause and release policy: [`docs/releasing.md`](docs/releasing.md)
 - Device: Samsung Galaxy Watch6 LTE (`SM-R955U`)
 - Evidence: navigation, mixed search, output routing, online/offline playback, favorites, and screen-off AAC/FLAC behavior were exercised on hardware.
 
@@ -128,7 +136,11 @@ tidal.redirecturi=YOUR_TIDAL_REDIRECT_URI
 # tidal.scopes=user.read collection.read collection.write playlists.read playlists.write search.read search.write recommendations.read entitlements.read playback
 ```
 
-If credentials are missing or invalid, the project may still compile, but sign-in/playback paths will fail at runtime.
+These properties feed generated BuildConfig fields used by catalog authentication.
+They do not replace the separate obfuscated first-party credential used for user
+device login. Missing or invalid configuration can break catalog/playback paths.
+Values compiled into APKs are recoverable; an ignored file or Actions secret is
+not protection for distributed credentials. Future publication remains paused.
 
 ### Build
 
@@ -227,7 +239,7 @@ Current release-track priorities:
 3. Decide the beta scope for downloads/offline: keep as narrow proof/MVP surfaces or expand after more real-watch evidence.
 4. Validate Full fidelity across more real watches, Bluetooth routes, and LTE/Wi-Fi transitions, including delivered-format and battery measurements.
 5. Keep README, release checklist, and work board aligned with shipped behavior.
-6. Only then promote from prerelease validation to a broader beta/release channel.
+6. Resolve TIDAL authorization and release policy before considering any broader publication.
 
 ## Contributing
 
