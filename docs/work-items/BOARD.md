@@ -22,6 +22,19 @@ _Generated from `work-items.json`._
   - Offline/download real-watch result is either passed or explicitly deferred for non-public beta.
   - Findings are linked back to #15 release decision record.
 
+### UNTIDY-046 — Fix core:playback unit-test failure: UnsupportedClassVersionError on TIDAL SDK AudioQuality
+
+- Priority: P1
+- Type: bug
+- Area: playback
+- Owner: Ric
+- Labels: ci, sdk, tests
+- Spec: `docs/perf/next-actions.md`
+- Next: Delegated (MID tier): reproduce, identify which SDK artifact has the newer classfile major version (javap -v or java -verbose:class), then align jvmTarget/toolchain or upgrade the local SDK artifact. Must run :core:playback:testDebugUnitTest to green.
+- Acceptance:
+  - :core:playback:testDebugUnitTest green
+  - root cause (classfile target mismatch) documented, build/test JVM or SDK artifact corrected
+
 ## review
 
 ### UNTIDY-014 — Release readiness / ship checklist
@@ -119,19 +132,6 @@ _Generated from `work-items.json`._
   - golden screenshots committed for 4 key screens x round/square
   - CI task regenerates + diffs
   - safe-area regressions would fail the gate (proved via one deliberate indent test)
-
-### UNTIDY-046 — Fix core:playback unit-test failure: UnsupportedClassVersionError on TIDAL SDK AudioQuality
-
-- Priority: P1
-- Type: bug
-- Area: playback
-- Owner: Ric
-- Labels: ci, sdk, tests
-- Spec: `docs/perf/next-actions.md`
-- Next: Delegated (MID tier): reproduce, identify which SDK artifact has the newer classfile major version (javap -v or java -verbose:class), then align jvmTarget/toolchain or upgrade the local SDK artifact. Must run :core:playback:testDebugUnitTest to green.
-- Acceptance:
-  - :core:playback:testDebugUnitTest green
-  - root cause (classfile target mismatch) documented, build/test JVM or SDK artifact corrected
 
 ## blocked
 
