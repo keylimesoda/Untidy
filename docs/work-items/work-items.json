@@ -1423,5 +1423,28 @@
     "next": "Delegated (MID tier): seed Roborazzi on Home, Player, Settings, Album with round + square device configs; record first golden set.",
     "githubUrl": null,
     "githubNumber": null
+  },
+  {
+    "id": "UNTIDY-046",
+    "title": "Fix core:playback unit-test failure: UnsupportedClassVersionError on TIDAL SDK AudioQuality",
+    "type": "bug",
+    "status": "todo",
+    "priority": "P1",
+    "area": "playback",
+    "owner": "Ric",
+    "labels": [
+      "ci",
+      "sdk",
+      "tests"
+    ],
+    "spec": "docs/perf/next-actions.md",
+    "evidence": "AudioPresetQualityMappingTest.sdkBackendUsesHighestVerifiedAudioQualityEnum fails with java.lang.UnsupportedClassVersionError at test line 35. Reproduced identically on 1fa281f (pre-TOOLS batch) and f3992c8 \u2014 pre-existing, unrelated to TOOLS-043/044/045 merges. Likely the bundled TIDAL SDK classes were compiled with a newer classfile target than the Gradle test JVM; ties into UNTIDY-041 full-fidelity SDK work.",
+    "acceptance": [
+      ":core:playback:testDebugUnitTest green",
+      "root cause (classfile target mismatch) documented, build/test JVM or SDK artifact corrected"
+    ],
+    "next": "Delegated (MID tier): reproduce, identify which SDK artifact has the newer classfile major version (javap -v or java -verbose:class), then align jvmTarget/toolchain or upgrade the local SDK artifact. Must run :core:playback:testDebugUnitTest to green.",
+    "githubUrl": null,
+    "githubNumber": null
   }
 ]
