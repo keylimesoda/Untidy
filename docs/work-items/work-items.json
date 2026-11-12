@@ -1349,5 +1349,79 @@
     "next": "Review TIDAL terms, trademark/package risk, Google Play policy, and distribution model before any paid/public launch.",
     "githubUrl": "https://github.com/keylimesoda/Untidy/issues/43",
     "githubNumber": 43
+  },
+  {
+    "id": "UNTIDY-043",
+    "title": "Wire detekt + ktlint/spotless static analysis gates",
+    "type": "task",
+    "status": "todo",
+    "priority": "P1",
+    "area": "tooling",
+    "owner": "Ric",
+    "labels": [
+      "static-analysis",
+      "detekt",
+      "ktlint",
+      "ci"
+    ],
+    "spec": "docs/perf/next-actions.md",
+    "evidence": "",
+    "acceptance": [
+      "detekt runs green on baseline; coroutine/security rulesets enabled",
+      "spotless check task wired into check",
+      "violations baseline committed so gate is ratchet-only"
+    ],
+    "next": "Delegated (MID tier): add detekt with coroutine rules + spotless ktfmt baseline; first run baselines existing violations, CI gate on new-only.",
+    "githubUrl": null,
+    "githubNumber": null
+  },
+  {
+    "id": "UNTIDY-044",
+    "title": "Macrobenchmark scaffold: cold-start, tap-to-screen, scroll jank",
+    "type": "test",
+    "status": "todo",
+    "priority": "P1",
+    "area": "qa",
+    "owner": "Ric",
+    "labels": [
+      "macrobenchmark",
+      "perf",
+      "scorecard"
+    ],
+    "spec": "docs/perf/next-actions.md",
+    "evidence": "",
+    "acceptance": [
+      "benchmark module builds; cold-start + scroll-jank benchmarks exist",
+      "results land in scorecard format",
+      "emulator smoke green; watch procedure documented"
+    ],
+    "next": "Delegated (MID tier): new benchmark module; cold-start x3 + scroll FrameTimingMetric on emulator as CI smoke; watch runs are manual step recorded in docs/ux/scorecard.md.",
+    "githubUrl": null,
+    "githubNumber": null
+  },
+  {
+    "id": "UNTIDY-045",
+    "title": "Roborazzi Compose screenshot tests for round safe-area screens",
+    "type": "test",
+    "status": "todo",
+    "priority": "P1",
+    "area": "qa",
+    "owner": "Ric",
+    "labels": [
+      "roborazzi",
+      "screenshots",
+      "safe-area",
+      "wear-ui"
+    ],
+    "spec": "docs/perf/next-actions.md",
+    "evidence": "",
+    "acceptance": [
+      "golden screenshots committed for 4 key screens x round/square",
+      "CI task regenerates + diffs",
+      "safe-area regressions would fail the gate (proved via one deliberate indent test)"
+    ],
+    "next": "Delegated (MID tier): seed Roborazzi on Home, Player, Settings, Album with round + square device configs; record first golden set.",
+    "githubUrl": null,
+    "githubNumber": null
   }
 ]

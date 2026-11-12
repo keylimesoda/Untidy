@@ -78,6 +78,48 @@ _Generated from `work-items.json`._
   - Document battery/storage/network implications.
   - Verify selected quality is reflected in playback context/log diagnostics without exposing private manifest URLs.
 
+### UNTIDY-043 — Wire detekt + ktlint/spotless static analysis gates
+
+- Priority: P1
+- Type: task
+- Area: tooling
+- Owner: Ric
+- Labels: static-analysis, detekt, ktlint, ci
+- Spec: `docs/perf/next-actions.md`
+- Next: Delegated (MID tier): add detekt with coroutine rules + spotless ktfmt baseline; first run baselines existing violations, CI gate on new-only.
+- Acceptance:
+  - detekt runs green on baseline; coroutine/security rulesets enabled
+  - spotless check task wired into check
+  - violations baseline committed so gate is ratchet-only
+
+### UNTIDY-044 — Macrobenchmark scaffold: cold-start, tap-to-screen, scroll jank
+
+- Priority: P1
+- Type: test
+- Area: qa
+- Owner: Ric
+- Labels: macrobenchmark, perf, scorecard
+- Spec: `docs/perf/next-actions.md`
+- Next: Delegated (MID tier): new benchmark module; cold-start x3 + scroll FrameTimingMetric on emulator as CI smoke; watch runs are manual step recorded in docs/ux/scorecard.md.
+- Acceptance:
+  - benchmark module builds; cold-start + scroll-jank benchmarks exist
+  - results land in scorecard format
+  - emulator smoke green; watch procedure documented
+
+### UNTIDY-045 — Roborazzi Compose screenshot tests for round safe-area screens
+
+- Priority: P1
+- Type: test
+- Area: qa
+- Owner: Ric
+- Labels: roborazzi, screenshots, safe-area, wear-ui
+- Spec: `docs/perf/next-actions.md`
+- Next: Delegated (MID tier): seed Roborazzi on Home, Player, Settings, Album with round + square device configs; record first golden set.
+- Acceptance:
+  - golden screenshots committed for 4 key screens x round/square
+  - CI task regenerates + diffs
+  - safe-area regressions would fail the gate (proved via one deliberate indent test)
+
 ## blocked
 
 _None._
