@@ -32,6 +32,10 @@ performance:
 
 coroutines:
   active: true
+  GlobalCoroutineUsage:
+    active: true
+  SuspendFunWithCoroutineScopeReceiver:
+    active: true
 
 potential-bugs:
   active: true
