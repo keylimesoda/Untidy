@@ -7,6 +7,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "2.2.21" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
     id("com.diffplug.spotless") version "8.11.0" apply false
+    id("io.github.takahirom.roborazzi") version "1.46.1" apply false
 }
 
 subprojects {

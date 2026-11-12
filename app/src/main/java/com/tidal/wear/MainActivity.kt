@@ -554,7 +554,7 @@ internal fun isReturnToPlayerRoot(rootEntryId: String?, currentEntryId: String?)
     rootEntryId != null && rootEntryId == currentEntryId
 
 @Composable
-private fun HomeScreen(
+internal fun HomeScreen(
     navController: NavHostController,
     authState: AuthState,
     track: TidalTrack?,

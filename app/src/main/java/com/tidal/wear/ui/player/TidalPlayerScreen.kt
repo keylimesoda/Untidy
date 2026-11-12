@@ -108,6 +108,29 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
+/** Transport/navigation actions the player UI needs; lets screenshot tests render it statelessly. */
+internal interface TidalPlayerActions {
+    fun togglePlayPause()
+    fun seekToPrevious()
+    fun seekToNext()
+    fun jumpToQueueIndex(index: Int)
+    fun setVolumeFraction(fraction: Float)
+    fun setPreferredAudioOutput(deviceId: Int?)
+    fun retryPlayback()
+}
+
+private class ViewModelPlayerActions(
+    private val viewModel: NowPlayingViewModel,
+) : TidalPlayerActions {
+    override fun togglePlayPause() = viewModel.togglePlayPause()
+    override fun seekToPrevious() = viewModel.seekToPrevious()
+    override fun seekToNext() = viewModel.seekToNext()
+    override fun jumpToQueueIndex(index: Int) = viewModel.jumpToQueueIndex(index)
+    override fun setVolumeFraction(fraction: Float) = viewModel.setVolumeFraction(fraction)
+    override fun setPreferredAudioOutput(deviceId: Int?) = viewModel.setPreferredAudioOutput(deviceId)
+    override fun retryPlayback() = viewModel.retryPlayback()
+}
+
 @Composable
 fun TidalPlayerScreen(
     viewModel: NowPlayingViewModel,
@@ -121,6 +144,7 @@ fun TidalPlayerScreen(
     onOpenArtist: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    val playerActions = remember(viewModel) { ViewModelPlayerActions(viewModel) }
     val albumArt = if (isAmbient) null else rememberAlbumArt(state.track)
     val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.OnSurfaceMuted
     val context = LocalContext.current
@@ -204,7 +228,7 @@ fun TidalPlayerScreen(
             state = state,
             albumArt = albumArt,
             accent = accent,
-            viewModel = viewModel,
+            actions = playerActions,
             apiClient = apiClient,
             downloadState = downloadState,
             onDownload = ::startTrackDownload,
@@ -219,11 +243,11 @@ fun TidalPlayerScreen(
 }
 
 @Composable
-private fun TidalPlayerNonAmbient(
+internal fun TidalPlayerNonAmbient(
     state: NowPlayingUiState,
     albumArt: AlbumArt?,
     accent: Color,
-    viewModel: NowPlayingViewModel,
+    actions: TidalPlayerActions,
     apiClient: TidalApiClient,
     downloadState: DownloadState,
     onDownload: () -> Unit,
@@ -321,7 +345,7 @@ private fun TidalPlayerNonAmbient(
             queue = state.queue,
             currentTrack = state.track,
             onJumpToIndex = { index ->
-                viewModel.jumpToQueueIndex(index)
+                actions.jumpToQueueIndex(index)
                 navigation.showQueue = false
             },
             onBack = { navigation.showQueue = false },
@@ -343,7 +367,7 @@ private fun TidalPlayerNonAmbient(
                     val step = if (event.verticalScrollPixels > 0f) 1 else -1
                     val nextVolume = (state.volume + step).coerceIn(0, maxVolume)
                     if (nextVolume != state.volume) {
-                        viewModel.setVolumeFraction(nextVolume.toFloat() / maxVolume.toFloat())
+                        actions.setVolumeFraction(nextVolume.toFloat() / maxVolume.toFloat())
                         showVolume = true
                         volumeChangePulse += 1
                         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -367,7 +391,7 @@ private fun TidalPlayerNonAmbient(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .offset(y = 12.dp * scale)
-                        .clickable(onClick = viewModel::togglePlayPause),
+                        .clickable(onClick = actions::togglePlayPause),
                     cornerRadius = 6.dp,
                 )
 
@@ -470,18 +494,18 @@ private fun TidalPlayerNonAmbient(
                     horizontalArrangement = Arrangement.spacedBy(4.dp * scale),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TransportButton(Icons.Filled.SkipPrevious, "Previous", visualSize = 28, iconSize = 16, scale = scale, onClick = viewModel::seekToPrevious)
+                    TransportButton(Icons.Filled.SkipPrevious, "Previous", visualSize = 28, iconSize = 16, scale = scale, onClick = actions::seekToPrevious)
                     TransportButton(
                         if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         if (state.isPlaying) "Pause" else "Play",
                         visualSize = 36,
                         iconSize = 20,
                         scale = scale,
-                        onClick = viewModel::togglePlayPause,
+                        onClick = actions::togglePlayPause,
                         isPlayPause = true,
                         playPauseColor = accent,
                     )
-                    TransportButton(Icons.Filled.SkipNext, "Next", visualSize = 28, iconSize = 16, scale = scale, onClick = viewModel::seekToNext)
+                    TransportButton(Icons.Filled.SkipNext, "Next", visualSize = 28, iconSize = 16, scale = scale, onClick = actions::seekToNext)
                 }
 
                 (state.error ?: likeError)?.takeIf { it.isNotBlank() }?.let { error ->
@@ -559,7 +583,7 @@ private fun TidalPlayerNonAmbient(
                                 Toast.makeText(context, "Repair queued. Check Downloads for progress.", Toast.LENGTH_LONG).show()
                                 onOpenHome()
                             }
-                        } else viewModel.retryPlayback()
+                        } else actions.retryPlayback()
                     },
                     onHome = onOpenHome,
                 )
@@ -582,7 +606,7 @@ private fun TidalPlayerNonAmbient(
                         navigation.showQueue = true
                     },
                     onOutputSelected = { deviceId ->
-                        viewModel.setPreferredAudioOutput(deviceId)
+                        actions.setPreferredAudioOutput(deviceId)
                     },
                     onAddToPlaylist = {
                         val track = state.track
