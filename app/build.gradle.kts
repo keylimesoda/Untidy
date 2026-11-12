@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("io.github.takahirom.roborazzi")
 }
 
 android {
@@ -58,6 +59,18 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests {
+            // Roborazzi/Robolectric needs the merged resources and manifest.
+            isIncludeAndroidResources = true
+        }
+    }
+}
+
+roborazzi {
+    // Golden PNGs are committed next to the JVM tests so review diffs are visible
+    // in the same change as the screens they cover.
+    outputDir.set(file("src/test/snapshots"))
 }
 
 kotlin {
@@ -105,6 +118,16 @@ dependencies {
     implementation("com.google.android.horologist:horologist-media-ui:0.6.22")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.test.ext:junit:1.2.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4:1.7.5")
+    testImplementation("androidx.compose.ui:ui-test-manifest:1.7.5")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.46.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.46.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-junit-rule:1.46.1")
+    // Provides the ComponentActivity used by createAndroidComposeRule in local tests.
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.7.5")
 }
 
 fun String.kotlinLiteral(): String = buildString {

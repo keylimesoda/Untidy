@@ -173,6 +173,82 @@ fun AlbumScreen(
         if (!loading) listState.scrollToItem(0)
     }
 
+    AlbumScreenContent(
+        title = title,
+        artwork = art.bitmap,
+        accent = accent,
+        liked = liked,
+        likeLoading = likeLoading,
+        onLike = {
+            if (likeLoading || albumId.isBlank()) return@AlbumScreenContent
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            val target = !liked
+            liked = target
+            likeLoading = true
+            scope.launch {
+                runCatching { withContext(Dispatchers.IO) { apiClient.setFavoriteAlbum(albumId, target) } }
+                    .onSuccess { persisted ->
+                        liked = persisted
+                        if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        }
+                    }
+                    .onFailure {
+                        liked = !target
+                        view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+                        Toast.makeText(context, "Couldn't update album like", Toast.LENGTH_SHORT).show()
+                    }
+                likeLoading = false
+            }
+        },
+        tracks = tracks,
+        loading = loading,
+        error = error,
+        onRetry = { retryTick += 1 },
+        offlineLabel = offlinePresentation.label,
+        offlineDetail = offlinePresentation.detail,
+        onDownload = {
+            // BATT-H4: enqueue suspends off the UI thread for its DataStore read.
+            scope.launch {
+                val result = offlineDownloader.enqueueTracks(tracks)
+                Toast.makeText(
+                    context,
+                    if (result.scheduled > 0) "Album download queued" else "Already saved on watch",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        },
+        onPlay = { onPlayAlbum(recentAlbum(), tracks, 0) },
+        onShuffle = { onPlayAlbum(recentAlbum(), tracks.shuffled(), 0) },
+        onTrackClick = { index -> onPlayAlbum(recentAlbum(), tracks, index) },
+        listState = listState,
+    )
+}
+
+/**
+ * Stateless visual content for [AlbumScreen]. Extracted so JVM screenshot tests
+ * can render the real layout without network/offline dependencies.
+ */
+@Composable
+internal fun AlbumScreenContent(
+    title: String,
+    artwork: androidx.compose.ui.graphics.ImageBitmap?,
+    accent: Color,
+    liked: Boolean,
+    likeLoading: Boolean,
+    onLike: () -> Unit,
+    tracks: List<TidalTrack>,
+    loading: Boolean,
+    error: String?,
+    onRetry: () -> Unit,
+    offlineLabel: String,
+    offlineDetail: String,
+    onDownload: () -> Unit,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    onTrackClick: (Int) -> Unit,
+    listState: androidx.wear.compose.foundation.lazy.ScalingLazyListState = rememberScalingLazyListState(initialCenterItemIndex = 0),
+) {
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(
             state = listState,
@@ -183,64 +259,33 @@ fun AlbumScreen(
             item {
                 AlbumArtworkHero(
                     title = title,
-                    bitmap = art.bitmap,
+                    bitmap = artwork,
                     accent = accent,
                     liked = liked,
                     likeLoading = likeLoading,
-                    onLike = {
-                        if (likeLoading || albumId.isBlank()) return@AlbumArtworkHero
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        val target = !liked
-                        liked = target
-                        likeLoading = true
-                        scope.launch {
-                            runCatching { withContext(Dispatchers.IO) { apiClient.setFavoriteAlbum(albumId, target) } }
-                                .onSuccess { persisted ->
-                                    liked = persisted
-                                    if (!view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)) {
-                                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                                    }
-                                }
-                                .onFailure {
-                                    liked = !target
-                                    view.performHapticFeedback(HapticFeedbackConstants.REJECT)
-                                    Toast.makeText(context, "Couldn't update album like", Toast.LENGTH_SHORT).show()
-                                }
-                            likeLoading = false
-                        }
-                    },
+                    onLike = onLike,
                 )
             }
             if (tracks.isNotEmpty()) {
                 item {
                     AlbumPlaybackActions(
                         accent = accent,
-                        onPlay = { onPlayAlbum(recentAlbum(), tracks, 0) },
-                        onShuffle = { onPlayAlbum(recentAlbum(), tracks.shuffled(), 0) },
+                        onPlay = onPlay,
+                        onShuffle = onShuffle,
                     )
                 }
                 item {
                     CollectionDownloadChip(
-                        label = offlinePresentation.label,
-                        secondary = offlinePresentation.detail,
+                        label = offlineLabel,
+                        secondary = offlineDetail,
                         accent = accent,
-                        onClick = {
-                            // BATT-H4: enqueue suspends off the UI thread for its DataStore read.
-                            scope.launch {
-                                val result = offlineDownloader.enqueueTracks(tracks)
-                                Toast.makeText(
-                                    context,
-                                    if (result.scheduled > 0) "Album download queued" else "Already saved on watch",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        },
+                        onClick = onDownload,
                     )
                 }
             }
             when {
                 loading -> item { StatusText("Loading tracks…") }
-                error != null -> item { RetryStatusChip(title = error.orEmpty(), onClick = { retryTick += 1 }) }
+                error != null -> item { RetryStatusChip(title = error, onClick = onRetry) }
                 tracks.isEmpty() -> item { StatusText("No tracks found") }
                 else -> tracks.forEachIndexed { index, track ->
                     item {
@@ -248,7 +293,7 @@ fun AlbumScreen(
                             index = index + 1,
                             track = track,
                             accent = accent,
-                            onClick = { onPlayAlbum(recentAlbum(), tracks, index) },
+                            onClick = { onTrackClick(index) },
                         )
                     }
                 }

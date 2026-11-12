@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tidal.wear.BuildConfig
 import com.tidal.wear.core.auth.AuthState
+import com.tidal.wear.core.auth.TidalAccountInfo
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.Icon
@@ -40,6 +41,7 @@ import androidx.wear.compose.material.ToggleChip
 import androidx.wear.compose.material.ToggleChipDefaults
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import com.tidal.wear.core.auth.TidalAuthRepository
 import com.tidal.wear.core.model.AudioPreset
 import com.tidal.wear.core.model.ReleaseVersionPreference
@@ -69,8 +71,6 @@ fun SettingsScreen(
     val authState by authRepository.authState.collectAsState(initial = AuthState.Initializing)
     val accountInfo by authRepository.accountInfo.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
-    var confirmErase by remember { mutableStateOf(false) }
-    var confirmRemoveDownloads by remember { mutableStateOf(false) }
     var downloadsRefreshTick by remember { mutableIntStateOf(0) }
     var downloadedTracks by remember { mutableStateOf<List<DownloadedTrackSummary>>(emptyList()) }
     var downloadsStorageBytes by remember { mutableStateOf(0L) }
@@ -82,6 +82,58 @@ fun SettingsScreen(
         downloadsStorageBytes = storageBytes
     }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+    SettingsScreenContent(
+        authState = authState,
+        accountInfo = accountInfo,
+        preset = preset,
+        releaseVersionPreference = releaseVersionPreference,
+        downloadOverLte = downloadOverLte,
+        downloadedTracks = downloadedTracks,
+        downloadsStorageBytes = downloadsStorageBytes,
+        onOpenDownloads = onOpenDownloads,
+        onPresetSelected = { selected -> scope.launch { repository.setPreset(selected) } },
+        onReleaseVersionSelected = { selected ->
+            scope.launch { repository.setReleaseVersionPreference(selected) }
+        },
+        onDownloadOverLteChanged = { enabled -> scope.launch { repository.setDownloadOverLte(enabled) } },
+        onSignOut = {
+            scope.launch {
+                authRepository.signOut()
+                onSignedOut()
+            }
+        },
+        onRemoveAllDownloads = {
+            if (context.removeAllOfflineTrackDownloads()) {
+                downloadsRefreshTick++
+            }
+        },
+        listState = listState,
+    )
+}
+
+/**
+ * Stateless visual content for [SettingsScreen]. Extracted so JVM screenshot
+ * tests can render the real layout without DataStore/auth/network dependencies.
+ */
+@Composable
+internal fun SettingsScreenContent(
+    authState: AuthState,
+    accountInfo: TidalAccountInfo?,
+    preset: AudioPreset,
+    releaseVersionPreference: ReleaseVersionPreference,
+    downloadOverLte: Boolean,
+    downloadedTracks: List<DownloadedTrackSummary>,
+    downloadsStorageBytes: Long,
+    onOpenDownloads: () -> Unit,
+    onPresetSelected: (AudioPreset) -> Unit,
+    onReleaseVersionSelected: (ReleaseVersionPreference) -> Unit,
+    onDownloadOverLteChanged: (Boolean) -> Unit,
+    onSignOut: () -> Unit,
+    onRemoveAllDownloads: () -> Unit,
+    listState: ScalingLazyListState = rememberScalingLazyListState(initialCenterItemIndex = 0),
+) {
+    var confirmErase by remember { mutableStateOf(false) }
+    var confirmRemoveDownloads by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().background(TidalColors.Black)) {
         ScalingLazyColumn(
             state = listState,
@@ -93,7 +145,7 @@ fun SettingsScreen(
                     item {
                         StatusChip(
                             label = "TIDAL account",
-                            secondary = "User #${accountInfo?.userId.orEmpty()}",
+                            secondary = "User #${accountInfo.userId}",
                             active = true,
                         )
                     }
@@ -120,10 +172,7 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                                 onClick = {
                                     confirmErase = false
-                                    scope.launch {
-                                        authRepository.signOut()
-                                        onSignedOut()
-                                    }
+                                    onSignOut()
                                 },
                                 label = { Text("Confirm sign out") },
                                 secondaryLabel = { Text(accountSignOutConfirmSecondary(downloadedTracks.size)) },
@@ -153,22 +202,22 @@ fun SettingsScreen(
                 }
                 item {
                     PresetChip("Battery Saver", "Lowest data and power", AudioPreset.BatterySaver, preset) {
-                        scope.launch { repository.setPreset(AudioPreset.BatterySaver) }
+                        onPresetSelected(AudioPreset.BatterySaver)
                     }
                 }
                 item {
                     PresetChip("Balanced", "Efficient everyday listening", AudioPreset.Balanced, preset) {
-                        scope.launch { repository.setPreset(AudioPreset.Balanced) }
+                        onPresetSelected(AudioPreset.Balanced)
                     }
                 }
                 item {
                     PresetChip("High", "Up to 320 kbps", AudioPreset.High, preset) {
-                        scope.launch { repository.setPreset(AudioPreset.High) }
+                        onPresetSelected(AudioPreset.High)
                     }
                 }
                 item {
                     PresetChip("Full fidelity", "Lossless / HiRes source", AudioPreset.FullFidelity, preset) {
-                        scope.launch { repository.setPreset(AudioPreset.FullFidelity) }
+                        onPresetSelected(AudioPreset.FullFidelity)
                     }
                 }
 
@@ -184,12 +233,12 @@ fun SettingsScreen(
                 }
                 item {
                     ReleaseVersionChip("Prefer explicit", ReleaseVersionPreference.Explicit, releaseVersionPreference) {
-                        scope.launch { repository.setReleaseVersionPreference(ReleaseVersionPreference.Explicit) }
+                        onReleaseVersionSelected(ReleaseVersionPreference.Explicit)
                     }
                 }
                 item {
                     ReleaseVersionChip("Prefer clean", ReleaseVersionPreference.Clean, releaseVersionPreference) {
-                        scope.launch { repository.setReleaseVersionPreference(ReleaseVersionPreference.Clean) }
+                        onReleaseVersionSelected(ReleaseVersionPreference.Clean)
                     }
                 }
 
@@ -209,9 +258,7 @@ fun SettingsScreen(
                         label = "Download over LTE",
                         secondary = if (downloadOverLte) "Uses watch data plan" else "Wi‑Fi only",
                         checked = downloadOverLte,
-                        onCheckedChange = { enabled ->
-                            scope.launch { repository.setDownloadOverLte(enabled) }
-                        },
+                        onCheckedChange = onDownloadOverLteChanged,
                     )
                 }
                 item { DisabledSettingChip("Storage limit", "Manual cleanup for now") }
@@ -239,10 +286,8 @@ fun SettingsScreen(
                             Chip(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                                 onClick = {
-                                    if (context.removeAllOfflineTrackDownloads()) {
-                                        confirmRemoveDownloads = false
-                                        downloadsRefreshTick++
-                                    }
+                                    confirmRemoveDownloads = false
+                                    onRemoveAllDownloads()
                                 },
                                 label = { Text("Remove local copies?") },
                                 secondaryLabel = { Text("Keeps TIDAL library") },
