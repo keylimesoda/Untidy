@@ -25,6 +25,18 @@ kotlin {
     }
 }
 
+// com.tidal.sdk:player-common:0.0.64 ships Java 21 bytecode (class file
+// major version 65). Android bytecode still targets 17, but unit tests run
+// on the host JVM, so that JVM must be Java 21 to load the SDK classes.
+val javaToolchains = extensions.getByType<JavaToolchainService>()
+tasks.withType<Test>().configureEach {
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        },
+    )
+}
+
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:auth"))
