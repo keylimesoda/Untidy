@@ -52,3 +52,48 @@ would help). Prior power data: `docs/reviews/hardware-power-2026-09-07.md`
 
 No TalkBack walkthrough yet. Icon-only control semantics audit pending
 (UXW-004 text sizes; UXC-010 notification-denial path).
+
+## Benchmark procedure
+
+Scaffold lives in `:benchmark` (Macrobenchmark `1.5.0`, no baseline profile;
+`CompilationMode.None()`). It targets the app's non-debuggable `benchmark`
+build type.
+
+- `StartupBenchmark.coldStartup` — `StartupTimingMetric`, 3 COLD iterations of
+  `com.tidal.wear/.MainActivity`.
+- `ScrollBenchmark.scrollHome` — `FrameTimingMetric`, 3 WARM iterations with
+  UiAutomator swipes on the Home screen (Home is a scrollable Compose column,
+  not a `LazyColumn` today).
+
+Compile check (no device required):
+
+```sh
+export JAVA_HOME=~/.local/jdk
+export ANDROID_HOME=~/.local/android-sdk
+./gradlew :benchmark:assembleAndroidTest -q
+```
+
+Emulator (Wear OS API 33+, x86_64 AVD):
+
+```sh
+./gradlew :app:assembleBenchmark :benchmark:assembleBenchmark
+./gradlew :benchmark:connectedBenchmarkAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR
+```
+
+Emulator numbers are smoke-test only; Macrobenchmark flags them as
+non-representative. Record them as such, never as a performance budget.
+
+Physical watch (manual):
+
+1. Pair over adb (`adb devices`), keep the watch awake and on the charger,
+   disable battery saver, and let it reach a stable thermal state.
+2. `./gradlew :app:assembleBenchmark :benchmark:assembleBenchmark`
+3. Install both APKs, then run
+   `./gradlew :benchmark:connectedBenchmarkAndroidTest`.
+4. Run the cold-start benchmark at least 3 times (the benchmark itself does
+   3 iterations) and record the `StartupTimingMetric` median plus the
+   `FrameTimingMetric` p50/p90/p99 for `scrollHome`.
+5. Note watch model, API level, build type, and thermal state alongside the
+   numbers. Add watch results to the Latency baselines / Perf baselines tables
+   above; keep emulator smoke results clearly separated.
