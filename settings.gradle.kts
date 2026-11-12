@@ -19,6 +19,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "TidalWearOS"
 include(":app")
+include(":benchmark")
 include(":core:model")
 include(":core:auth")
 include(":core:tidal-api")

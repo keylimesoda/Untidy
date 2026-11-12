@@ -47,6 +47,16 @@ android {
             // Local installable release; replace with Play Store signing for distribution.
             signingConfig = signingConfigs.getByName("debug")
         }
+        create("benchmark") {
+            // Release-like, non-debuggable target for Macrobenchmark. No baseline
+            // profile is generated or consumed. Keep minification off so the
+            // benchmark test APK does not need matching shrinker configuration.
+            isDebuggable = false
+            isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
