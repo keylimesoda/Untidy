@@ -1,6 +1,6 @@
 # Untidy Release Readiness Checklist
 
-_Last updated: 2026-06-17_
+_Last updated: 2026-11-12 (publication policy; historical QA evidence retained)_
 
 ## Purpose
 
@@ -17,7 +17,7 @@ Release readiness means:
 
 ## Current release posture
 
-**Status:** Emulator/professional gate passed; public/beta release is blocked only on physical Wear OS validation (#33) or explicit non-public-beta deferral.
+**Status:** Future publication is paused pending TIDAL authorization and release-policy review, independently of physical-watch validation. No QA deferral overrides this blocker. See [releasing.md](releasing.md).
 
 **Offline/download release decision:** #11 / UNTIDY-011 is closed as a completed capability spike, and the sanctioned `usage=DOWNLOAD` proof line has advanced through the single-track offline MVP. Offline/download is no longer a categorical permission blocker. The remaining release decision is narrower: whether the current single-track Downloads shelf/remove/fallback/settings implementation is accepted for beta, or whether album/playlist collection downloads and real-watch offline validation are deferred.
 
@@ -164,7 +164,7 @@ Use `docs/ux/wear-os-ux-walkthrough-2026-06-17.md` as the baseline.
 
 ### 8. Security/privacy/account safety
 
-- [x] No secrets are committed or logged in artifacts in reviewed release/proof artifacts.
+- [ ] Resolve the obfuscated first-party device-login credential and obtain TIDAL authorization before future publication. Previous artifact checks do not establish credential confidentiality in APKs.
 - [x] Live TIDAL library mutations are limited to approved test/faux playlist behavior.
 - [x] Created test playlists are preserved; local downloaded content deletion is allowed and remote TIDAL deletion is not introduced.
 - [x] Exported service posture is documented (#17).
@@ -198,6 +198,9 @@ Evidence reviewed:
 ```
 
 ## Current recommended next steps
+
+Publication stays paused throughout these QA steps. Resolve the authorization
+and release-policy blocker in [releasing.md](releasing.md) before publishing.
 
 1. Run the final full Gradle gate and release-readiness emulator sweep against the selected release scope.
 2. Decide whether real-watch validation is required before public beta or record it as an explicit non-public-beta deferral in #15.
