@@ -44,6 +44,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -89,7 +90,14 @@ internal class DirectManifestPlaybackBackend(
     private var player: ExoPlayer = buildPlayer()
 
     private fun buildPlayer(): ExoPlayer = ExoPlayer.Builder(appContext)
-        .setAudioAttributes(AudioAttributes.DEFAULT, true)
+        .setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .build(),
+            true,
+        )
+        .setHandleAudioBecomingNoisy(true)
         .build()
         .also { exo ->
             lastOffloadedPlayback.set(false)
@@ -239,7 +247,7 @@ internal class DirectManifestPlaybackBackend(
             fresh.playWhenReady = wasPlaying
             fresh.prepare()
         }
-        setPreferredAudioOutput(PreferredAudioOutputPreference.get(appContext))
+        PreferredAudioOutputPreference.set(appContext, null)
         brokenPlayer.release()
         // The MediaSession binds to a specific Player instance (wrapped by the service's
         // queue forwarding player); after a rebuild it mirrors a RELEASED player unless the
@@ -250,7 +258,9 @@ internal class DirectManifestPlaybackBackend(
     }
 
     init {
-        setPreferredAudioOutput(PreferredAudioOutputPreference.get(appContext))
+        // Delegate audio routing to the Wear OS system media-output switcher; clear any
+        // legacy custom-picker pin so Bluetooth routing is never overridden.
+        PreferredAudioOutputPreference.set(appContext, null)
         watchdogHandler.postDelayed(watchdogTick, OFFLOAD_WATCHDOG_INTERVAL_MS)
     }
 
@@ -339,18 +349,30 @@ internal class DirectManifestPlaybackBackend(
         val next = window.lookAheadForPlayerIndex(playerIndex) ?: return
         lookAheadJob?.takeIf { it.isActive }?.let { return }
         lookAheadJob = scope.launch {
-            runCatching {
-                val queueIndex = window.queueIndexForPlayerIndex(playerIndex + 1)
-                val resolved = resolveMediaSource(next, window.tracks, queueIndex, generation)
-                if (generation != queueGeneration || queueWindow !== window || appendedMediaItemCount != playerIndex + 1) return@launch
-                player.addMediaSource(resolved.source)
-                resolvedManifestsByPlayerIndex[playerIndex + 1] = resolved.manifest
-                appendedMediaItemCount += 1
-                Log.d(DIRECT_LOG_TAG, "manifest lookahead appended id=${next.id} playerIndex=${playerIndex + 1} queueIndex=$queueIndex")
-            }.onFailure { error ->
-                if (generation == queueGeneration) {
-                    Log.w(DIRECT_LOG_TAG, "manifest lookahead failed id=${next.id} reason=${error::class.java.simpleName}: ${error.message}")
+            val queueIndex = window.queueIndexForPlayerIndex(playerIndex + 1)
+            for (attempt in 1..LOOKAHEAD_MAX_ATTEMPTS) {
+                val result = runCatching {
+                    resolveMediaSource(next, window.tracks, queueIndex, generation)
                 }
+                val resolved = result.getOrNull()
+                if (resolved != null) {
+                    if (generation != queueGeneration || queueWindow !== window || appendedMediaItemCount != playerIndex + 1) {
+                        return@launch
+                    }
+                    player.addMediaSource(resolved.source)
+                    resolvedManifestsByPlayerIndex[playerIndex + 1] = resolved.manifest
+                    appendedMediaItemCount += 1
+                    Log.d(DIRECT_LOG_TAG, "manifest lookahead appended id=${next.id} playerIndex=${playerIndex + 1} queueIndex=$queueIndex")
+                    return@launch
+                }
+                val error = result.exceptionOrNull()
+                if (error is CancellationException) throw error
+                if (generation != queueGeneration) return@launch
+                Log.w(
+                    DIRECT_LOG_TAG,
+                    "manifest lookahead attempt=$attempt/$LOOKAHEAD_MAX_ATTEMPTS failed id=${next.id} reason=${error?.javaClass?.simpleName}: ${error?.message}",
+                )
+                if (attempt < LOOKAHEAD_MAX_ATTEMPTS) delay(LOOKAHEAD_RETRY_DELAY_MS)
             }
         }
     }
@@ -840,3 +862,5 @@ private const val OFFLOAD_WATCHDOG_INTERVAL_MS = 2000L
 
 /** Rebuild attempts per media item before holding; guards against pathological storms. */
 private const val MAX_REBUILDS_PER_ITEM = 2
+private const val LOOKAHEAD_MAX_ATTEMPTS = 2
+private const val LOOKAHEAD_RETRY_DELAY_MS = 1_500L

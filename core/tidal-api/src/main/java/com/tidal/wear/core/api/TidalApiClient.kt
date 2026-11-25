@@ -709,14 +709,21 @@ class TidalApiClient(
                 pageCursor = cursor,
             )
             val includedByKey = root.includedObjects().associateBy { it.resourceKey() }
-            tracks += root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }
+            val orderedDataTracks = root.dataObjects().mapNotNull { item ->
+                (includedByKey[item.resourceKey()] ?: item).toTrack(includedByKey)
+            }
+            tracks += if (orderedDataTracks.isNotEmpty()) {
+                orderedDataTracks
+            } else {
+                root.allResourceObjects().mapNotNull { it.toTrack(includedByKey) }
+            }
             val nextCursor = root.nextPageCursor()
                 ?.takeIf { it.isNotBlank() }
                 ?.takeIf { seenCursors.add(it) }
                 ?: break
             cursor = nextCursor
         }
-        return hydrateTrackArt(tracks.distinctBy { it.id })
+        return tracks.distinctBy { it.id }
     }
 
     suspend fun isFavoriteTrack(trackId: String): Boolean {
