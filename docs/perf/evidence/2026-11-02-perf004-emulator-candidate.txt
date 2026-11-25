@@ -1,0 +1,2 @@
+PERF-004 candidate: wear6 emulator, signed-in debug build, same temporary UntidyArtProbe as baseline. Three cold launches; 12-second home observation: zero resolver-attempt log entries in each run. am start -W TotalTime ms: 665, 632, 850 (screening only, no watch performance claim).
+On opening Recent: 11:49:37.962 track; 11:49:38.141 track; 11:49:38.243 playlist; 11:49:38.335 playlist. Recent displayed track cover artwork; opening first track displayed its context, title, artist and album. Counts are resolver attempts, not confirmed network requests or energy use.

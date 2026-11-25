@@ -9,6 +9,9 @@ import android.media.AudioManager
 import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.animation.AnimatedVisibility
@@ -49,6 +52,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -145,11 +149,12 @@ fun TidalPlayerScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val playerActions = remember(viewModel) { ViewModelPlayerActions(viewModel) }
-    val albumArt = if (isAmbient) null else rememberAlbumArt(state.track)
-    val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.OnSurfaceMuted
     val context = LocalContext.current
     val authRepository = remember(context) { TidalAuthRepositoryProvider.get(context.applicationContext) }
     val apiClient = remember(authRepository) { TidalApiClient(authRepository) }
+    val artTrack = rememberRestoredTrackArtwork(state.track, apiClient)
+    val albumArt = if (isAmbient) null else rememberAlbumArt(artTrack)
+    val accent = if (albumArt?.bitmap != null) albumArt.palette.accentColor() else TidalColors.OnSurfaceMuted
     val currentTrack = state.track
     var downloadState by remember(currentTrack?.id) {
         mutableStateOf(context.initialDownloadState(currentTrack))
@@ -174,9 +179,9 @@ fun TidalPlayerScreen(
         val track = currentTrack
         when {
             track?.isDownloadEligible() != true -> Toast.makeText(context, "Track unavailable", Toast.LENGTH_SHORT).show()
-            downloadState is DownloadState.Downloading -> Unit
+            downloadState == DownloadState.Downloading -> Unit
             else -> {
-                downloadState = DownloadState.Downloading(0.05f)
+                downloadState = DownloadState.Downloading
                 scope.launch {
                     when (offlineDownloader.downloadTrack(track)) {
                         OfflineDownloadResult.Downloaded -> {
@@ -655,7 +660,7 @@ private fun BottomGripPullOverHandle(
     onAccessibilityOpen: () -> Unit,
 ) {
     val view = LocalView.current
-    var draggedUpPx by remember { mutableStateOf(0f) }
+    var draggedUpPx by remember { mutableFloatStateOf(0f) }
     var hapticCommitted by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
@@ -1012,6 +1017,14 @@ internal fun rememberAudioOutputOptions(requestedDeviceId: Int?): AudioOutputUiS
     val context = LocalContext.current
     val audioManager = remember(context) { context.getSystemService(AudioManager::class.java) }
     var outputGeneration by remember(audioManager) { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) outputGeneration += 1
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     DisposableEffect(audioManager) {
         if (audioManager == null) return@DisposableEffect onDispose {}
         val callback = object : AudioDeviceCallback() {
@@ -1120,3 +1133,21 @@ private fun playerLayoutScale(): Float {
 
 
 
+
+// Refresh the first restored track's artwork once per player composition;
+// later tracks are probed only when their queue entries have no artwork.
+@Composable
+private fun rememberRestoredTrackArtwork(track: TidalTrack?, apiClient: TidalApiClient): TidalTrack? {
+    var freshUrl by remember(apiClient) { mutableStateOf<String?>(null) }
+    var probedId by remember(apiClient) { mutableStateOf<String?>(null) }
+    LaunchedEffect(track?.id) {
+        val id = track?.id?.takeIf { it.isNotBlank() && it != "tidal-current" } ?: return@LaunchedEffect
+        if (id == probedId) return@LaunchedEffect
+        if (!track.artworkUrl.isNullOrBlank() && probedId != null) return@LaunchedEffect
+        probedId = id
+        apiClient.trackArtwork(id)?.takeIf { it.isNotBlank() }?.let { freshUrl = it }
+    }
+    val current = track ?: return null
+    val replacement = freshUrl?.takeIf { it.isNotBlank() && it != current.artworkUrl && current.id == probedId }
+    return if (replacement != null) current.copy(artworkUrl = replacement) else current
+}

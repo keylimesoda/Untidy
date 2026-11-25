@@ -256,6 +256,86 @@ notes: two self-inflicted storms documented here so they never return:
   cadence owner = watchdogTick tail. JVM tests pin both behaviors
   (segment-drain must not fire; plateau/loading/paused/end guards).
 
+## EXP-013 — pause-path matrix across every transport surface (UX-025 triage)
+
+finding: UX-025 (user report "pause acting up") | scripts/perf/pause_repro.sh
+method: cold playback, then exercise + verify each path against session state
+and position: on-screen transport pause/resume (foreground), backgrounded
+resume + pause, `cmd media_session dispatch play|pause` (what buds/sysui use).
+results: on-screen pause -> PAUSED(2)+frozen position+resume exact (fg and bg);
+session commands -> play/pause/hold/resume all exact; `input keyevent 121/126`
+-> NO-OP on SM_R955U (Samsung input routing drops injected media keys — harness
+trap, documented, use cmd media_session dispatch instead).
+verdict: diagnostic complete — production paths healthy; root cause was the
+EXP-014 rebuild orphaning the session mirror, not pause wiring.
+
+## EXP-014 — consumption-stall gated on actual offload + session rebind after rebuild (UX-025/UX-026)
+
+finding: UX-025 (Now-Playing decoupled: frozen title/position while audio
+  played), UX-026 (sentinel misfire on healthy software streams) | commit 511019e
+evidence (user session 22:29-22:33): 20-track LTE queue logged TWO
+  `ConsumptionStalled; rebuilding` events ~78 s apart while audio was healthy —
+  software decode (suspended), so rebuilds were pure churn; each rebuild
+  released the ExoPlayer the MediaSession wrapper was bound to -> mirror froze
+  on the previous track (session NONE/stale `updated=`), audio continued on the
+  replacement. "Pause acting up" and "Play icon while playing" = same corpse.
+change: Sample.usesOffload (from ExoPlayer AudioOffloadListener actual state);
+  consumption rule requires whole window offload-active. Software-path true
+  failures stay covered: dead loader -> position reaches buffered -> isLoading
+  guard resets window; dead renderer -> RenderPlateau (path-independent).
+  Backend emits PlayerReplaced; service re-wraps + session.setPlayer.
+  MAX_REBUILDS_PER_ITEM=2, reset per transition.
+tests: 4 new sentinel cases (misfire signature pinned: software=None,
+  offload=stall, mixed window=None, software plateau=fire); 157 green.
+verification (physical watch, user-driven): playlist playback after fix —
+  icons, titles, queue advance all correct across the 80s queue ("Seems to be
+  playing correctly, yeah. Icons and all"); clean-room sample: transport shows
+  Pause from t+2s, six consecutive PLAYING samples.
+verdict: **ACCEPT**
+
+## EXP-015 — artwork pipeline re-platformed to TIDAL coverArt relationships (UX-027)
+finding: UX-027 | commit: this commit
+hypothesis: grey artwork = expired persisted URLs (initial guess, WRONG).
+root cause (measured live 2026-11-01 evening, curl + in-app logcat):
+- TIDAL v2 payloads carry NO image fields (tracks/albums/playlists attributes
+  stripped of imageId/cover); relationship endpoints 400 any nested include
+  except whitelisted paths; `coverArt`→`artworks` resources serve pre-built
+  size-qualified CDN hrefs (`/images/{uuid-slashes}/{W}x{W}.jpg`).
+- Legacy unsigned keys (`{uuid}.jpg`) = S3 AccessDenied (403) app-wide.
+- Fresh v1 inline ids (album cover/picture) STILL construct 200 responses
+  (18/18 sampled) but older ones die: hrefs/ids observed live at 22:50 and
+  dead by 23:28 (17432a5a); playlist href rotated between fetches
+  (4c07d9c5→753dfc35) and the old one 403s within ~10 min. 1 req/min probe:
+  fresh href alive the full 40 min (40/40 samples 200). Burst 403 hypothesis
+  REJECTED (40/40 parallel = 200). UA blocking REJECTED (all UAs identical
+  behavior).
+- EXP-006's liked path (v2 batch) had no album relation at all -> guaranteed grey.
+change: include params (track/albums/playlist/album/track+playlist batches);
+relationship-hop resolution in toTrack/toPlaylist/toAlbum (+coverArtUrl/
+artworkFileUrl helpers, prefer >=requested size); hydrateTrackArt batch refill
+(relationship endpoints serve imageless tracks); batched enrichPlaylistArt
+(filter[id] cap 20 measured: 25=400); recents re-resolve by id with 30-min
+trust window (rememberFreshRecentArtwork); player one-shot art re-probe per
+composition (rememberRestoredTrackArtwork); Coil failure logging (row loader
+now catches what used to be a throwing drawable access on ErrorResult).
+tests: CoverArtPayloadTest (5): relationship-hop resolution for track/album/
+playlist, file size selection, legacy identity still constructs. All suites green.
+verification (physical SM-R955U): Recent screen track cover + 1994! playlist
+cover; Liked list rows (264 hydrated, zero 'row art failed'); library
+playlists `enriched found=46 total=46`; player shows full-size cover mid-play.
+lessons (-> automation-notes/wear-guidelines refs):
+- Never persist TIDAL artwork URLs as identity; ids only, URLs are TTL'd.
+- Library root art surfaces refresh per open; batch endpoints save the watch
+  ~15 round-trips per screen (each TLS call ~1.5 s on-device).
+verdict: **ACCEPT**
+
+**Evidence correction:** the recorded probes do not establish an artwork URL
+TTL or rotation. The later `17432a5a` check used different UUID path segments
+from the original successful fetch, and the `4c07d9c5` URL was not linked to
+the playlist later queried. The 40-minute probe establishes only that one URL
+returned 200 throughout that window. Treat the 30-minute refresh threshold as
+a heuristic, not a measured expiry. No battery effect was measured.
+
 ## Reverted / inconclusive
 
 ### EXP-007 — UX-013 search-strand fix (never implemented: finding withdrawn)
@@ -265,3 +345,46 @@ UX-013 withdrawn in findings.md. Lesson stored in skill references.
 
 (none yet — reverted experiments are the highest-value anti-recurrence data;
 record them here, not in findings prose)
+
+## EXP-016 — system-owned audio output selection (in progress)
+problem: Play on inserts an app picker before the system picker and can persist a player-specific device preference that conflicts with system routing.
+hypothesis: clear the legacy preference and open the system switcher directly; show the system media route on the action row.
+expected improvement: one fewer selection screen; system choice remains authoritative.
+invariants: preserve playback, system picker fallback and Back behavior; do not claim a route when unknown.
+falsifier: system choice cannot change playback route or the displayed route is stale or misleading.
+verification: debug build and app unit tests pass; installed on physical watch. User reports the system picker change restored AirPods Max playback. Device-label refresh and cancellation have not been independently exercised.
+verdict: accept provisionally; follow-up route refresh and cancellation checks remain.
+
+## EXP-017 — explicit close control in actions sheet (UX-028)
+problem: the sheet's drag handle suggests a swipe, which can open the watch launcher instead of dismissing the sheet (user observation, UX-028).
+hypothesis: replace the handle with a labeled close button, retaining the existing callback.
+expected improvement: clear one-tap dismissal without system gesture ambiguity.
+invariants: close returns to player; existing sheet actions and Back remain available; target at least 48dp.
+falsifier: tap fails to dismiss or the new control obscures sheet actions.
+
+verification: debug build and app unit tests pass; release installed on watch. Direct launch of PlayerActivity was denied because it is not exported. User confirmed the X works on the watch.
+verdict: accept.
+
+## EXP-019 — honest in-flight track download (UX-006)
+problem: player shows a fixed, fabricated 5% and allows a tap that does nothing during an in-flight download.
+hypothesis: show “Downloading…” without a percentage and disable the in-flight action; retain completion and failure behavior.
+invariants: completed downloads remain removable; failed or queued work keeps existing behavior; no claim that queued-state recovery is fixed.
+falsifier: completion/removal breaks or an actual measured percentage is lost.
+
+## EXP-020 — truthful offline Library state
+problem: Library briefly reports zero before local downloads load and claims “Downloads available” even with none; the offline status row offers a retry that cannot succeed while offline.
+hypothesis: represent the local count as unknown while loading, remove redundant offline availability claims, and make offline status informational while keeping On this watch actionable.
+invariants: saved tracks remain accessible offline and online errors retain retry; zero, nonzero and loading counts are distinct.
+falsifier: saved downloads cannot be reached or retry is lost for online failures.
+
+## EXP-021 — cancel obsolete Library loads
+problem: retry or connectivity changes leave earlier requests running in a separate remembered scope; an older response can overwrite a newer offline or retry state.
+hypothesis: make both local and network loads children of the keyed effect so key changes cancel obsolete work.
+invariants: cancellation propagates; offline downloads still load; online failures remain retryable; no partial stale results overwrite a newer state.
+falsifier: latest request is cancelled unexpectedly or an older request can still publish after a network change.
+
+EXP-019 verification: debug build and app unit tests pass; release installed on physical watch. An active download was not exercised; waiting-for-network still reverts to Download after a transient toast and remains open. Verdict: inconclusive pending in-flight journey.
+
+EXP-020 verification: debug build and app unit tests pass; release installed and online Library displayed local count 0, 46 playlists and 50 albums on watch. Offline zero/nonzero and loading states were not exercised. Verdict: inconclusive pending offline journeys.
+
+EXP-021 verification: debug build and app unit tests pass; online Library loaded on watch. Connectivity-change and out-of-order-response paths were not exercised. Verdict: inconclusive pending interruption test.

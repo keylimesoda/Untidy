@@ -36,6 +36,9 @@ if [[ -z "${ANDROID_HOME:-}" || ! -x "${ANDROID_HOME}/platform-tools/adb" ]]; th
 fi
 
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
+if [[ -z "${ANDROID_AVD_HOME:-}" && -f "$HOME/.config/.android/avd/wear6.ini" && ! -f "$HOME/.android/avd/wear6.ini" ]]; then
+  export ANDROID_AVD_HOME="$HOME/.config/.android/avd"
+fi
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$HOME/.local/bin:$PATH"
 
 if [[ ! -x "${JAVA_HOME:-}/bin/java" ]]; then

@@ -27,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +58,7 @@ import com.tidal.wear.ui.offline.rememberNetworkAvailable
 import com.tidal.wear.ui.theme.TidalColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -71,44 +71,41 @@ fun LibraryScreen(
     onPlayTrack: (TidalTrack) -> Unit,
     onOpenDownloads: () -> Unit = {},
 ) {
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current.applicationContext
     val networkAvailable = rememberNetworkAvailable()
     var favorites by remember { mutableStateOf<TidalSearchResult?>(null) }
-    var downloadedTracks by remember { mutableStateOf(emptyList<DownloadedTrackSummary>()) }
+    var downloadedTracks by remember { mutableStateOf<List<DownloadedTrackSummary>?>(null) }
     var selectedCategory by remember { mutableStateOf<LibraryCategory?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf(false) }
     var loadTick by remember { mutableIntStateOf(0) }
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 2)
 
-    fun loadLibrary() {
-        scope.launch {
-            downloadedTracks = withContext(Dispatchers.IO) { context.readOfflineDownloadedTracks() }
-        }
-        if (!networkAvailable) {
-            favorites = null
-            loading = false
-            error = true
-            return
-        }
-        loading = true
-        error = false
-        scope.launch {
-            try {
-                favorites = withContext(Dispatchers.IO) { apiClient.favorites() }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Throwable) {
+    LaunchedEffect(loadTick, networkAvailable) {
+        coroutineScope {
+            launch {
+                downloadedTracks = withContext(Dispatchers.IO) { context.readOfflineDownloadedTracks() }
+            }
+            if (!networkAvailable) {
                 favorites = null
-                error = true
-            } finally {
                 loading = false
+                error = true
+            } else {
+                loading = true
+                error = false
+                try {
+                    favorites = withContext(Dispatchers.IO) { apiClient.favorites() }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    favorites = null
+                    error = true
+                } finally {
+                    loading = false
+                }
             }
         }
     }
-
-    LaunchedEffect(loadTick, networkAvailable) { loadLibrary() }
     LaunchedEffect(selectedCategory, loading) {
         if (!loading) listState.scrollToItem(if (selectedCategory == null) 2 else 0)
     }
@@ -129,7 +126,7 @@ fun LibraryScreen(
                 // useful immediately, including when the watch is offline.
                 item {
                     OnThisWatchRow(
-                        count = downloadedTracks.size,
+                        count = downloadedTracks?.size,
                         onClick = onOpenDownloads,
                     )
                 }
@@ -137,9 +134,6 @@ fun LibraryScreen(
                     loading -> item { LoadingCollection() }
                     error -> {
                         item { ErrorRow(networkAvailable = networkAvailable, onClick = { loadTick++ }) }
-                        if (!networkAvailable) {
-                            item { OfflineDownloadsHint(count = downloadedTracks.size) }
-                        }
                     }
                     favorites.isEmpty() -> item {
                         EmptyCollection()
@@ -255,25 +249,6 @@ private fun TidalSearchResult?.isEmpty(): Boolean = this == null ||
     (tracks.isEmpty() && albums.isEmpty() && artists.isEmpty() && playlists.isEmpty())
 
 @Composable
-private fun OfflineDownloadsHint(count: Int) {
-    Chip(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
-        onClick = { },
-        enabled = false,
-        colors = ChipDefaults.secondaryChipColors(
-            backgroundColor = TidalColors.SurfaceHigh,
-            contentColor = TidalColors.White,
-            secondaryContentColor = TidalColors.OnSurfaceMuted,
-            iconColor = TidalColors.Cyan,
-        ),
-        icon = { Icon(Icons.Filled.Download, contentDescription = null) },
-        label = { RowText("Downloads available") },
-        secondaryLabel = { RowText(if (count == 1) "1 saved track" else "$count saved tracks") },
-        contentPadding = PaddingValues(horizontal = 12.dp),
-    )
-}
-
-@Composable
 private fun LibraryTitle(title: String) {
     Text(
         text = title,
@@ -288,7 +263,7 @@ private fun LibraryTitle(title: String) {
 }
 
 @Composable
-private fun OnThisWatchRow(count: Int, onClick: () -> Unit) {
+private fun OnThisWatchRow(count: Int?, onClick: () -> Unit) {
     Chip(
         modifier = Modifier
             .fillMaxWidth()
@@ -303,7 +278,7 @@ private fun OnThisWatchRow(count: Int, onClick: () -> Unit) {
         icon = { Icon(Icons.Filled.Download, contentDescription = null) },
         label = { RowText("On this watch") },
         secondaryLabel = {
-            RowText(if (count == 1) "1 downloaded track" else "$count downloaded tracks")
+            RowText(when (count) { null -> "Checking downloads…"; 1 -> "1 downloaded track"; else -> "$count downloaded tracks" })
         },
         contentPadding = PaddingValues(horizontal = 12.dp),
     )
@@ -394,6 +369,7 @@ private fun ErrorRow(networkAvailable: Boolean, onClick: () -> Unit) {
     Chip(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         onClick = onClick,
+        enabled = networkAvailable,
         colors = ChipDefaults.secondaryChipColors(
             backgroundColor = TidalColors.Surface,
             contentColor = TidalColors.White,
@@ -401,7 +377,7 @@ private fun ErrorRow(networkAvailable: Boolean, onClick: () -> Unit) {
             iconColor = TidalColors.Cyan,
         ),
         label = { RowText(if (networkAvailable) "Library unavailable" else "Connect for full library") },
-        secondaryLabel = { RowText(if (networkAvailable) "Tap to retry" else "Downloaded music still plays") },
+        secondaryLabel = { RowText(if (networkAvailable) "Tap to retry" else "Connect to see your collection") },
     )
 }
 

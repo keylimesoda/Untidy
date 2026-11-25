@@ -142,3 +142,22 @@
 - `scripts/run-wear-emulator.sh` boots `-no-snapshot-load` (no wipe): once
   signed in, the emulator KEEPS auth across boots; `adb install -r` keeps
   data; `pm clear` destroys it (re-auth needed).
+
+## Wake/retry driver (use it, don't re-improvise)
+
+`scripts/ux_drive.py tap|shot|swipe|texts` — one process, wake-before-dump,
+4x dump retry on "null root node" (ambient mode / animation), auto-scroll to
+find target text. Ad-hoc `input tap` against a dimmed screen silently lands
+nowhere: the ~7 s timeout ambient-dims mid-sequence and uiautomator then
+returns empty trees; screenshots of ambient show dark chrome, not the app.
+Always re-wake (keyevent 224) immediately before dump AND before screenshot.
+
+## Watch network reality check
+
+Check the exact artwork URL and its source on both watch and host; a 403
+alone does not establish URL expiry or a device-network problem. EXP-015's
+purported expiry comparisons used mismatched or unlinked image paths.
+
+Some installations keep AVDs under `~/.config/.android/avd`. The environment
+script detects `wear6` there when it is absent from the default AVD directory;
+an explicit `ANDROID_AVD_HOME` takes precedence.

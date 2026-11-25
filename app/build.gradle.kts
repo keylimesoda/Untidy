@@ -26,8 +26,8 @@ android {
         applicationId = "com.tidal.wear"
         minSdk = 33
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.6.0-beta.8"
+        versionCode = 14
+        versionName = "0.6.0-beta.9"
 
         val tidalProperties = Properties().apply {
             // Cross-platform path via java.io.File resolution (was a Windows

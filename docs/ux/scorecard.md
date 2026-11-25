@@ -97,3 +97,9 @@ Physical watch (manual):
 5. Note watch model, API level, build type, and thermal state alongside the
    numbers. Add watch results to the Latency baselines / Perf baselines tables
    above; keep emulator smoke results clearly separated.
+
+## Recent device notes
+
+Library fallback completion log marker, physical watch, n=3: before median 7.3 s / worst 8.6 s; EXP-018 candidate median 5.0 s / worst 6.1 s. This is not a UI-frame measure; conditions and caveats are in `docs/perf/experiments.md`.
+
+2026-11-02: Offline Library and track download feedback changes are implemented but await offline and in-flight device exercises; no interaction-count improvement is claimed yet.

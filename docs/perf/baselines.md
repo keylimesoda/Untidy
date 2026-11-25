@@ -26,3 +26,19 @@
 Every baseline row: build variant, versionCode, battery level at start,
 temperature, network path, route, screen state sequence. Missing condition =
 row is provisional.
+
+## 2026-11-02 Library fallback (watch, release)
+
+Tap to `library fallback ok` log marker, n=3 each, charging with playback and AirPods Max: before 8.6 / 7.3 / 6.1 s (median 7.3, worst 8.6); bounded-parallel candidate 6.1 / 5.0 / 5.0 s (median 5.0, worst 6.1). The app was reinstalled and the same track restarted between sets; battery/temperature reported 96%/42.3 C and 92%/41.5 C after respective sets. This marker is not UI-frame timing; see EXP-018 for limits.
+
+## 2026-11-02 disconnected idle (watch, release, preliminary)
+
+SM-R955U, versionCode 14, no playback, off charger, ADB disconnected after
+reset and reconnected at the end. One 18m 01s window: battery 84% → 83%,
+26.6 → 23.4 °C; screen off 17m 31s, deep idle 14m 48s. BatteryStats
+attributed 0.000022 mAh and 3 ms CPU to Untidy UID 10194. Whole-device
+charge-counter decrease was 2.4 mAh; it is not attributable to Untidy.
+Evidence: `evidence/2026-11-02-disconnected-idle-batterystats.txt`.
+One trial is not a distribution or a before/after result. Screen-on setup
+and reconnect activity are included; Android's component estimates do not
+sum consistently to its reported total, so do not infer component savings.

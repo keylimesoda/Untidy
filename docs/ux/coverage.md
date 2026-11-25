@@ -54,3 +54,42 @@ Settings + scrolled, Track Context + scrolled, ux013 picker state
 2. Benchmark module (Macrobenchmark) — `testing-setup` skill installed for this.
 3. androidTest/journey harness — repo has zero instrumented tests.
 4. Rotary + ambient + font-scale matrix on wear6.
+
+## 2026-11-02 audio output follow-up
+
+Physical watch: system picker update installed; user reports AirPods Max connects and plays. Selected-device label refresh, picker cancellation, and actions-sheet close control remain unverified. App debug build and unit tests pass. A subsequent release with the close control was installed; direct shell launch of the non-exported player activity was denied.
+
+User confirmed the actions-sheet X works (EXP-017). EXP-018 release on physical watch: Library displayed 46 playlists and 264 liked tracks after the parallel batch change; three API completion marker trials recorded in the performance ledger. Playback audibility during those trials remains awaiting user confirmation.
+
+## 2026-11-02 usability follow-up
+
+Release with EXP-019–021 installed on SM-R955U. Online Library displayed 0 downloaded tracks, 46 playlists and 50 albums. In-flight download, offline zero/nonzero, and interrupted/retried request paths remain untested on the watch; the build and app unit tests passed.
+
+Preserved `wear6` emulator, current debug build: disconnected Wi-Fi and mobile
+data while viewing Library. It showed “Connect for full library” and retained
+“On this watch · 18 downloaded tracks”; tapping that row opened Downloads
+with the 18 tracks listed. After restoring both radios and returning to Library,
+the collection eventually displayed 46 playlists and 50 albums. This exercises
+the nonempty offline path and a reconnect; zero-download, active-download and
+deliberately out-of-order response cases remain unverified. Emulator evidence
+does not establish watch performance or battery use.
+
+The current release was reinstalled on SM-R955U without clearing data; the
+launcher opened to signed-in home with the recent track visible. This is a
+launch smoke check, not a repeat of the download or playback journeys.
+The emulator's existing AVD was found under `~/.config/.android/avd`; the
+environment script now selects that directory when the default location lacks
+`wear6`, while respecting an explicitly configured `ANDROID_AVD_HOME`.
+
+PERF-004 candidate: release installed on SM-R955U; signed-in Home → Recent
+displayed two track covers, and opening a track displayed its context and album.
+The same journey was exercised on the signed-in emulator. See
+`../perf/experiments.md` for lookup counts and limitations.
+
+Static-analysis pass: full project `./gradlew lint` completed with 0 errors,
+29 warnings across modules and two informational Compose float-boxing findings.
+The two gesture states now use `mutableFloatStateOf`; app unit tests and
+`lintDebug` passed. Baseline and updated drag-open / close-actions flows were
+exercised on `wear6`; the minified release was installed on SM-R955U and the
+player drag-open, close and pause flows exercised. No allocation, latency or
+battery delta was measured. R8 still reports Kotlin metadata parsing warnings.
