@@ -89,7 +89,10 @@ class CoverArtPayloadTest {
             put(
                 "relationships",
                 buildJsonObject {
-                    put("coverArt", relationshipArray("artworks", "2b7Vtuqr18QSIXFVYWk7TuLHdcEtUsVBmSal92xFmWkl2CbAKdgMwEU65"))
+                    put(
+                        "coverArt",
+                        relationshipArray("artworks", "2b7Vtuqr18QSIXFVYWk7TuLHdcEtUsVBmSal92xFmWkl2CbAKdgMwEU65"),
+                    )
                 },
             )
         }
