@@ -1,0 +1,5 @@
+PERF-004 baseline: wear6 emulator, signed-in debug build; temporary UntidyArtProbe log immediately before each recent artwork resolver call. Three cold launches; 12-second observation on home. am start -W TotalTime ms: 723, 665, 815 (screening only, no watch performance claim).
+Trial 1: 11:47:42.599 track; 11:47:43.078 track; 11:47:43.190 playlist; 11:47:43.291 playlist.
+Trial 2: 11:47:55.382 track; 11:47:55.552 track; 11:47:55.863 playlist; 11:47:55.960 playlist.
+Trial 3: 11:48:08.373 track; 11:48:08.936 track; 11:48:09.094 playlist; 11:48:09.194 playlist.
+Counts are lookup attempts, not confirmed HTTP requests or energy usage.

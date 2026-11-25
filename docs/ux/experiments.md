@@ -329,6 +329,13 @@ lessons (-> automation-notes/wear-guidelines refs):
   ~15 round-trips per screen (each TLS call ~1.5 s on-device).
 verdict: **ACCEPT**
 
+**Evidence correction:** the recorded probes do not establish an artwork URL
+TTL or rotation. The later `17432a5a` check used different UUID path segments
+from the original successful fetch, and the `4c07d9c5` URL was not linked to
+the playlist later queried. The 40-minute probe establishes only that one URL
+returned 200 throughout that window. Treat the 30-minute refresh threshold as
+a heuristic, not a measured expiry. No battery effect was measured.
+
 ## Reverted / inconclusive
 
 ### EXP-007 — UX-013 search-strand fix (never implemented: finding withdrawn)

@@ -52,6 +52,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -633,7 +634,7 @@ private fun BottomGripPullOverHandle(
     onAccessibilityOpen: () -> Unit,
 ) {
     val view = LocalView.current
-    var draggedUpPx by remember { mutableStateOf(0f) }
+    var draggedUpPx by remember { mutableFloatStateOf(0f) }
     var hapticCommitted by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
@@ -1107,10 +1108,8 @@ private fun playerLayoutScale(): Float {
 
 
 
-// Media-session queue extras outlive artwork hrefs (which expire within an hour),
-// so a restored player session shows stale/blank art. Re-resolve the current
-// track's artwork once per player composition; live playback queues are already
-// fresh and only re-probe when their artwork is missing.
+// Refresh the first restored track's artwork once per player composition;
+// later tracks are probed only when their queue entries have no artwork.
 @Composable
 private fun rememberRestoredTrackArtwork(track: TidalTrack?, apiClient: TidalApiClient): TidalTrack? {
     var freshUrl by remember(apiClient) { mutableStateOf<String?>(null) }

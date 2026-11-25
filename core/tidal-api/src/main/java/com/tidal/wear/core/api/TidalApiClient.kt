@@ -851,9 +851,7 @@ class TidalApiClient(
         return root.dataObjects().firstOrNull()?.toTrack(root.includedObjects().associateBy { it.resourceKey() })
     }
 
-    // Artwork hrefs are time-limited (issued per response); long-lived surfaces
-    // (persisted recents, restored queues) must re-resolve by id, not reuse the
-    // stored URL.
+    // Resolve fresh artwork for long-lived surfaces using the entity ID.
     suspend fun trackArtwork(trackId: String): String? = runCatching { track(trackId)?.artworkUrl }.getOrNull()
 
     suspend fun playlistArtwork(playlistId: String): String? = runCatching { playlist(playlistId)?.artworkUrl }

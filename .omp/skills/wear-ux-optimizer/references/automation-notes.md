@@ -154,7 +154,10 @@ Always re-wake (keyevent 224) immediately before dump AND before screenshot.
 
 ## Watch network reality check
 
-Every TLS call from the watch costs ~1-2 s (batch endpoints are worth ~15x
-that per screen). Artwork CDN 403s from the watch were URL expiry, not
-network: never debug watch CDN failures before re-probing the exact URL from
-the host minutes later.
+Check the exact artwork URL and its source on both watch and host; a 403
+alone does not establish URL expiry or a device-network problem. EXP-015's
+purported expiry comparisons used mismatched or unlinked image paths.
+
+Some installations keep AVDs under `~/.config/.android/avd`. The environment
+script detects `wear6` there when it is absent from the default AVD directory;
+an explicit `ANDROID_AVD_HOME` takes precedence.

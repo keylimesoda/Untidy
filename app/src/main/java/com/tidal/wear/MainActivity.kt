@@ -220,10 +220,9 @@ private fun TidalWearApp(
             val hasUsableSession by authRepository.isAuthenticated.collectAsState(initial = true)
             val releaseVersionPreference by settingsRepository.releaseVersionPreference.collectAsState(initial = ReleaseVersionPreference.Explicit)
             val storedRecentItems by recentRepository.items.collectAsState(initial = emptyList())
-            val recentItems = rememberFreshRecentArtwork(storedRecentItems, apiClient)
             val homeShelfContent = selectHomeShelfContent(
                 downloadedTracks = appContext.readOfflineDownloadedTracks(),
-                recentItems = recentItems,
+                recentItems = storedRecentItems,
             )
             var currentRoute by remember { mutableStateOf<String?>(null) }
             var currentBackStackEntryId by remember { mutableStateOf<String?>(null) }
@@ -376,6 +375,7 @@ private fun TidalWearApp(
                     )
                 }
                 composable(Routes.Recent) {
+                    val recentItems = rememberFreshRecentArtwork(storedRecentItems, apiClient)
                     RecentScreen(
                         items = recentItems,
                         onOpenTrack = { item -> navController.navigate(Routes.trackContext(item.id)) },
@@ -388,7 +388,7 @@ private fun TidalWearApp(
                     TrackContextScreen(
                         apiClient = apiClient,
                         offlineDownloader = offlineDownloader,
-                        initialRecent = recentItems.firstOrNull { it.type == RecentItemType.Track && it.id == trackId },
+                        initialRecent = storedRecentItems.firstOrNull { it.type == RecentItemType.Track && it.id == trackId },
                         trackId = trackId,
                         onPlayTrack = ::playTrack,
                         onOpenAlbum = ::openAlbumId,
@@ -809,9 +809,8 @@ private fun TidalTrack?.metadataLine(): String = listOf(
     this?.artist.orEmpty(),
 ).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "TIDAL" }
 
-// TIDAL artwork hrefs are short-lived (issued per response; observed expiring
-// inside an hour). Persisted recents embed the URL captured at play time, so
-// anything older than the trust window gets re-resolved by id, once per session.
+// Persisted recents can contain old artwork URLs. Refresh entries older than
+// this heuristic window by ID once per session; URL expiry is not established.
 private const val ARTWORK_TRUST_WINDOW_MS = 30 * 60 * 1000L
 
 @Composable

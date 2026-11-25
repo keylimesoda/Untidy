@@ -29,12 +29,11 @@
 9. **Repo toolchain paths**: `~/Work/toolchains/{android-sdk,jdk21}`; env
    script probes locations rather than hardcoding (this host; ThinkPad
    fallbacks preserved).
-10. **Artwork URLs are TTL'd, ids are identity** (2026-11 TIDAL migration):
-    persist only ids; every long-lived surface re-resolves art by id
-    (`trackArtwork`/`playlistArtwork`/… with 30-min trust window for recents,
-    one-shot probe for restored player sessions). Never construct CDN URLs
-    from ids as the primary path (legacy identities rot over hours); the
-    relationship-hopped `artworks.files[]` href is the only reliable source.
+10. **Artwork identity and freshness**: recents persist IDs and artwork URLs;
+    the UI attempts to refresh older entries using a 30-minute heuristic, and
+    restored player sessions perform a one-shot probe. The probes in EXP-015
+    do not establish a URL expiry time or that constructed URLs are invalid.
+    The v2 `coverArt` → `artworks.files[]` relationship is a verified source.
 
 ## Product (pre-approved directions, still per-experiment)
 
