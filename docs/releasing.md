@@ -1,62 +1,108 @@
-# GitHub APK releases
+# APK publication paused
 
-Tag pushes build and publish an installable, signed APK. Each repo has its own
-signing key, stored only as GitHub Actions secrets. Never commit a keystore or
-send signing credentials in Discord.
+Future Untidy publication is fail-closed. `.github/workflows/release-apk.yml`
+contains only a failing notice: no checkout, build, secrets, artifacts or release
+API calls, with an empty permission set. Tag pushes, main pushes and manual
+runs of this version cannot publish. Existing releases remain untouched.
 
-## One-time setup (each repository separately)
+## Authorization policy (separate from pipeline security)
 
-In `Settings → Secrets and variables → Actions`, add:
+The current device-code login uses an obfuscated TIDAL first-party credential
+not registered to this project. The maintainer has no TIDAL sign-off. The
+source comment in `core/auth/.../TidalAuthRepository.kt` describes that origin;
+no credential values are reproduced here. Obfuscation is not confidentiality.
+This change does not alter authentication or other application behavior.
 
-- `RELEASE_KEYSTORE_BASE64` — base64 encoding of that app's `.jks` file
-- `RELEASE_STORE_PASSWORD`
-- `RELEASE_KEY_ALIAS`
-- `RELEASE_KEY_PASSWORD`
+Resume publication only after documented TIDAL authorization, review of the
+permitted client classification and distribution terms, and a separately
+reviewed change that replaces this pause with an approved release pipeline.
+Passing build/signing checks or manual QA is not authorization from TIDAL.
 
-For Untidy also add the TIDAL application configuration as Actions secrets:
+## Build configuration audit
 
-- `TIDAL_CLIENT_ID`
-- `TIDAL_CLIENT_SECRET`
-- `TIDAL_REDIRECT_URI`
+The old workflow's `TIDAL_CLIENT_ID`, `TIDAL_CLIENT_SECRET` and
+`TIDAL_REDIRECT_URI` references were **not unused**: it wrote them to
+`.dev-secrets/tidal-app.properties`; `app/build.gradle.kts` and
+`core/auth/build.gradle.kts` compile those properties into BuildConfig fields.
+`TidalAuthRepository` reads the generated auth fields. A repository-wide Kotlin
+call-site scan found the `client_credentials` helper implementation in core
+auth but no production caller outside that repository; this does not establish
+that the grant is active at runtime. User device login uses the separate
+first-party fallback. Supplying developer credentials does not replace that
+device-login credential.
 
-Generate an independent long-lived key for each app on a trusted computer;
-keep an encrypted offline backup. Example (choose your own alias and passwords;
-never paste them into chat or commit them):
+All CI TIDAL and signing-secret references were removed because publication
+and its build have been retired, not because the TIDAL fields were unused.
+Local build/auth configuration remains unchanged. Actions secrets protect
+storage and log handling in CI; they cannot keep values confidential once
+compiled into a distributed APK. No secret values were inspected or decoded.
 
-```sh
-keytool -genkeypair -v -keystore untidy-release.jks -alias untidy \
-  -keyalg RSA -keysize 4096 -validity 10000
-base64 -w0 untidy-release.jks
-```
+## Required repository-owner UI actions
 
-Upload the base64 output and matching alias/password values directly into the
-repository's GitHub Actions secrets. Repeat with a different keystore/alias for
-Thumbscript. Losing a signing key prevents future in-place APK updates.
+Local changes have no effect on GitHub until reviewed and merged by the owner.
+Even after merging, historical tags retain the old workflow contents.
 
-## Release procedure
+1. In **Actions → Publish signed Wear OS APK** (the existing
+   `release-apk.yml` workflow) → **… → Disable workflow**. Confirm it is disabled;
+   leave it disabled after this rename. This blocks old workflow versions and
+   reruns through this workflow. Alternatively disable all Actions under
+   **Settings → Actions → General** if no Actions should run at all.
+2. Inspect queued/in-progress historical publishing runs and cancel them in
+   Actions if any exist. Do not rerun old versions or create release tags.
+3. Review/remove obsolete repository signing and TIDAL Actions secrets through
+   **Settings → Secrets and variables → Actions** after checking for other
+   consumers. This cleanup does not delete GitHub secrets. Do not copy values
+   into tickets, logs or documentation.
+4. Review/merge this branch through the normal review process; keep the workflow
+   disabled until authorization and a new pipeline have independent approval.
 
-1. Update `versionName` and increment `versionCode` in `app/build.gradle.kts`.
-2. Merge the release commit to `main`.
-3. Create and push an exact matching `v<versionName>` tag, e.g. `v0.6.2`.
-4. Actions verifies the tag/version match, builds `:app:assembleRelease`, checks
-   the APK signature, generates `SHA256SUMS.txt`, and publishes both assets on
-   the GitHub Release. Hyphenated versions (beta/rc) are marked prerelease.
+Disabling Actions does not revoke an APK-embedded credential. Credential
+ownership/remediation needs the provider's authorized process. Do not modify,
+withdraw or delete existing releases as part of this cleanup.
 
-The workflow intentionally fails before building if required secrets are
-missing. Untagged main builds continue using the developer's existing local
-signing behavior and do not publish.
+## Observed GitHub failure
 
-## Signing migration warning
+Read-only GitHub queries confirm
+[run 43301417154](https://github.com/keylimesoda/Untidy/actions/runs/43301417154)
+failed on `push` to `main` at `2986773d2991f994c7040e0777d4f7521bf1c577`, with
+no jobs or commit check-runs. The Actions summary explicitly reports:
+`Invalid workflow file` at line 17, column 30: `Unrecognized named-value:
+'runner'` in the expression `runner.temp`. The old workflow used
+`${{ runner.temp }}` in job-level `env`; GitHub's [context-availability
+table](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability)
+does not allow the `runner` context at `jobs.<job_id>.env`. This parser error,
+not missing secrets or a build/signing failure, explains the zero-job run. The
+replacement pause workflow removes the expression. Branch-protection
+inspection on 2026-11-12 returned `404 Branch not protected`; the repository
+rulesets list was empty. The current workflow is still active, the repository
+has no configured environments, and its repository-level Actions secrets list
+is empty. Disable the historical workflow in the Actions UI before merging this
+replacement; the owner actions above remain required.
 
-The existing public APKs (`Untidy v0.6.0-beta.8` and `Thumbscript/Still
-Scriptures v0.6.1`) were produced before this workflow and are signed with the
-previous debug certificate. The original private debug keystore is not present
-on this build host. The new per-app release keys therefore will **not** update
-those installations in place. For the first release signed by the new key,
-users must uninstall the old build before installing the new APK; this removes
-local app data. After that one-time migration, later releases signed with the
-same key install as upgrades and preserve data. Do not publish the first new-key
-APK until you accept that migration and have backed up any local data you need.
+## Local cleanup validation (2026-11-12)
 
-These are sideloadable GitHub releases, not Google Play releases. They are not
-Play App Signing keys and are not a substitute for Play Console publishing.
+Both worktrees started clean on their requested `security/release-guard-*`
+branches. `actionlint` was not installed. Equivalent targeted validation used
+duplicate-aware YAML 1.2 loading, Python jsonschema Draft 7 against
+SchemaStore's GitHub workflow schema,
+`bash -n` for every inline shell step, full-SHA action-reference checks and
+`git diff --check`. All passed. The schema was retrieved read-only from
+`SchemaStore/schemastore/src/schemas/json/github-workflow.json`; its SHA-256 was
+`10f7b2dba224b461c81bbd288b07c9c64712f0d0df58ff0856d09b2431612d8b`.
+The original workflows also passed this schema, so this check does not explain
+the server-side zero-job rejection.
+
+Targeted local fixtures executed the actual inline gates without credentials:
+Untidy's notice exits 1; Thumbscript accepts the exact reviewed version and
+rejects a version mismatch, unsafe tag, manual event, branch ref, duplicate
+version declaration and off-main commit. The actual certificate comparison
+accepts the expected fingerprint and rejects a wrong, multiple or missing
+signer. Static assertions confirm secret isolation, environment assignments,
+publish dependencies, full action pins and the contents-write boundary.
+
+No full Android build, end-to-end signing or GitHub service execution was
+performed. No credentials were printed, decoded or reconstructed. No pushes,
+tags, workflow dispatches, artifact uploads or release mutations were performed.
+GitHub protections and secret configuration require owner action; no workflow
+was dispatched, so local validation cannot certify GitHub Actions runtime
+behavior.
